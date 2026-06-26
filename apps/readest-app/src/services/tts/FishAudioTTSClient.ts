@@ -44,7 +44,6 @@ export class FishAudioTTSClient implements TTSClient {
   #speakingLang = '';
   #currentVoiceId = FISH_AUDIO_DEFAULT_VOICE_ID;
   #rate = 1.0;
-  #pitch = 1.0;
 
   #audioElement: HTMLAudioElement | null = null;
   #isPlaying = false;
@@ -274,8 +273,8 @@ export class FishAudioTTSClient implements TTSClient {
     this.#rate = rate;
   }
 
-  async setPitch(pitch: number) {
-    this.#pitch = pitch;
+  async setPitch(_pitch: number) {
+    // Fish Audio's s2.1 model does not expose a pitch control; ignored.
   }
 
   async setVoice(voice: string) {
