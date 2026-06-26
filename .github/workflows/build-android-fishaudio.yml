@@ -1,0 +1,87 @@
+name: Build Android (Fish Audio TTS)
+
+# Personal build of Readest with the Fish Audio "Claire" TTS voice.
+# Produces an installable, debug-signed universal APK (works on arm64 phones)
+# and uploads it as a workflow artifact. Triggered manually.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fishaudio-tts
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: initialize git submodules
+        run: git submodule update --init --recursive
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: setup node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: copy pdfjs-dist and simplecc-dist to public directory
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: create .env.local for Next.js
+        run: |
+          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> apps/readest-app/.env.local
+          echo "NEXT_PUBLIC_FISHAUDIO_API_KEY=${{ secrets.NEXT_PUBLIC_FISHAUDIO_API_KEY }}" >> apps/readest-app/.env.local
+
+      # Fail fast on type errors before the expensive Rust/Android toolchain runs.
+      - name: typecheck
+        run: pnpm --filter @readest/readest-app exec tsgo --noEmit
+
+      - name: setup Java
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+
+      - name: install NDK
+        run: sdkmanager "ndk;28.2.13676358"
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: apps/readest-app/src-tauri
+
+      - name: build debug APK
+        shell: bash
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        run: |
+          cd apps/readest-app
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init
+          pnpm tauri icon ../../data/icons/readest-book.png
+          git checkout .
+          pnpm tauri android build --apk --debug
+
+      - name: upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: readest-fishaudio-debug-apk
+          path: apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/**/debug/*.apk
+          if-no-files-found: error
