@@ -376,7 +376,11 @@ export class TTSController extends EventTarget {
       if (!ssml) break;
       ssmls.push(ssml);
     }
-    await Promise.all(ssmls.map((ssml) => this.preloadSSML(ssml, new AbortController().signal)));
+    // Tie preloads to the current speak session so navigating/stopping cancels
+    // in-flight preloads instead of leaving uncancellable requests running (and,
+    // for Fish, creating blob URLs) for a position the user already left.
+    const preloadSignal = this.#currentSpeakAbortController?.signal ?? new AbortController().signal;
+    await Promise.all(ssmls.map((ssml) => this.preloadSSML(ssml, preloadSignal)));
   }
 
   async #preprocessSSML(ssml?: string) {
@@ -422,7 +426,11 @@ export class TTSController extends EventTarget {
           if (this.#nossmlCnt < 10 && this.state === 'playing' && !oneTime) {
             resolve();
             if (await this.#initTTSForNextSection()) {
-              await this.forward();
+              // Speak the new section from its start. Previously this called
+              // forward() (tts.next()), which advances PAST the first sentence
+              // of the freshly-inited section — dropping the chapter's opening
+              // line. Mirrors #handleNavigationWithoutSSML.
+              await this.#speak(this.view.tts?.start());
             } else {
               await this.stop();
             }

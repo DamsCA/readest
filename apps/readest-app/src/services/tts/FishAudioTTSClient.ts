@@ -12,6 +12,8 @@ import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/
 // (s2.1-pro-free, $0.00 / M UTF-8 bytes — no API credit required).
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
 const FISH_AUDIO_MODEL = 's2.1-pro-free';
+// Max number of synthesized-sentence object URLs kept in memory (LRU-evicted).
+const FISH_AUDIO_CACHE_MAX = 24;
 
 // Default reading voice: "Claire" — soft / deep / intimate / breathy / gentle.
 // Chosen by the user as a warm, sensual, hypnotic French narration voice.
@@ -111,7 +113,17 @@ export class FishAudioTTSClient implements TTSClient {
     const buffer = await response.arrayBuffer();
     if (!buffer.byteLength) throw new Error('No audio data received.');
     const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/mpeg' }));
+    // Bound the cache and revoke evicted object URLs. Without this the map grew
+    // unbounded over a reading session, leaking every synthesized sentence's
+    // blob (a real memory leak on long books).
     this.#audioCache.set(cacheKey, url);
+    while (this.#audioCache.size > FISH_AUDIO_CACHE_MAX) {
+      const oldestKey = this.#audioCache.keys().next().value as string | undefined;
+      if (oldestKey === undefined) break;
+      const oldUrl = this.#audioCache.get(oldestKey);
+      this.#audioCache.delete(oldestKey);
+      if (oldUrl && oldUrl !== url) URL.revokeObjectURL(oldUrl);
+    }
     return url;
   }
 

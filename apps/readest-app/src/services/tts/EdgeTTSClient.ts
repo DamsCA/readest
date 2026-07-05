@@ -265,6 +265,13 @@ export class EdgeTTSClient implements TTSClient {
     if (!boundaries.length) return;
     let lastIndex = -1;
     const tick = () => {
+      // Bail if playback has stopped/moved on. Otherwise a RAF tick already
+      // queued when stopInternal() ran keeps re-arming and dispatches stale word
+      // highlights over the next sentence (highlight drift after stop/skip).
+      if (!this.#isPlaying || !audio.src) {
+        this.#wordTrackingRafId = null;
+        return;
+      }
       const index = findBoundaryIndexAtTime(boundaries, audio.currentTime);
       if (index !== lastIndex && index >= 0) {
         lastIndex = index;

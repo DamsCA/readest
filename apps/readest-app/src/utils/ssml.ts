@@ -27,11 +27,17 @@ export const parseSSMLLang = (ssml: string, primaryLang?: string): string => {
   let lang = 'en';
   const match = ssml.match(/xml:lang\s*=\s*"([^"]+)"/);
   if (match && match[1]) {
-    const parts = match[1].split('-');
-    lang =
-      parts.length > 1
-        ? `${parts[0]!.toLowerCase()}-${parts[1]!.toUpperCase()}`
-        : parts[0]!.toLowerCase();
+    // Normalize each subtag by its role instead of blindly uppercasing the
+    // second one: 2-letter = region (UPPER), 4-letter = script (Title), so
+    // `zh-Hant-TW` stays `zh-Hant-TW` instead of collapsing to an invalid
+    // `zh-HANT` that falls back to English.
+    const [primary, ...rest] = match[1].split('-');
+    lang = primary!.toLowerCase();
+    for (const sub of rest) {
+      if (sub.length === 2) lang += `-${sub.toUpperCase()}`;
+      else if (sub.length === 4) lang += `-${sub[0]!.toUpperCase()}${sub.slice(1).toLowerCase()}`;
+      else lang += `-${sub}`;
+    }
 
     lang = code6392to6391(lang) || lang;
     if (!isValidLang(lang)) {
@@ -184,8 +190,28 @@ export const filterSSMLWithLang = (
     }
 
     const combinedContent = langBlocks.map((block) => block.match).join('');
-    return `${speakOpenMatch[0]}${combinedContent}${speakCloseMatch[0]}`;
+    // The <mark> boundaries live outside the <lang> blocks, so rebuilding from
+    // the blocks alone dropped every mark — parseSSMLMarks then yields no marks
+    // and the controller SKIPS the chunk, silently swallowing the translated
+    // sentence. Re-inject a leading mark (reuse the first one from the source,
+    // or synthesize one) so the target-language text is attached to a mark and
+    // actually gets spoken.
+    const firstMark = ssml.match(/<mark\b[^>]*\/?>/i);
+    const markTag = firstMark ? firstMark[0] : '<mark name="0"/>';
+    return `${speakOpenMatch[0]}${markTag}${combinedContent}${speakCloseMatch[0]}`;
   }
 
-  return ssml;
+  // Reading a translation (target differs from the section's main language) but
+  // this chunk has no matching <lang> block — e.g. at a chapter boundary before
+  // the async translation is injected, or a paragraph the translator left as-is.
+  // Returning the unfiltered SSML here made TTS fall back to reading the SOURCE
+  // language, producing the source/translation mixing heard when changing
+  // chapters. Return an empty utterance instead so the chunk is skipped (the
+  // controller advances on empty marks) rather than read in the wrong language.
+  const emptyOpen = ssml.match(/<speak[^>]*>/i);
+  const emptyClose = ssml.match(/<\/speak>/i);
+  if (emptyOpen && emptyClose) {
+    return `${emptyOpen[0]}${emptyClose[0]}`;
+  }
+  return '';
 };

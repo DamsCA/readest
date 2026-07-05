@@ -614,7 +614,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
         }
       }
 
-      if (!ttsFromIndex) {
+      // Section index 0 is valid (first chapter); `!ttsFromIndex` wrongly
+      // treated it as "unset" and overwrote it with progress.index.
+      if (ttsFromIndex == null) {
         ttsFromIndex = progress.index;
       }
 
