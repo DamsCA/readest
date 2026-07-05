@@ -41,6 +41,10 @@ const getClaireServerUrl = () =>
 const getClaireR2Url = () =>
   (process.env['NEXT_PUBLIC_CLAIRE_R2_URL'] || '').replace(/\/+$/, '');
 
+// Shared secret sent to the Claire server so only this app can generate through
+// the public tunnel (a stranger with the URL is rejected).
+const getClaireToken = () => process.env['NEXT_PUBLIC_CLAIRE_TOKEN'] || '';
+
 // The PC's address can change (DHCP, or a fresh Cloudflare quick-tunnel URL on
 // each restart). Rather than bake a fixed address, the server publishes its
 // current URL to R2 at "server-url.txt"; the app discovers it there. Cached
@@ -228,12 +232,10 @@ export class FishAudioTTSClient implements TTSClient {
       // server-side "claire" voice folder. Returns WAV.
       const body = JSON.stringify({ text, reference_id: 'claire' });
       const url = `${serverUrl}/v1/tts`;
-      const opts: RequestInit = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal,
-      };
+      const token = getClaireToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const opts: RequestInit = { method: 'POST', headers, body, signal };
       response = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
       if (!response.ok) {
         const detail = await response.text().catch(() => '');
