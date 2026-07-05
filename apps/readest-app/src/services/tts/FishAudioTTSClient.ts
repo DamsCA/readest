@@ -163,6 +163,9 @@ export class FishAudioTTSClient implements TTSClient {
   // Small cache of synthesized audio object URLs keyed by `${voiceId}:${text}`,
   // populated by preload so playback can start without a round-trip.
   #audioCache = new Map<string, string>();
+  // In-flight requests keyed by cacheKey, so the same sentence is never
+  // generated twice concurrently (e.g. playback catching up to a preload).
+  #inFlight = new Map<string, { promise: Promise<string>; priority: 'high' | 'low' }>();
 
   constructor(controller?: TTSController, appService?: AppService | null) {
     this.controller = controller;
@@ -181,29 +184,59 @@ export class FishAudioTTSClient implements TTSClient {
     return `${voiceId}:${text}`;
   }
 
-  async #synthesize(voiceId: string, text: string, signal: AbortSignal): Promise<string> {
+  async #synthesize(
+    voiceId: string,
+    text: string,
+    signal: AbortSignal,
+    priority: 'high' | 'low' = 'high',
+  ): Promise<string> {
     const cacheKey = this.#cacheKey(voiceId, text);
     const cached = this.#audioCache.get(cacheKey);
     if (cached) return cached;
 
-    // 1) Persistent on-device cache: audio generated in a previous session.
-    //    This is the "PC off / offline" path — no server needed.
-    const persisted = await readPersistedAudio(voiceId, text);
-    if (persisted) {
-      return this.#storeInMemory(cacheKey, persisted.buffer, persisted.type);
+    // Coalesce concurrent requests for the same sentence so it is generated
+    // once. Exception: a high-priority (playback) request never waits on an
+    // in-flight low-priority (preload) one — it fires its own so it can jump
+    // the GPU queue; the stray preload copy just finishes and gets cached.
+    const inflight = this.#inFlight.get(cacheKey);
+    if (inflight && !(priority === 'high' && inflight.priority === 'low')) {
+      try {
+        return await inflight.promise;
+      } catch {
+        // Shared request failed/aborted — fall through and run our own.
+      }
     }
 
-    // 2) Generate (Claire server preferred, Fish Audio fallback), then persist
-    //    forever so it never has to be generated again.
-    const { buffer, type } = await this.#fetchAudio(voiceId, text, signal);
-    await writePersistedAudio(voiceId, text, buffer, type);
-    return this.#storeInMemory(cacheKey, buffer, type);
+    const task = (async () => {
+      // 1) Persistent on-device cache: audio generated in a previous session.
+      //    This is the "PC off / offline" path — no server needed.
+      const persisted = await readPersistedAudio(voiceId, text);
+      if (persisted) {
+        return this.#storeInMemory(cacheKey, persisted.buffer, persisted.type);
+      }
+
+      // 2) Generate (Claire server preferred, Fish Audio fallback), then persist
+      //    forever so it never has to be generated again.
+      const { buffer, type } = await this.#fetchAudio(voiceId, text, signal, priority);
+      await writePersistedAudio(voiceId, text, buffer, type);
+      return this.#storeInMemory(cacheKey, buffer, type);
+    })();
+
+    const entry = { promise: task, priority };
+    this.#inFlight.set(cacheKey, entry);
+    try {
+      return await task;
+    } finally {
+      // Only clear if still ours (a later high-priority call may have replaced it).
+      if (this.#inFlight.get(cacheKey) === entry) this.#inFlight.delete(cacheKey);
+    }
   }
 
   async #fetchAudio(
     voiceId: string,
     text: string,
     signal: AbortSignal,
+    priority: 'high' | 'low' = 'high',
   ): Promise<{ buffer: ArrayBuffer; type: string }> {
     let response: Response;
     const isTauri = isTauriAppPlatform();
@@ -237,6 +270,9 @@ export class FishAudioTTSClient implements TTSClient {
       const token = getClaireToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
+      // Playback ('high') preempts preload ('low') on the server's GPU queue so
+      // the sentence being listened to never waits behind prefetched ones.
+      headers['X-Claire-Priority'] = priority;
       const opts: RequestInit = { method: 'POST', headers, body, signal };
       try {
         response = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
@@ -325,7 +361,7 @@ export class FishAudioTTSClient implements TTSClient {
         const mark = marks[i]!;
         const voiceId = this.getVoiceIdFromLang(mark.language);
         try {
-          await this.#synthesize(voiceId, mark.text, signal);
+          await this.#synthesize(voiceId, mark.text, signal, 'low');
         } catch (err) {
           console.warn('Fish Audio preload failed for mark', i, err);
         }
@@ -349,7 +385,7 @@ export class FishAudioTTSClient implements TTSClient {
         const voiceId = this.getVoiceIdFromLang(mark.language);
         this.#currentVoiceId = voiceId;
         this.#speakingLang = mark.language;
-        const audioUrl = await this.#synthesize(voiceId, mark.text, signal);
+        const audioUrl = await this.#synthesize(voiceId, mark.text, signal, 'high');
         if (signal.aborted) {
           yield { code: 'error', message: 'Aborted' } as TTSMessageEvent;
           break;
