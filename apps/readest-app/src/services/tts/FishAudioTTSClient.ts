@@ -378,8 +378,26 @@ export class FishAudioTTSClient implements TTSClient {
     audio.setAttribute('x-webkit-airplay', 'deny');
     audio.preload = 'auto';
 
-    for (const mark of marks) {
+    // Pipeline synthesis within the paragraph: keep the next couple of sentences
+    // generating while the current one plays, so there's no stall on each new
+    // sentence. #synthesize dedups + caches, so awaiting an already-prefetched
+    // mark is an instant cache hit. These are 'high' (imminent playback), so
+    // they preempt the low-priority preload of later paragraphs on the GPU.
+    const LOOKAHEAD = 2;
+    const prefetchMark = (i: number) => {
+      if (i < 0 || i >= marks.length) return;
+      const m = marks[i]!;
+      void this.#synthesize(this.getVoiceIdFromLang(m.language), m.text, signal, 'high').catch(
+        () => {},
+      );
+    };
+    for (let i = 0; i < LOOKAHEAD; i++) prefetchMark(i);
+
+    for (let markIdx = 0; markIdx < marks.length; markIdx++) {
+      const mark = marks[markIdx]!;
       this.controller?.dispatchSpeakMark(mark);
+      // Keep the pipeline full: start generating the sentence LOOKAHEAD ahead.
+      prefetchMark(markIdx + LOOKAHEAD);
       let abortHandler: null | (() => void) = null;
       try {
         const voiceId = this.getVoiceIdFromLang(mark.language);
