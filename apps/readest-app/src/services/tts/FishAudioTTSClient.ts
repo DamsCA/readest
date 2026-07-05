@@ -34,6 +34,13 @@ const getApiKey = () => process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'] || '';
 const getClaireServerUrl = () =>
   (process.env['NEXT_PUBLIC_CLAIRE_SERVER_URL'] || '').replace(/\/+$/, '');
 
+// Public read-only URL of the Cloudflare R2 bucket where the Claire server
+// banks every generated MP3 (e.g. "https://pub-xxxx.r2.dev"). Checked first:
+// if a sentence was ever generated (on any device, by anyone), its audio is
+// here — playable with the PC off, offline-friendly, cross-device.
+const getClaireR2Url = () =>
+  (process.env['NEXT_PUBLIC_CLAIRE_R2_URL'] || '').replace(/\/+$/, '');
+
 // Persistent, cross-session audio cache ("generate once, keep forever"): a
 // sentence synthesized while the PC is on is stored on-device via the Cache
 // API, so re-reading it later plays instantly and works fully offline / with
@@ -156,6 +163,25 @@ export class FishAudioTTSClient implements TTSClient {
     let response: Response;
     const isTauri = isTauriAppPlatform();
     const tauriFetch = isTauri ? (await import('@tauri-apps/plugin-http')).fetch : null;
+
+    // 0) Cloud (R2) first: if this exact sentence was ever generated, its MP3
+    //    is already banked in R2 — play it with the PC off / offline. The key
+    //    matches the Claire server's r2_key(text): "audio/<djb2>-<len>.mp3".
+    const r2Url = getClaireR2Url();
+    if (r2Url) {
+      try {
+        const url = `${r2Url}/audio/${hashText(text)}.mp3`;
+        const r2resp = tauriFetch
+          ? await tauriFetch(url, { method: 'GET', signal })
+          : await fetch(url, { method: 'GET', signal });
+        if (r2resp.ok) {
+          const buffer = await r2resp.arrayBuffer();
+          if (buffer.byteLength) return { buffer, type: 'audio/mpeg' };
+        }
+      } catch {
+        // R2 miss/unreachable (or just-generated, not yet propagated) → generate.
+      }
+    }
 
     if (serverUrl) {
       // Self-hosted Claire server (user's GPU). Reference id is fixed to the
