@@ -173,6 +173,7 @@ export default function AuthPage() {
   };
 
   const handleOAuthUrl = async (url: string) => {
+    alert(`DEBUG CALLBACK reçu:\n${url.slice(0, 140)}`);
     console.log('Handle OAuth URL:', url);
     const hashMatch = url.match(/#(.*)/);
     if (hashMatch) {
@@ -181,14 +182,41 @@ export default function AuthPage() {
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
       const type = params.get('type');
+      alert(`DEBUG fragment #: access_token=${accessToken ? 'PRÉSENT' : 'ABSENT'}`);
       if (accessToken) {
         let next = params.get('next') ?? '/';
         if (getUserProfilePlan(accessToken) === 'free') {
           next = '/user';
         }
         handleAuthCallback({ accessToken, refreshToken, type, next, login, navigate: router.push });
+        return;
       }
     }
+    // PKCE fallback: modern Supabase returns ?code=... in the query instead of
+    // tokens in the # fragment. Exchange it for a session.
+    const codeMatch = url.match(/[?&]code=([^&]+)/);
+    if (codeMatch && supabase) {
+      alert('DEBUG: format ?code= (PKCE) détecté, échange en cours...');
+      const { data, error } = await supabase.auth.exchangeCodeForSession(decodeURIComponent(codeMatch[1]!));
+      if (error) {
+        alert(`DEBUG exchangeCodeForSession ERROR:\n${error.message}`);
+        return;
+      }
+      const session = data?.session;
+      if (session?.access_token) {
+        alert('DEBUG PKCE OK, connexion...');
+        handleAuthCallback({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          type: 'oauth',
+          next: '/',
+          login,
+          navigate: router.push,
+        });
+        return;
+      }
+    }
+    alert('DEBUG: callback reçu mais NI token NI code exploitables');
   };
 
   const startTauriOAuth = async () => {
