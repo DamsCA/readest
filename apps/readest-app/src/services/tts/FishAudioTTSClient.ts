@@ -41,6 +41,45 @@ const getClaireServerUrl = () =>
 const getClaireR2Url = () =>
   (process.env['NEXT_PUBLIC_CLAIRE_R2_URL'] || '').replace(/\/+$/, '');
 
+// The PC's address can change (DHCP, or a fresh Cloudflare quick-tunnel URL on
+// each restart). Rather than bake a fixed address, the server publishes its
+// current URL to R2 at "server-url.txt"; the app discovers it there. Cached
+// briefly so we don't refetch on every sentence.
+let _discoveredServerUrl = '';
+let _discoveredServerAt = 0;
+const SERVER_URL_TTL_MS = 5 * 60 * 1000;
+
+const resolveClaireServerUrl = async (
+  tauriFetch: typeof fetch | null,
+  signal?: AbortSignal,
+): Promise<string> => {
+  const baked = getClaireServerUrl();
+  if (baked) return baked;
+  const r2 = getClaireR2Url();
+  if (!r2) return '';
+  const now = Date.now();
+  if (_discoveredServerUrl && now - _discoveredServerAt < SERVER_URL_TTL_MS) {
+    return _discoveredServerUrl;
+  }
+  try {
+    const url = `${r2}/server-url.txt`;
+    const resp = tauriFetch
+      ? await tauriFetch(url, { method: 'GET', signal })
+      : await fetch(url, { method: 'GET', signal });
+    if (resp.ok) {
+      const discovered = (await resp.text()).trim().replace(/\/+$/, '');
+      if (/^https?:\/\//.test(discovered)) {
+        _discoveredServerUrl = discovered;
+        _discoveredServerAt = now;
+        return discovered;
+      }
+    }
+  } catch {
+    // Discovery failed — fall back to whatever we last knew (may be empty).
+  }
+  return _discoveredServerUrl;
+};
+
 // Persistent, cross-session audio cache ("generate once, keep forever"): a
 // sentence synthesized while the PC is on is stored on-device via the Cache
 // API, so re-reading it later plays instantly and works fully offline / with
@@ -127,7 +166,8 @@ export class FishAudioTTSClient implements TTSClient {
   async init() {
     // Available when the self-hosted Claire server is configured, when a Fish
     // key is baked into the build (Tauri), or on the web platform (proxy route).
-    this.initialized = !!getClaireServerUrl() || !!getApiKey() || isWebAppPlatform();
+    this.initialized =
+      !!getClaireR2Url() || !!getClaireServerUrl() || !!getApiKey() || isWebAppPlatform();
     return this.initialized;
   }
 
@@ -159,10 +199,10 @@ export class FishAudioTTSClient implements TTSClient {
     text: string,
     signal: AbortSignal,
   ): Promise<{ buffer: ArrayBuffer; type: string }> {
-    const serverUrl = getClaireServerUrl();
     let response: Response;
     const isTauri = isTauriAppPlatform();
     const tauriFetch = isTauri ? (await import('@tauri-apps/plugin-http')).fetch : null;
+    const serverUrl = await resolveClaireServerUrl(tauriFetch, signal);
 
     // 0) Cloud (R2) first: if this exact sentence was ever generated, its MP3
     //    is already banked in R2 — play it with the PC off / offline. The key
