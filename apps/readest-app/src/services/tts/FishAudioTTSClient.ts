@@ -28,6 +28,63 @@ const FISH_AUDIO_DEFAULT_VOICE_ID = FISH_AUDIO_VOICES[0]!.id;
 
 const getApiKey = () => process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'] || '';
 
+// URL of the self-hosted Claire server running on the user's own GPU (WSL2),
+// e.g. "http://192.168.0.130:8880". When set, it is the primary (free) engine;
+// Fish Audio is only used as a fallback while its free tier lasts.
+const getClaireServerUrl = () =>
+  (process.env['NEXT_PUBLIC_CLAIRE_SERVER_URL'] || '').replace(/\/+$/, '');
+
+// Persistent, cross-session audio cache ("generate once, keep forever"): a
+// sentence synthesized while the PC is on is stored on-device via the Cache
+// API, so re-reading it later plays instantly and works fully offline / with
+// the PC off. Only brand-new, never-read text needs the server.
+const PERSIST_CACHE_NAME = 'claire-tts-audio-v1';
+
+const hashText = (s: string): string => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  // Include length to further reduce the already-tiny collision chance.
+  return `${h.toString(16)}-${s.length.toString(16)}`;
+};
+
+const persistRequest = (voiceId: string, text: string) =>
+  new Request(`https://claire-tts.local/${encodeURIComponent(voiceId)}/${hashText(text)}`);
+
+const readPersistedAudio = async (
+  voiceId: string,
+  text: string,
+): Promise<{ buffer: ArrayBuffer; type: string } | null> => {
+  if (typeof caches === 'undefined') return null;
+  try {
+    const cache = await caches.open(PERSIST_CACHE_NAME);
+    const res = await cache.match(persistRequest(voiceId, text));
+    if (!res) return null;
+    const buffer = await res.arrayBuffer();
+    if (!buffer.byteLength) return null;
+    return { buffer, type: res.headers.get('Content-Type') || 'audio/mpeg' };
+  } catch {
+    return null;
+  }
+};
+
+const writePersistedAudio = async (
+  voiceId: string,
+  text: string,
+  buffer: ArrayBuffer,
+  type: string,
+): Promise<void> => {
+  if (typeof caches === 'undefined') return;
+  try {
+    const cache = await caches.open(PERSIST_CACHE_NAME);
+    await cache.put(
+      persistRequest(voiceId, text),
+      new Response(buffer, { headers: { 'Content-Type': type } }),
+    );
+  } catch {
+    // Storage unavailable/full — degrade to in-memory only, don't break playback.
+  }
+};
+
 // Fish Audio's REST API does not send CORS headers, so a direct browser fetch
 // is blocked. We therefore use two transports:
 //  - Tauri (desktop/Android): the native HTTP plugin, which is not subject to
@@ -61,9 +118,9 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   async init() {
-    // Available when a key is baked into the build (Tauri) or when running on
-    // the web platform, where the proxy route holds the key server-side.
-    this.initialized = !!getApiKey() || isWebAppPlatform();
+    // Available when the self-hosted Claire server is configured, when a Fish
+    // key is baked into the build (Tauri), or on the web platform (proxy route).
+    this.initialized = !!getClaireServerUrl() || !!getApiKey() || isWebAppPlatform();
     return this.initialized;
   }
 
@@ -76,16 +133,55 @@ export class FishAudioTTSClient implements TTSClient {
     const cached = this.#audioCache.get(cacheKey);
     if (cached) return cached;
 
-    const payload = JSON.stringify({
-      text,
-      reference_id: voiceId,
-      format: 'mp3',
-      mp3_bitrate: 128,
-    });
+    // 1) Persistent on-device cache: audio generated in a previous session.
+    //    This is the "PC off / offline" path — no server needed.
+    const persisted = await readPersistedAudio(voiceId, text);
+    if (persisted) {
+      return this.#storeInMemory(cacheKey, persisted.buffer, persisted.type);
+    }
 
+    // 2) Generate (Claire server preferred, Fish Audio fallback), then persist
+    //    forever so it never has to be generated again.
+    const { buffer, type } = await this.#fetchAudio(voiceId, text, signal);
+    await writePersistedAudio(voiceId, text, buffer, type);
+    return this.#storeInMemory(cacheKey, buffer, type);
+  }
+
+  async #fetchAudio(
+    voiceId: string,
+    text: string,
+    signal: AbortSignal,
+  ): Promise<{ buffer: ArrayBuffer; type: string }> {
+    const serverUrl = getClaireServerUrl();
     let response: Response;
-    if (isTauriAppPlatform()) {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+    const isTauri = isTauriAppPlatform();
+    const tauriFetch = isTauri ? (await import('@tauri-apps/plugin-http')).fetch : null;
+
+    if (serverUrl) {
+      // Self-hosted Claire server (user's GPU). Reference id is fixed to the
+      // server-side "claire" voice folder. Returns WAV.
+      const body = JSON.stringify({ text, reference_id: 'claire' });
+      const url = `${serverUrl}/v1/tts`;
+      const opts: RequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal,
+      };
+      response = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(`Claire server failed (${response.status}): ${detail.slice(0, 200)}`);
+      }
+      const buffer = await response.arrayBuffer();
+      if (!buffer.byteLength) throw new Error('No audio data received.');
+      return { buffer, type: 'audio/wav' };
+    }
+
+    // Fish Audio fallback (free tier). Tauri calls the API directly via the
+    // native HTTP plugin; web goes through the key-hiding proxy route.
+    const payload = JSON.stringify({ text, reference_id: voiceId, format: 'mp3', mp3_bitrate: 128 });
+    if (tauriFetch) {
       response = await tauriFetch(FISH_AUDIO_TTS_URL, {
         method: 'POST',
         headers: {
@@ -104,18 +200,19 @@ export class FishAudioTTSClient implements TTSClient {
         signal,
       });
     }
-
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       throw new Error(`Fish Audio TTS failed (${response.status}): ${detail.slice(0, 200)}`);
     }
-
     const buffer = await response.arrayBuffer();
     if (!buffer.byteLength) throw new Error('No audio data received.');
-    const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/mpeg' }));
-    // Bound the cache and revoke evicted object URLs. Without this the map grew
-    // unbounded over a reading session, leaking every synthesized sentence's
-    // blob (a real memory leak on long books).
+    return { buffer, type: 'audio/mpeg' };
+  }
+
+  #storeInMemory(cacheKey: string, buffer: ArrayBuffer, type: string): string {
+    const url = URL.createObjectURL(new Blob([buffer], { type }));
+    // Bound the in-memory map and revoke evicted object URLs (the durable copy
+    // lives in the persistent cache, so eviction here loses nothing).
     this.#audioCache.set(cacheKey, url);
     while (this.#audioCache.size > FISH_AUDIO_CACHE_MAX) {
       const oldestKey = this.#audioCache.keys().next().value as string | undefined;
