@@ -351,7 +351,10 @@ export class TTSController extends EventTarget {
     for await (const _ of iter);
   }
 
-  async preloadNextSSML(count: number = 4) {
+  // Look further ahead so idle moments (the reader pausing to think, a long
+  // sentence playing) are spent banking upcoming audio to R2. On a modest GPU
+  // generation is ~real-time, so a deeper queue is what smooths first-time reads.
+  async preloadNextSSML(count: number = 6) {
     const tts = this.view.tts;
     if (!tts) return;
 

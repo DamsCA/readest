@@ -51,7 +51,9 @@ const getClaireToken = () => process.env['NEXT_PUBLIC_CLAIRE_TOKEN'] || '';
 // briefly so we don't refetch on every sentence.
 let _discoveredServerUrl = '';
 let _discoveredServerAt = 0;
-const SERVER_URL_TTL_MS = 5 * 60 * 1000;
+// Short TTL so a fresh tunnel URL (the server publishes a new one to R2 each
+// time it restarts) is picked up quickly instead of failing for minutes.
+const SERVER_URL_TTL_MS = 60 * 1000;
 
 const resolveClaireServerUrl = async (
   tauriFetch: typeof fetch | null,
@@ -236,8 +238,22 @@ export class FishAudioTTSClient implements TTSClient {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const opts: RequestInit = { method: 'POST', headers, body, signal };
-      response = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
+      try {
+        response = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
+      } catch (err) {
+        // Network error usually means the tunnel URL is stale (server restarted
+        // → new URL published to R2). Drop the cache so the next call re-resolves
+        // it immediately instead of waiting out the TTL.
+        _discoveredServerUrl = '';
+        _discoveredServerAt = 0;
+        throw err;
+      }
       if (!response.ok) {
+        // 502/503/504 from Cloudflare = the tunnel points at a dead server.
+        if (response.status >= 502 && response.status <= 504) {
+          _discoveredServerUrl = '';
+          _discoveredServerAt = 0;
+        }
         const detail = await response.text().catch(() => '');
         throw new Error(`Claire server failed (${response.status}): ${detail.slice(0, 200)}`);
       }
