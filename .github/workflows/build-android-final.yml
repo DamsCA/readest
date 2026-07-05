@@ -1,0 +1,124 @@
+name: Build Android (Claire — release + auto-update)
+
+# Final personal build: signed release arm64 APK configured for the user's
+# self-hosted Claire server (discovered via R2) + Cloudflare R2 cloud cache.
+# No Fish Audio key is embedded, so the APK is safe to publish publicly, which
+# lets the Tauri auto-updater fetch updates. Publishes the APK + latest.json to
+# a GitHub Release so "install once, update forever" works.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claire-release
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: initialize git submodules
+        run: git submodule update --init --recursive
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: setup node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: copy pdfjs-dist and simplecc-dist to public directory
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: create .env.local (Claire config, NO Fish key)
+        run: |
+          f=apps/readest-app/.env.local
+          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> $f
+          echo "NEXT_PUBLIC_CLAIRE_R2_URL=${{ vars.CLAIRE_R2_URL }}" >> $f
+          echo "NEXT_PUBLIC_CLAIRE_TOKEN=${{ vars.CLAIRE_TOKEN }}" >> $f
+
+      - name: typecheck
+        run: pnpm --filter @readest/readest-app exec tsgo --noEmit
+
+      - name: setup Java
+        uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+
+      - name: install NDK
+        run: sdkmanager "ndk;28.2.13676358"
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: apps/readest-app/src-tauri
+
+      - name: build + sign release arm64 APK, publish latest.json
+        shell: bash
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          set -euo pipefail
+          cd apps/readest-app
+          version="$(node -p "require('./package.json').version")-claire.${{ github.run_number }}"
+
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init
+          pnpm tauri icon ../../data/icons/readest-book.png
+          git checkout .
+
+          # Android app-signing keystore (stable → updates accepted)
+          pushd src-tauri/gen/android
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
+          echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
+          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > "$RUNNER_TEMP/keystore.jks"
+          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
+          popd
+
+          pnpm tauri android build --apk -t aarch64
+
+          apk_src="src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
+          apk_name="Readest-Claire_${version}_arm64.apk"
+          cp "$apk_src" "$apk_name"
+
+          # updater signature (.sig) for the APK
+          pnpm tauri signer sign "$apk_name"
+          sig="$(cat "${apk_name}.sig")"
+
+          url="https://github.com/${{ github.repository }}/releases/download/claire-v${version}/${apk_name}"
+          cat > latest.json <<JSON
+          {
+            "version": "${version}",
+            "notes": "Mise à jour Claire",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "android-arm64": { "signature": "${sig}", "url": "${url}" }
+            }
+          }
+          JSON
+
+          gh release create "claire-v${version}" "$apk_name" "latest.json" \
+            --repo "${{ github.repository }}" \
+            --title "Readest Claire ${version}" \
+            --notes "Build Claire (voix locale + cloud R2). Installe une fois, mises à jour auto ensuite." \
+            --latest
