@@ -128,36 +128,47 @@ export default function AuthPage() {
   };
 
   const tauriSignIn = async (provider: OAuthProvider) => {
-    if (!supabase) {
-      throw new Error('No backend connected');
-    }
-    supabase.auth.signOut();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        skipBrowserRedirect: true,
-        redirectTo: getTauriRedirectTo(true),
-      },
-    });
+    try {
+      // TEMP DIAGNOSTIC: surface exactly where Google sign-in fails on-device.
+      alert(
+        `DEBUG 1\nbackend: ${supabase ? 'OK' : 'ABSENT'}\n` +
+          `isAndroidApp: ${appService?.isAndroidApp}\n` +
+          `isMobileApp: ${appService?.isMobileApp}\n` +
+          `redirectTo: ${getTauriRedirectTo(true)}`,
+      );
+      if (!supabase) {
+        alert('DEBUG: backend ABSENT (config Supabase non embarquée)');
+        return;
+      }
+      supabase.auth.signOut();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          skipBrowserRedirect: true,
+          redirectTo: getTauriRedirectTo(true),
+        },
+      });
 
-    if (error) {
-      console.error('Authentication error:', error);
-      return;
-    }
-    // Open the OAuth URL in a ASWebAuthenticationSession on iOS to comply with Apple's guidelines
-    // for other platforms, open the OAuth URL in the default browser
-    if (appService?.isIOSApp || appService?.isMacOSApp) {
-      const res = await authWithSafari({ authUrl: data.url });
-      if (res) {
-        handleOAuthUrl(res.redirectUrl);
+      if (error) {
+        alert(`DEBUG 2 signInWithOAuth ERROR:\n${error.message}`);
+        return;
       }
-    } else if (appService?.isAndroidApp) {
-      const res = await authWithCustomTab({ authUrl: data.url });
-      if (res) {
-        handleOAuthUrl(res.redirectUrl);
+      alert(`DEBUG 2 url: ${data?.url ? data.url.slice(0, 90) : 'AUCUNE URL'}`);
+
+      if (appService?.isIOSApp || appService?.isMacOSApp) {
+        const res = await authWithSafari({ authUrl: data.url });
+        if (res) handleOAuthUrl(res.redirectUrl);
+      } else if (appService?.isAndroidApp) {
+        alert('DEBUG 3 ouverture Custom Tab...');
+        const res = await authWithCustomTab({ authUrl: data.url });
+        alert(`DEBUG 3 retour: ${res?.redirectUrl ? res.redirectUrl.slice(0, 90) : 'AUCUN'}`);
+        if (res) handleOAuthUrl(res.redirectUrl);
+      } else {
+        await openUrl(data.url);
       }
-    } else {
-      await openUrl(data.url);
+    } catch (e) {
+      alert(`DEBUG EXCEPTION:\n${e instanceof Error ? e.message : String(e)}`);
+      console.error('login exception', e);
     }
   };
 
