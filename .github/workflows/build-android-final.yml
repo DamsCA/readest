@@ -95,6 +95,13 @@ jobs:
           echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
           popd
 
+          # Disable R8/ProGuard minification for the release build: it strips the
+          # native-bridge plugin's OAuth (auth_with_custom_tab) since there are no
+          # keep rules, which silently broke Google sign-in (worked in debug, not
+          # release). Matches the working debug behaviour.
+          sed -i 's/isMinifyEnabled = true/isMinifyEnabled = false/' \
+            src-tauri/gen/android/app/build.gradle.kts
+
           pnpm tauri android build --apk -t aarch64
 
           apk_src="src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
