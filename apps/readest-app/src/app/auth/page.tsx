@@ -128,52 +128,34 @@ export default function AuthPage() {
   };
 
   const tauriSignIn = async (provider: OAuthProvider) => {
-    try {
-      // TEMP DIAGNOSTIC: surface exactly where Google sign-in fails on-device.
-      alert(
-        `DEBUG 1\nbackend: ${supabase ? 'OK' : 'ABSENT'}\n` +
-          `isAndroidApp: ${appService?.isAndroidApp}\n` +
-          `isMobileApp: ${appService?.isMobileApp}\n` +
-          `redirectTo: ${getTauriRedirectTo(true)}`,
-      );
-      if (!supabase) {
-        alert('DEBUG: backend ABSENT (config Supabase non embarquée)');
-        return;
-      }
-      supabase.auth.signOut();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          skipBrowserRedirect: true,
-          redirectTo: getTauriRedirectTo(true),
-        },
-      });
+    if (!supabase) {
+      throw new Error('No backend connected');
+    }
+    supabase.auth.signOut();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        skipBrowserRedirect: true,
+        redirectTo: getTauriRedirectTo(true),
+      },
+    });
 
-      if (error) {
-        alert(`DEBUG 2 signInWithOAuth ERROR:\n${error.message}`);
-        return;
-      }
-      alert(`DEBUG 2 url: ${data?.url ? data.url.slice(0, 90) : 'AUCUNE URL'}`);
-
-      if (appService?.isIOSApp || appService?.isMacOSApp) {
-        const res = await authWithSafari({ authUrl: data.url });
-        if (res) handleOAuthUrl(res.redirectUrl);
-      } else if (appService?.isAndroidApp) {
-        alert('DEBUG 3 ouverture Custom Tab...');
-        const res = await authWithCustomTab({ authUrl: data.url });
-        alert(`DEBUG 3 retour: ${res?.redirectUrl ? res.redirectUrl.slice(0, 90) : 'AUCUN'}`);
-        if (res) handleOAuthUrl(res.redirectUrl);
-      } else {
-        await openUrl(data.url);
-      }
-    } catch (e) {
-      alert(`DEBUG EXCEPTION:\n${e instanceof Error ? e.message : String(e)}`);
-      console.error('login exception', e);
+    if (error) {
+      console.error('Authentication error:', error);
+      return;
+    }
+    if (appService?.isIOSApp || appService?.isMacOSApp) {
+      const res = await authWithSafari({ authUrl: data.url });
+      if (res) handleOAuthUrl(res.redirectUrl);
+    } else if (appService?.isAndroidApp) {
+      const res = await authWithCustomTab({ authUrl: data.url });
+      if (res) handleOAuthUrl(res.redirectUrl);
+    } else {
+      await openUrl(data.url);
     }
   };
 
   const handleOAuthUrl = async (url: string) => {
-    alert(`DEBUG CALLBACK reçu:\n${url.slice(0, 140)}`);
     console.log('Handle OAuth URL:', url);
     const hashMatch = url.match(/#(.*)/);
     if (hashMatch) {
@@ -182,7 +164,6 @@ export default function AuthPage() {
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
       const type = params.get('type');
-      alert(`DEBUG fragment #: access_token=${accessToken ? 'PRÉSENT' : 'ABSENT'}`);
       if (accessToken) {
         let next = params.get('next') ?? '/';
         if (getUserProfilePlan(accessToken) === 'free') {
@@ -192,19 +173,20 @@ export default function AuthPage() {
         return;
       }
     }
-    // PKCE fallback: modern Supabase returns ?code=... in the query instead of
-    // tokens in the # fragment. Exchange it for a session.
+    // PKCE: modern Supabase returns ?code=... in the query instead of tokens in
+    // the # fragment. Exchange it for a session (this is what fixed Google
+    // sign-in returning to a blank login screen).
     const codeMatch = url.match(/[?&]code=([^&]+)/);
     if (codeMatch && supabase) {
-      alert('DEBUG: format ?code= (PKCE) détecté, échange en cours...');
-      const { data, error } = await supabase.auth.exchangeCodeForSession(decodeURIComponent(codeMatch[1]!));
+      const { data, error } = await supabase.auth.exchangeCodeForSession(
+        decodeURIComponent(codeMatch[1]!),
+      );
       if (error) {
-        alert(`DEBUG exchangeCodeForSession ERROR:\n${error.message}`);
+        console.error('exchangeCodeForSession error', error);
         return;
       }
       const session = data?.session;
       if (session?.access_token) {
-        alert('DEBUG PKCE OK, connexion...');
         handleAuthCallback({
           accessToken: session.access_token,
           refreshToken: session.refresh_token,
@@ -213,10 +195,8 @@ export default function AuthPage() {
           login,
           navigate: router.push,
         });
-        return;
       }
     }
-    alert('DEBUG: callback reçu mais NI token NI code exploitables');
   };
 
   const startTauriOAuth = async () => {
