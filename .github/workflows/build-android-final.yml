@@ -45,6 +45,9 @@ jobs:
           echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> $f
           echo "NEXT_PUBLIC_CLAIRE_R2_URL=${{ vars.CLAIRE_R2_URL }}" >> $f
           echo "NEXT_PUBLIC_CLAIRE_TOKEN=${{ vars.CLAIRE_TOKEN }}" >> $f
+          # Point the in-app updater at this fork's GitHub Releases (latest.json
+          # + APK are published there) instead of the official Readest server.
+          echo "NEXT_PUBLIC_UPDATER_BASE_URL=https://github.com/${{ github.repository }}/releases/latest/download" >> $f
 
       - name: typecheck
         run: pnpm --filter @readest/readest-app exec tsgo --noEmit
@@ -86,6 +89,13 @@ jobs:
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
           git checkout .
+
+          # Stamp the real version into package.json AFTER the reset above, so the
+          # bundled app (getAppVersion) and the APK both report "0.11.12-claire.N".
+          # This makes the in-app updater's semver compare work: the next build
+          # (claire.N+1) is strictly greater, so it's detected and offered.
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${version}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          echo "Stamped app version: ${version}"
 
           # Android app-signing keystore (stable → updates accepted)
           pushd src-tauri/gen/android

@@ -815,7 +815,10 @@ export const SHARE_TOKEN_LENGTH = 22;
 export const SHARE_PRESIGN_TTL_SECONDS = 300;
 export const SHARE_CFI_MAX_LENGTH = 512;
 
-const LATEST_DOWNLOAD_BASE_URL = 'https://download.readest.com/releases';
+// Overridable so a personal fork can point the in-app updater at its own
+// release host (e.g. GitHub Releases) instead of the official download server.
+const LATEST_DOWNLOAD_BASE_URL =
+  process.env['NEXT_PUBLIC_UPDATER_BASE_URL'] || 'https://download.readest.com/releases';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
