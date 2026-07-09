@@ -13,10 +13,10 @@ import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
 const FISH_AUDIO_MODEL = 's2.1-pro-free';
 // Max number of synthesized-sentence object URLs kept in memory (LRU-evicted).
-// Must exceed peak concurrency so the sentence being played can't be evicted:
-// the paragraph pipeline (current + LOOKAHEAD) plus up to two overlapping
-// preloadNextSSML batches (6 paragraphs x 2 marks) plus recently-played history.
-const FISH_AUDIO_CACHE_MAX = 48;
+// Must exceed peak concurrency so the sentence being played can't be evicted,
+// and hold enough banked-ahead audio to ride out gaps: the paragraph pipeline
+// plus the deep preload (up to ~8 paragraphs x 4 marks) plus played history.
+const FISH_AUDIO_CACHE_MAX = 64;
 
 // Default reading voice: "Claire" — soft / deep / intimate / breathy / gentle.
 // Chosen by the user as a warm, sensual, hypnotic French narration voice.
@@ -372,7 +372,10 @@ export class FishAudioTTSClient implements TTSClient {
     const { marks } = parseSSMLMarks(ssml, this.#primaryLang);
 
     if (preload) {
-      const maxImmediate = 2;
+      // Bank several sentences per upcoming paragraph (not just the first two)
+      // so a deep buffer builds ahead of the playhead — low priority, so it only
+      // fills the GPU's idle time and never delays the sentence being heard.
+      const maxImmediate = 4;
       for (let i = 0; i < Math.min(maxImmediate, marks.length); i++) {
         if (signal.aborted) break;
         const mark = marks[i]!;

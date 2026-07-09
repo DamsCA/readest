@@ -49,6 +49,12 @@ const TTS_NATIVE_SPEAK_MAX_CONSECUTIVE_ERRORS = 5;
 // book. After this many skips in a row we stop so the user isn't stranded in
 // silence far from where they were.
 const TTS_MAX_CONSECUTIVE_EMPTY_SKIPS = 30;
+// In translation mode, wait-and-retry the current paragraph this many times
+// (a paragraph filters to empty until its async translation is injected) before
+// giving up and advancing. Stops a new book from skipping its opening lines
+// while the translator catches up.
+const TTS_MAX_EMPTY_RETRIES = 3;
+const TTS_EMPTY_RETRY_DELAY_MS = 600;
 
 type TTSState =
   | 'stopped'
@@ -74,6 +80,7 @@ export class TTSController extends EventTarget {
   // wholly-unusable engine stops instead of racing to the book end. See #4613.
   #consecutiveSpeakErrors: number = 0;
   #consecutiveEmptySkips: number = 0;
+  #emptyRetries: number = 0;
   #currentSpeakAbortController: AbortController | null = null;
   #currentSpeakPromise: Promise<void> | null = null;
 
@@ -375,10 +382,11 @@ export class TTSController extends EventTarget {
     for await (const _ of iter);
   }
 
-  // Look further ahead so idle moments (the reader pausing to think, a long
-  // sentence playing) are spent banking upcoming audio to R2. On a modest GPU
-  // generation is ~real-time, so a deeper queue is what smooths first-time reads.
-  async preloadNextSSML(count: number = 6) {
+  // Look far ahead so idle moments (the reader pausing to think, a long sentence
+  // playing) are spent banking upcoming audio to R2. On a modest GPU generation
+  // is ~real-time, so a deep queue is what smooths first-time reads. These run at
+  // low priority, so they never delay the sentence being heard.
+  async preloadNextSSML(count: number = 10) {
     const tts = this.view.tts;
     if (!tts) return;
 
@@ -477,6 +485,19 @@ export class TTSController extends EventTarget {
         if (!oneTime) {
           if (!plainText || marks.length === 0) {
             resolve();
+            // Translation mode: an empty utterance almost always means this
+            // paragraph isn't translated YET. Wait briefly and retry the SAME
+            // position a few times before advancing, so a new book doesn't skip
+            // its opening lines while the translator catches up.
+            if (this.ttsTargetLang && this.#emptyRetries < TTS_MAX_EMPTY_RETRIES) {
+              this.#emptyRetries++;
+              await new Promise((r) => setTimeout(r, TTS_EMPTY_RETRY_DELAY_MS));
+              if (this.state === 'playing') {
+                return await this.#speak(this.view.tts?.resume());
+              }
+              return;
+            }
+            this.#emptyRetries = 0;
             // Bound consecutive skips so a lagging translation (untranslated
             // paragraphs → empty utterances) can't silently race to the book end.
             this.#consecutiveEmptySkips++;
@@ -487,6 +508,7 @@ export class TTSController extends EventTarget {
             }
             return await this.forward();
           } else {
+            this.#emptyRetries = 0;
             this.#consecutiveEmptySkips = 0;
             this.dispatchSpeakMark(marks[0]);
           }

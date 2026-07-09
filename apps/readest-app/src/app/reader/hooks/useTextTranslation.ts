@@ -138,8 +138,14 @@ export function useTextTranslation(
 
         if (lastIdx === -1) return;
 
+        // Translate well past the visible range (not just +2) so that when TTS
+        // follows the reading position, upcoming paragraphs are already in French
+        // by the time the audio prefetch reaches them — no stall waiting on the
+        // translator. Concurrency is still capped by MAX_CONCURRENT_TRANSLATIONS,
+        // and already-translated paragraphs are skipped, so this only front-loads
+        // work that would happen anyway.
         const startIdx = Math.max(0, firstIdx - 1);
-        const endIdx = Math.min(nodes.length - 1, lastIdx + 2);
+        const endIdx = Math.min(nodes.length - 1, lastIdx + 8);
 
         for (let i = startIdx; i <= endIdx; i++) {
           const node = nodes[i];
