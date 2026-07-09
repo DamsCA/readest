@@ -194,13 +194,23 @@ export const filterSSMLWithLang = (
       return ssml;
     }
 
-    // Each block now carries its own preceding <mark>, so the rebuilt utterance
-    // has the correct per-sentence marks (highlight lines up with the French).
-    const combinedContent = langBlocks.map((block) => block.match).join('');
-    // Fallback: if no block had a preceding mark, inject one leading mark so the
-    // chunk still has a mark and isn't skipped by the controller.
-    const markTag = /<mark\b/i.test(combinedContent) ? '' : '<mark name="0"/>';
-    return `${speakOpenMatch[0]}${markTag}${combinedContent}${speakCloseMatch[0]}`;
+    // Guarantee every block's text is preceded by a <mark>. parseSSMLMarks only
+    // emits a mark for text that follows an active <mark>; any text before the
+    // first mark is silently dropped — so a French sentence whose block lacks a
+    // leading mark would VANISH from playback. When a block already opens with a
+    // mark (captured before its <lang>, or the first thing inside it) we keep it
+    // as-is (correct per-sentence highlight); otherwise we prepend a synthetic
+    // mark so the sentence is at least spoken.
+    const combinedContent = langBlocks
+      .map((block, i) => {
+        const startsWithMark = /^\s*<mark\b/i.test(block.match);
+        const langThenMark = /^\s*<lang\b[^>]*>\s*<mark\b/i.test(block.match);
+        return startsWithMark || langThenMark
+          ? block.match
+          : `<mark name="ttsfilter-${i}"/>${block.match}`;
+      })
+      .join('');
+    return `${speakOpenMatch[0]}${combinedContent}${speakCloseMatch[0]}`;
   }
 
   // Reading a translation (target differs from the section's main language) but
