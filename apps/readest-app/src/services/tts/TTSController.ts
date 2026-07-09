@@ -43,6 +43,12 @@ let ttsPositionSequence = 0;
 // consecutive failures so a wholly-unusable engine still stops gracefully
 // instead of silently racing to the end of the book. See #4613, #4408.
 const TTS_NATIVE_SPEAK_MAX_CONSECUTIVE_ERRORS = 5;
+// Bound how many consecutive empty/mark-less paragraphs we auto-skip. In
+// translation mode, paragraphs not yet translated filter down to an empty
+// utterance; without a bound, playback silently fast-forwards through the whole
+// book. After this many skips in a row we stop so the user isn't stranded in
+// silence far from where they were.
+const TTS_MAX_CONSECUTIVE_EMPTY_SKIPS = 30;
 
 type TTSState =
   | 'stopped'
@@ -67,6 +73,7 @@ export class TTSController extends EventTarget {
   // a successful 'end' in between. Reset on success; caps skip-on-error so a
   // wholly-unusable engine stops instead of racing to the book end. See #4613.
   #consecutiveSpeakErrors: number = 0;
+  #consecutiveEmptySkips: number = 0;
   #currentSpeakAbortController: AbortController | null = null;
   #currentSpeakPromise: Promise<void> | null = null;
 
@@ -333,15 +340,32 @@ export class TTSController extends EventTarget {
     }
   }
 
-  async #handleNavigationWithoutSSML(initSection: () => Promise<boolean>, isPlaying: boolean) {
-    if (await initSection()) {
-      if (isPlaying) {
-        this.#speak(this.view.tts?.start());
-      } else {
-        this.view.tts?.start();
-      }
-    } else {
+  async #handleNavigationWithoutSSML(
+    initSection: () => Promise<boolean>,
+    isPlaying: boolean,
+    toEnd = false,
+  ) {
+    if (!(await initSection())) {
       await this.stop();
+      return;
+    }
+    let ssml = this.view.tts?.start();
+    if (toEnd) {
+      // Backward across a chapter boundary: seek to the LAST block of the
+      // freshly-initialized previous section (its last sentence), not its first.
+      // next() with no paused flag just returns the block's SSML and advances the
+      // iterator without speaking/highlighting, so walking it is side-effect free.
+      let next = this.view.tts?.next();
+      while (next) {
+        ssml = next;
+        next = this.view.tts?.next();
+      }
+    }
+    if (isPlaying) {
+      this.#speak(ssml);
+    } else if (ssml) {
+      const { marks } = parseSSMLMarks(ssml);
+      if (marks.length > 0) this.dispatchSpeakMark(marks[0]);
     }
   }
 
@@ -410,8 +434,13 @@ export class TTSController extends EventTarget {
 
   async #speak(ssml: string | undefined | Promise<string>, oneTime = false) {
     await this.stop();
-    this.#currentSpeakAbortController = new AbortController();
-    const { signal } = this.#currentSpeakAbortController;
+    // Capture our own controller locally. The finally below must abort/clear
+    // THIS one, not the instance field — which a newer #speak may already have
+    // replaced. Otherwise an interrupted speak's late finally would abort the
+    // fresh playback and strand the transport in 'playing'.
+    const controller = new AbortController();
+    this.#currentSpeakAbortController = controller;
+    const { signal } = controller;
 
     this.#currentSpeakPromise = new Promise(async (resolve, reject) => {
       try {
@@ -448,8 +477,17 @@ export class TTSController extends EventTarget {
         if (!oneTime) {
           if (!plainText || marks.length === 0) {
             resolve();
+            // Bound consecutive skips so a lagging translation (untranslated
+            // paragraphs → empty utterances) can't silently race to the book end.
+            this.#consecutiveEmptySkips++;
+            if (this.#consecutiveEmptySkips > TTS_MAX_CONSECUTIVE_EMPTY_SKIPS) {
+              this.#consecutiveEmptySkips = 0;
+              console.warn('[TTS] too many empty paragraphs in a row, stopping');
+              return await this.stop();
+            }
             return await this.forward();
           } else {
+            this.#consecutiveEmptySkips = 0;
             this.dispatchSpeakMark(marks[0]);
           }
           await this.preloadSSML(ssml, signal);
@@ -504,8 +542,11 @@ export class TTSController extends EventTarget {
           reject(e);
         }
       } finally {
-        if (this.#currentSpeakAbortController) {
-          this.#currentSpeakAbortController.abort();
+        // Abort only OUR controller (cancels this session's preloads/listeners),
+        // and clear the shared field only if it still points at us — never touch
+        // a newer session's controller.
+        controller.abort();
+        if (this.#currentSpeakAbortController === controller) {
           this.#currentSpeakAbortController = null;
         }
       }
@@ -592,10 +633,12 @@ export class TTSController extends EventTarget {
 
     const ssml = byMark ? this.view.tts?.prevMark(!isPlaying) : this.view.tts?.prev(!isPlaying);
     if (!ssml) {
-      await this.#handleNavigationWithoutSSML(() => this.#initTTSForPrevSection(), isPlaying);
+      // toEnd=true: land on the previous chapter's LAST sentence, not its first.
+      await this.#handleNavigationWithoutSSML(() => this.#initTTSForPrevSection(), isPlaying, true);
     } else {
       await this.#handleNavigationWithSSML(ssml, isPlaying);
     }
+    if (isPlaying && !byMark) this.preloadNextSSML();
   }
 
   // goto next mark/paragraph

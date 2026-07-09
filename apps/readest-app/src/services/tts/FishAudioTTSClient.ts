@@ -13,7 +13,10 @@ import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
 const FISH_AUDIO_MODEL = 's2.1-pro-free';
 // Max number of synthesized-sentence object URLs kept in memory (LRU-evicted).
-const FISH_AUDIO_CACHE_MAX = 24;
+// Must exceed peak concurrency so the sentence being played can't be evicted:
+// the paragraph pipeline (current + LOOKAHEAD) plus up to two overlapping
+// preloadNextSSML batches (6 paragraphs x 2 marks) plus recently-played history.
+const FISH_AUDIO_CACHE_MAX = 48;
 
 // Default reading voice: "Claire" — soft / deep / intimate / breathy / gentle.
 // Chosen by the user as a warm, sensual, hypnotic French narration voice.
@@ -192,7 +195,13 @@ export class FishAudioTTSClient implements TTSClient {
   ): Promise<string> {
     const cacheKey = this.#cacheKey(voiceId, text);
     const cached = this.#audioCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      // Refresh LRU recency: a sentence prefetched early would otherwise sit at
+      // the oldest position and be the first evicted right when it's played.
+      this.#audioCache.delete(cacheKey);
+      this.#audioCache.set(cacheKey, cached);
+      return cached;
+    }
 
     // Coalesce concurrent requests for the same sentence so it is generated
     // once. Exception: a high-priority (playback) request never waits on an
@@ -331,15 +340,23 @@ export class FishAudioTTSClient implements TTSClient {
 
   #storeInMemory(cacheKey: string, buffer: ArrayBuffer, type: string): string {
     const url = URL.createObjectURL(new Blob([buffer], { type }));
+    // Overwriting the same key (a high-priority call superseding a stray preload
+    // copy) must revoke the old URL for that key so it doesn't leak.
+    const prev = this.#audioCache.get(cacheKey);
+    if (prev && prev !== url) URL.revokeObjectURL(prev);
     // Bound the in-memory map and revoke evicted object URLs (the durable copy
     // lives in the persistent cache, so eviction here loses nothing).
     this.#audioCache.set(cacheKey, url);
+    const liveSrc = this.#audioElement?.src;
     while (this.#audioCache.size > FISH_AUDIO_CACHE_MAX) {
       const oldestKey = this.#audioCache.keys().next().value as string | undefined;
       if (oldestKey === undefined) break;
       const oldUrl = this.#audioCache.get(oldestKey);
       this.#audioCache.delete(oldestKey);
-      if (oldUrl && oldUrl !== url) URL.revokeObjectURL(oldUrl);
+      // Never revoke the URL we just created, nor the one currently loaded into
+      // the audio element (the sentence being played) — revoking a live blob URL
+      // is exactly what caused the "Audio playback error" glitch.
+      if (oldUrl && oldUrl !== url && oldUrl !== liveSrc) URL.revokeObjectURL(oldUrl);
     }
     return url;
   }

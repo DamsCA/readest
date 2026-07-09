@@ -127,14 +127,18 @@ describe('filterSSMLWithLang', () => {
     expect(result).not.toContain('world');
   });
 
-  it('should return original when no matching blocks found', () => {
+  it('should return an empty utterance when no matching blocks found', () => {
     const ssml = ssmlWithLang(
       'en',
       '<mark name="0"/>Hello <lang xml:lang="fr"><mark name="1"/>Bonjour</lang>',
     );
     const result = filterSSMLWithLang(ssml, 'de');
-    // "de" doesn't match main lang "en" and no <lang xml:lang="de"> blocks exist
-    expect(result).toBe(ssml);
+    // "de" matches neither the main lang "en" nor any <lang> block, so the chunk
+    // is skipped (empty utterance) rather than falling back to the source lang —
+    // otherwise the source language leaks into a translated read.
+    expect(result).not.toContain('Hello');
+    expect(result).not.toContain('Bonjour');
+    expect(result).toMatch(/<speak[^>]*><\/speak>/);
   });
 
   it('should handle multiple lang blocks and extract all matching ones', () => {

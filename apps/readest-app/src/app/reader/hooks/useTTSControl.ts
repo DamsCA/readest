@@ -253,6 +253,18 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       viewSettings.ttsLocation = cfi;
       setViewSettings(bookKey, viewSettings);
 
+      // Re-arm following when TTS advances onto the page the user is currently
+      // viewing. Without this, `followingTTSLocationRef` latches false forever
+      // (the clearing effect only runs on `progress` changes, and with following
+      // off the page never turns, so progress never changes) — the view freezes
+      // while audio marches across pages. If the user had scrolled away, the new
+      // sentence's cfi won't be in their visible `location`, so we don't yank
+      // them back.
+      if (isCfiInLocation(cfi, location)) {
+        followingTTSLocationRef.current = true;
+        setShowBackToCurrentTTSLocation(false);
+      }
+
       const hlContents = view.renderer.getContents();
       const hlPrimaryIdx = view.renderer.primaryIndex;
       const { doc, index: viewSectionIndex } = (hlContents.find((x) => x.index === hlPrimaryIdx) ??

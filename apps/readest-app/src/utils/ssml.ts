@@ -166,17 +166,22 @@ export const filterSSMLWithLang = (
 
   // Check if target matches any <lang> block
   const langBlocks: Array<{ match: string; lang: string; content: string }> = [];
-  const langBlockRegex = /<lang\s+xml:lang="([^"]+)"[^>]*>(.*?)<\/lang>/gs;
+  // Also capture the <mark> that immediately precedes a <lang> block: foliate
+  // emits the translated sentence's mark just OUTSIDE (before) its <lang> block,
+  // so grabbing it keeps each French sentence attached to its OWN mark — the
+  // highlight range then lines up with the spoken text instead of pointing at
+  // the source sentence.
+  const langBlockRegex = /(<mark\b[^>]*\/?>\s*)?<lang\s+xml:lang="([^"]+)"[^>]*>(.*?)<\/lang>/gs;
   let match: RegExpExecArray | null;
 
   const tempRegex = new RegExp(langBlockRegex.source, langBlockRegex.flags);
   while ((match = tempRegex.exec(ssml)) !== null) {
-    const blockLang = code6392to6391(match[1]!.toLowerCase()) || match[1]!.toLowerCase();
+    const blockLang = code6392to6391(match[2]!.toLowerCase()) || match[2]!.toLowerCase();
     if (isSameLang(blockLang, normalizedTarget)) {
       langBlocks.push({
-        match: match[0]!,
-        lang: match[1]!,
-        content: match[2]!,
+        match: match[0]!, // includes the preceding <mark> when present
+        lang: match[2]!,
+        content: match[3]!,
       });
     }
   }
@@ -189,15 +194,12 @@ export const filterSSMLWithLang = (
       return ssml;
     }
 
+    // Each block now carries its own preceding <mark>, so the rebuilt utterance
+    // has the correct per-sentence marks (highlight lines up with the French).
     const combinedContent = langBlocks.map((block) => block.match).join('');
-    // The <mark> boundaries live outside the <lang> blocks, so rebuilding from
-    // the blocks alone dropped every mark — parseSSMLMarks then yields no marks
-    // and the controller SKIPS the chunk, silently swallowing the translated
-    // sentence. Re-inject a leading mark (reuse the first one from the source,
-    // or synthesize one) so the target-language text is attached to a mark and
-    // actually gets spoken.
-    const firstMark = ssml.match(/<mark\b[^>]*\/?>/i);
-    const markTag = firstMark ? firstMark[0] : '<mark name="0"/>';
+    // Fallback: if no block had a preceding mark, inject one leading mark so the
+    // chunk still has a mark and isn't skipped by the controller.
+    const markTag = /<mark\b/i.test(combinedContent) ? '' : '<mark name="0"/>';
     return `${speakOpenMatch[0]}${markTag}${combinedContent}${speakCloseMatch[0]}`;
   }
 
