@@ -839,7 +839,9 @@ export const READEST_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;
 export const SYNC_BOOKS_INTERVAL_SEC = 5;
-export const CHECK_UPDATE_INTERVAL_SEC = 24 * 60 * 60;
+// Personal fork ships updates often; check hourly (was daily) so a new build is
+// offered promptly. The About screen's manual check bypasses this throttle.
+export const CHECK_UPDATE_INTERVAL_SEC = 60 * 60;
 
 export const MAX_ZOOM_LEVEL = 500;
 export const MIN_ZOOM_LEVEL = 50;
