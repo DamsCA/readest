@@ -815,16 +815,20 @@ export const SHARE_TOKEN_LENGTH = 22;
 export const SHARE_PRESIGN_TTL_SECONDS = 300;
 export const SHARE_CFI_MAX_LENGTH = 512;
 
-// Overridable so a personal fork can point the in-app updater at its own
-// release host (e.g. GitHub Releases) instead of the official download server.
-const LATEST_DOWNLOAD_BASE_URL =
-  process.env['NEXT_PUBLIC_UPDATER_BASE_URL'] || 'https://download.readest.com/releases';
+// Personal Claire fork: the in-app updater must ONLY ever see THIS repo's
+// releases — never the official Readest server, which would offer a vanilla
+// build (e.g. 0.11.18) that can't even install over the fork's own signature.
+// Hardcoded (not env-derived) so it can never silently fall back to the official
+// host if a NEXT_PUBLIC_ var fails to inline at build time.
+const LATEST_DOWNLOAD_BASE_URL = 'https://github.com/DamsCA/readest/releases/latest/download';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
 export const READEST_CHANGELOG_FILE = `${LATEST_DOWNLOAD_BASE_URL}/release-notes.json`;
 
-export const READEST_NIGHTLY_UPDATER_FILE = 'https://download.readest.com/nightly/latest.json';
+// Nightly channel also stays on this fork (no separate nightly stream published,
+// so it points at the same manifest) — never the official nightly host.
+export const READEST_NIGHTLY_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
 // Public (verification) key, identical to src-tauri/tauri.conf.json `updater.pubkey`.
 // Used to verify nightly artifacts in the custom install flows (portable /
