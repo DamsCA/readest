@@ -1,6 +1,7 @@
 import { FoliateView } from '@/types/view';
 import { AppService } from '@/types/system';
-import { filterSSMLWithLang, parseSSMLMarks } from '@/utils/ssml';
+import { filterSSMLWithLang, parseSSMLMarks, prefetchSentenceTexts } from '@/utils/ssml';
+import { walkTextNodes } from '@/utils/walk';
 import { Overlayer } from 'foliate-js/overlayer.js';
 import {
   TTSGranularity,
@@ -75,6 +76,13 @@ export class TTSController extends EventTarget {
   isAuthenticated: boolean = false;
   preprocessCallback?: (ssml: string) => Promise<string>;
   onSectionChange?: (sectionIndex: number) => Promise<void>;
+  // Translation-mode dependency injected by useTTSControl: batch-translate raw
+  // paragraph texts through the SAME provider/cache the reader's injector uses,
+  // returning the final (polished) target-language strings — or null when
+  // translation is disabled/unavailable. Used to prepare the NEXT chapter
+  // (translation cache warm + audio pre-generation) while the current one is
+  // still playing, so the chapter flip is seamless.
+  prefetchTranslations?: (texts: string[]) => Promise<(string | null)[] | null>;
   #nossmlCnt: number = 0;
   // Consecutive native-TTS utterances that ended in a terminal 'error' without
   // a successful 'end' in between. Reset on success; caps skip-on-error so a
@@ -86,6 +94,11 @@ export class TTSController extends EventTarget {
   #currentSpeakPromise: Promise<void> | null = null;
 
   #ttsSectionIndex: number = -1;
+  // Cross-chapter prefetch state. The abort controller is session-scoped
+  // (aborted in shutdown, NOT by per-paragraph stop()), because banked audio is
+  // content-addressed — a prefetch that outlives navigation is still value.
+  #prefetchAbortController = new AbortController();
+  #prefetchedNextSection: number = -1;
 
   // Word-level highlight state for the currently spoken chunk. Armed by a
   // successful dispatchSpeakMark, populated by prepareSpeakWords when a TTS
@@ -285,33 +298,122 @@ export class TTSController extends EventTarget {
     this.view.tts = new TTS(
       doc,
       textWalker,
-      createRejectFilter({
-        tags: ['rt', 'canvas', 'br'],
-        // Footnotes/endnotes are hidden in the rendered page (see the
-        // `.epubtype-footnote`/`aside[epub|type]` rules in getPageLayoutStyles);
-        // skip them in TTS too, including for background sections whose
-        // documents are loaded without those styles.
-        classes: [
-          'annotationLayer',
-          'epubtype-footnote',
-          'duokan-footnote-content',
-          'duokan-footnote-item',
-        ],
-        attributeTokens: [
-          {
-            tag: 'aside',
-            attribute: 'epub:type',
-            tokens: ['footnote', 'endnote', 'note', 'rearnote'],
-          },
-        ],
-        contents: [{ tag: 'a', content: /^[\[\(]?[\*\d]+[\)\]]?$/ }],
-      }),
+      this.#createTTSNodeFilter(),
       this.#getHighlighter(),
       granularity,
     );
     console.log(`[TTS] Initialized TTS for section ${sectionIndex}`);
 
     return true;
+  }
+
+  #createTTSNodeFilter() {
+    return createRejectFilter({
+      tags: ['rt', 'canvas', 'br'],
+      // Footnotes/endnotes are hidden in the rendered page (see the
+      // `.epubtype-footnote`/`aside[epub|type]` rules in getPageLayoutStyles);
+      // skip them in TTS too, including for background sections whose
+      // documents are loaded without those styles.
+      classes: [
+        'annotationLayer',
+        'epubtype-footnote',
+        'duokan-footnote-content',
+        'duokan-footnote-item',
+      ],
+      attributeTokens: [
+        {
+          tag: 'aside',
+          attribute: 'epub:type',
+          tokens: ['footnote', 'endnote', 'note', 'rearnote'],
+        },
+      ],
+      contents: [{ tag: 'a', content: /^[\[\(]?[\*\d]+[\)\]]?$/ }],
+    });
+  }
+
+  // Prepare the NEXT chapter while the current one is still playing, so the
+  // flip is seamless: warm the translation cache for its opening paragraphs
+  // (the reader's injector then cache-hits instantly on page turn) and
+  // pre-generate their audio at low priority (banked in memory + R2). Runs on
+  // a detached background document — never touches the live view or view.tts.
+  async #prefetchNextSection() {
+    const nextIndex = this.#ttsSectionIndex + 1;
+    if (this.#prefetchedNextSection === nextIndex) return;
+    const sections = this.view.book.sections;
+    if (!sections || nextIndex >= sections.length) return;
+    const section = sections[nextIndex];
+    if (!section?.createDocument) return;
+    this.#prefetchedNextSection = nextIndex;
+
+    const signal = this.#prefetchAbortController.signal;
+    try {
+      const doc = await section.createDocument();
+      if (signal.aborted) return;
+      const html = doc.querySelector('html');
+      const docLang = html?.getAttribute('lang') || html?.getAttribute('xml:lang') || '';
+      if (html && !isValidLang(docLang) && this.ttsLang) {
+        html.setAttribute('lang', this.ttsLang);
+        html.setAttribute('xml:lang', this.ttsLang);
+      }
+
+      if (this.ttsTargetLang && this.prefetchTranslations) {
+        // Translation mode. Collect paragraph texts exactly as the reader's
+        // translator does (same element walk, same normalization), so the warm
+        // shares cache keys with the injection that happens after the flip.
+        if (!doc.body) return;
+        const elements = walkTextNodes(doc.body as HTMLElement, ['pre', 'code', 'math']);
+        const texts: string[] = [];
+        for (const el of elements) {
+          const text = el.textContent?.replaceAll('\n', '').trim();
+          if (text) texts.push(text);
+          if (texts.length >= 12) break;
+        }
+        if (texts.length === 0) return;
+        const translated = await this.prefetchTranslations(texts);
+        if (signal.aborted || !translated) return;
+
+        // Pre-generate audio for the sentences exactly as foliate will emit
+        // them at playback time (byte-identical cache keys). Low priority via
+        // the preload path — fills GPU idle time, never delays live playback.
+        const blockLang =
+          (html?.getAttribute('lang') || this.ttsLang || 'en').split('-')[0] || 'en';
+        const sentences = translated
+          .filter((t): t is string => !!t)
+          .flatMap((t) => prefetchSentenceTexts(t, blockLang))
+          .slice(0, 40);
+        for (let i = 0; i < sentences.length; i += 4) {
+          if (signal.aborted) return;
+          const chunk = sentences.slice(i, i + 4);
+          const body = chunk.map((s, j) => `<mark name="pf${i + j}"/>${s}`).join('');
+          const ssml = `<speak xml:lang="${this.ttsTargetLang}">${body}</speak>`;
+          await this.preloadSSML(ssml, signal);
+        }
+      } else if (!this.ttsTargetLang) {
+        // Source-language book: walk a throwaway foliate TTS over the
+        // background doc and preload its opening utterances directly.
+        const { TTS } = await import('foliate-js/tts.js');
+        const { textWalker } = await import('foliate-js/text-walker.js');
+        let granularity: TTSGranularity = this.view.language.isCJK ? 'sentence' : 'word';
+        const supported = this.ttsClient.getGranularities();
+        if (!supported.includes(granularity)) granularity = supported[0]!;
+        const bgTts = new TTS(doc, textWalker, this.#createTTSNodeFilter(), () => {}, granularity);
+        let count = 0;
+        let raw: string | undefined = bgTts.start();
+        while (raw && count < 8 && !signal.aborted) {
+          const processed = await this.#preprocessSSML(raw);
+          if (processed) {
+            await this.preloadSSML(processed, signal);
+            count++;
+          }
+          raw = bgTts.next();
+        }
+      }
+      console.log('[TTS] prefetched next section', nextIndex);
+    } catch (err) {
+      // Best-effort: allow a later retry for this section.
+      this.#prefetchedNextSection = -1;
+      console.warn('[TTS] next-section prefetch failed', err);
+    }
   }
 
   async #initTTSForNextSection(): Promise<boolean> {
@@ -404,6 +506,12 @@ export class TTSController extends EventTarget {
     }
     for (let i = 0; i < rawSsmls.length; i++) {
       tts.prev();
+    }
+    // Fewer than `count` paragraphs left in this section: the chapter boundary
+    // is near. Prepare the next chapter now (translation warm + audio bank) so
+    // the flip is seamless. Fire-and-forget; internally deduped per section.
+    if (rawSsmls.length < count) {
+      void this.#prefetchNextSection();
     }
 
     const ssmls: string[] = [];
@@ -512,7 +620,12 @@ export class TTSController extends EventTarget {
                 }
               }
               this.#emptyRetries++;
-              await new Promise((r) => setTimeout(r, TTS_EMPTY_RETRY_DELAY_MS));
+              // First retries come fast: with the next-chapter prefetch warming
+              // the translation cache, injection after a page flip takes ~100ms
+              // — a long first wait would be dead air. Later retries back off to
+              // cover a real (cold) DeepL round trip.
+              const delay = this.#emptyRetries <= 2 ? 300 : TTS_EMPTY_RETRY_DELAY_MS;
+              await new Promise((r) => setTimeout(r, delay));
               // A newer speak session may have started while we slept (user
               // pressed forward/play) — our signal is aborted then; don't fight it.
               if (!signal.aborted && this.state === 'playing') {
@@ -978,6 +1091,7 @@ export class TTSController extends EventTarget {
   }
 
   async shutdown() {
+    this.#prefetchAbortController.abort();
     await this.stop();
     this.#clearHighlighter();
     this.#ttsSectionIndex = -1;

@@ -120,6 +120,53 @@ export const parseSSMLMarks = (ssml: string, primaryLang?: string) => {
   return { plainText, marks };
 };
 
+// Split a translated paragraph into the exact per-sentence mark texts that
+// foliate-js TTS will later produce for it, so audio pre-generated from these
+// strings is a byte-identical cache/R2 hit when the paragraph is actually
+// spoken. Mirrors, in order: foliate's segmentation-string normalization and
+// Intl.Segmenter sentence split, its abbreviation merge pass, XML escaping
+// (parseSSMLMarks never decodes entities), the controller's #preprocessSSML
+// character replacements, and parseSSMLMarks' cleanTextContent (trimStart,
+// trailing whitespace KEPT — it is part of the audio cache key).
+export const prefetchSentenceTexts = (text: string, blockLang = 'en'): string[] => {
+  if (!text) return [];
+  const s = text.replace(/\r\n/g, '  ').replace(/\r/g, ' ').replace(/\n/g, ' ');
+  let raw: { segment: string }[];
+  try {
+    raw = [...new Intl.Segmenter(blockLang || undefined, { granularity: 'sentence' }).segment(s)];
+  } catch {
+    raw = [{ segment: s }];
+  }
+  // foliate's abbreviation merge: a segment ending in a short abbreviation-like
+  // word + '.' is merged into the following segment (Mr. / Dr. / etc.).
+  const segs: string[] = [];
+  for (let i = 0, j = 0; i < raw.length; i++) {
+    if (
+      i < raw.length - 1 &&
+      /\s([A-Z]{1,2}[a-z]{0,5}|[a-z]{1,3})\.\s*$/.test(' ' + raw[i]!.segment)
+    ) {
+      continue;
+    }
+    let t = '';
+    while (j <= i) t += raw[j++]!.segment;
+    segs.push(t);
+  }
+  return segs
+    .map((t) =>
+      t
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/[–—]/g, ',')
+        .replace(/\.{3,}/g, '   ')
+        .replace(/……/g, '  ')
+        .replace(/\*/g, ' ')
+        .replace(/·/g, ' ')
+        .trimStart(),
+    )
+    .filter((t) => t && !/^[\p{P}\p{S}]+$/u.test(t.trim()));
+};
+
 export const findSSMLMark = (charIndex: number, marks: TTSMark[]) => {
   let left = 0;
   let right = marks.length - 1;
