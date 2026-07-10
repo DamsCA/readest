@@ -51,10 +51,11 @@ const TTS_NATIVE_SPEAK_MAX_CONSECUTIVE_ERRORS = 5;
 const TTS_MAX_CONSECUTIVE_EMPTY_SKIPS = 30;
 // In translation mode, wait-and-retry the current paragraph this many times
 // (a paragraph filters to empty until its async translation is injected) before
-// giving up and advancing. Stops a new book from skipping its opening lines
-// while the translator catches up.
-const TTS_MAX_EMPTY_RETRIES = 3;
-const TTS_EMPTY_RETRY_DELAY_MS = 600;
+// giving up and advancing. The first retry also drives the view to the
+// paragraph (see #speak) so the viewport-driven translator can see it; DeepL
+// then needs a couple of seconds, so the budget must cover a full round trip.
+const TTS_MAX_EMPTY_RETRIES = 8;
+const TTS_EMPTY_RETRY_DELAY_MS = 800;
 
 type TTSState =
   | 'stopped'
@@ -459,7 +460,11 @@ export class TTSController extends EventTarget {
           resolve();
         });
 
-        ssml = await this.#preprocessSSML(await ssml);
+        // Keep the RAW (unfiltered) SSML: in translation mode its source-language
+        // marks are the only way to locate this paragraph in the view while the
+        // translation hasn't been injected yet (the filtered SSML is empty then).
+        const rawSsml = await ssml;
+        ssml = await this.#preprocessSSML(rawSsml);
         if (!ssml) {
           this.#nossmlCnt++;
           // FIXME: in case we are at the end of the book, need a better way to handle this
@@ -490,9 +495,27 @@ export class TTSController extends EventTarget {
             // position a few times before advancing, so a new book doesn't skip
             // its opening lines while the translator catches up.
             if (this.ttsTargetLang && this.#emptyRetries < TTS_MAX_EMPTY_RETRIES) {
+              // CRITICAL at chapter boundaries: the translator only translates
+              // paragraphs VISIBLE in the view. Right after a section change the
+              // view may still sit on the old chapter, so the translation would
+              // never arrive and playback died here (stopped dead, no recovery).
+              // Dispatch the paragraph's SOURCE mark to drive the view to this
+              // position (the cross-section path in handleHighlightMark forces
+              // the page turn) — the paragraph becomes visible, the translator
+              // picks it up, and the retry below then finds the French.
+              if (this.#emptyRetries === 0 && rawSsml) {
+                try {
+                  const { marks: rawMarks } = parseSSMLMarks(rawSsml);
+                  if (rawMarks.length > 0) this.dispatchSpeakMark(rawMarks[0]);
+                } catch {
+                  // Position-driving is best-effort; the retry loop still runs.
+                }
+              }
               this.#emptyRetries++;
               await new Promise((r) => setTimeout(r, TTS_EMPTY_RETRY_DELAY_MS));
-              if (this.state === 'playing') {
+              // A newer speak session may have started while we slept (user
+              // pressed forward/play) — our signal is aborted then; don't fight it.
+              if (!signal.aborted && this.state === 'playing') {
                 return await this.#speak(this.view.tts?.resume());
               }
               return;
@@ -506,6 +529,7 @@ export class TTSController extends EventTarget {
               console.warn('[TTS] too many empty paragraphs in a row, stopping');
               return await this.stop();
             }
+            if (signal.aborted) return; // a newer session took over while we waited
             return await this.forward();
           } else {
             this.#emptyRetries = 0;
