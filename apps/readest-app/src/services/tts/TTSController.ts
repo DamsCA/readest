@@ -99,6 +99,12 @@ export class TTSController extends EventTarget {
   // content-addressed — a prefetch that outlives navigation is still value.
   #prefetchAbortController = new AbortController();
   #prefetchedNextSection: number = -1;
+  // Idle bank-ahead: keeps generating upcoming audio to R2 even while paused /
+  // stopped (idle GPU time), so the rest of the book is progressively banked and
+  // future reading is instant. Self-skips while actively playing (playback's own
+  // preloadNextSSML covers that). Cleared on shutdown.
+  #idleBankTimer: ReturnType<typeof setInterval> | null = null;
+  #idleBankDepth: number = 0;
 
   // Word-level highlight state for the currently spoken chunk. Armed by a
   // successful dispatchSpeakMark, populated by prepareSpeakWords when a TTS
@@ -527,6 +533,60 @@ export class TTSController extends EventTarget {
     await Promise.all(ssmls.map((ssml) => this.preloadSSML(ssml, preloadSignal)));
   }
 
+  // Bank `depth` upcoming paragraphs to R2 from the CURRENT position, without
+  // moving playback (gather via next() then rewind — synchronous so foliate's
+  // #ranges is restored before any await). Low priority; tied to the session
+  // prefetch signal so it survives navigation but stops on shutdown.
+  async #bankAhead(depth: number, signal: AbortSignal) {
+    const tts = this.view.tts;
+    if (!tts || signal.aborted) return;
+    const rawSsmls: string[] = [];
+    for (let i = 0; i < depth; i++) {
+      const ssml = tts.next();
+      if (!ssml) break;
+      rawSsmls.push(ssml);
+    }
+    for (let i = 0; i < rawSsmls.length; i++) {
+      tts.prev();
+    }
+    if (rawSsmls.length < depth) void this.#prefetchNextSection();
+    for (const raw of rawSsmls) {
+      if (signal.aborted) return;
+      const ssml = await this.#preprocessSSML(raw);
+      if (ssml) await this.preloadSSML(ssml, signal);
+    }
+  }
+
+  // Start (or restart) the idle bank-ahead loop: while the book is open but NOT
+  // actively playing (paused/stopped), progressively bank the rest of the book
+  // to R2 using idle GPU time — so resuming, or reaching content later, is
+  // instant. Harmless while playing: it skips those ticks (playback's own
+  // preloadNextSSML handles banking, at higher priority).
+  startIdleBanking() {
+    this.stopIdleBanking();
+    this.#idleBankDepth = 6;
+    this.#idleBankTimer = setInterval(() => {
+      const signal = this.#prefetchAbortController.signal;
+      if (signal.aborted) {
+        this.stopIdleBanking();
+        return;
+      }
+      // Only use IDLE time — during active playback the speak loop + its
+      // preloadNextSSML already bank ahead, and we must not fight its iterator.
+      if (this.state === 'playing') return;
+      const depth = this.#idleBankDepth;
+      this.#idleBankDepth = Math.min(depth + 6, 48);
+      void this.#bankAhead(depth, signal).catch(() => {});
+    }, 9000);
+  }
+
+  stopIdleBanking() {
+    if (this.#idleBankTimer) {
+      clearInterval(this.#idleBankTimer);
+      this.#idleBankTimer = null;
+    }
+  }
+
   async #preprocessSSML(ssml?: string) {
     if (!ssml) return;
     ssml = ssml
@@ -726,6 +786,9 @@ export class TTSController extends EventTarget {
     if (!oneTime) {
       this.preloadNextSSML();
       this.dispatchSpeakMark();
+      // Keep banking the rest of the book during idle time (pauses/stops), not
+      // just while playing — so future reading is instant.
+      this.startIdleBanking();
     }
   }
 
@@ -1091,6 +1154,7 @@ export class TTSController extends EventTarget {
   }
 
   async shutdown() {
+    this.stopIdleBanking();
     this.#prefetchAbortController.abort();
     await this.stop();
     this.#clearHighlighter();
