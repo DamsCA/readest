@@ -17,7 +17,7 @@ import { EdgeTTSClient } from './EdgeTTSClient';
 import { FishAudioTTSClient } from './FishAudioTTSClient';
 import { TTSUtils } from './TTSUtils';
 import { TTSClient } from './TTSClient';
-import { isValidLang } from '@/utils/lang';
+import { isSameLang, isValidLang } from '@/utils/lang';
 import {
   computeWordOffsets,
   getTextSubRange,
@@ -104,7 +104,7 @@ export class TTSController extends EventTarget {
   // future reading is instant. Self-skips while actively playing (playback's own
   // preloadNextSSML covers that). Cleared on shutdown.
   #idleBankTimer: ReturnType<typeof setInterval> | null = null;
-  #idleBankDepth: number = 0;
+  #idleBankCursor: number = 0;
 
   // Word-level highlight state for the currently spoken chunk. Armed by a
   // successful dispatchSpeakMark, populated by prepareSpeakWords when a TTS
@@ -277,13 +277,28 @@ export class TTSController extends EventTarget {
     }
 
     let doc: Document;
-    if (currentSection?.index === sectionIndex && currentSection?.doc) {
-      doc = currentSection.doc;
+    // Re-check the RENDERED content AFTER onSectionChange navigated the view:
+    // binding to the rendered doc (not a detached background copy) is what lets
+    // the async translator's injections reach this TTS instance — a background
+    // doc never receives the French, so chapter flips either leaked the source
+    // language or starved into silence.
+    const renderedSection = this.#getPrimaryContent();
+    if (renderedSection?.index === sectionIndex && renderedSection?.doc) {
+      doc = renderedSection.doc;
     } else {
       doc = await section.createDocument();
       const html = doc.querySelector('html');
       const lang = html?.getAttribute('lang') || html?.getAttribute('xml:lang') || '';
-      if (html && !isValidLang(lang) && this.ttsLang) {
+      // Never stamp the TARGET language onto a source-language document: if
+      // ttsLang got resolved to the translation language, stamping it here made
+      // filterSSMLWithLang treat the whole English chapter as French and read
+      // the source aloud ("English at chapter change").
+      if (
+        html &&
+        !isValidLang(lang) &&
+        this.ttsLang &&
+        !(this.ttsTargetLang && isSameLang(this.ttsLang, this.ttsTargetLang))
+      ) {
         html.setAttribute('lang', this.ttsLang);
         html.setAttribute('xml:lang', this.ttsLang);
       }
@@ -357,7 +372,12 @@ export class TTSController extends EventTarget {
       if (signal.aborted) return;
       const html = doc.querySelector('html');
       const docLang = html?.getAttribute('lang') || html?.getAttribute('xml:lang') || '';
-      if (html && !isValidLang(docLang) && this.ttsLang) {
+      if (
+        html &&
+        !isValidLang(docLang) &&
+        this.ttsLang &&
+        !(this.ttsTargetLang && isSameLang(this.ttsLang, this.ttsTargetLang))
+      ) {
         html.setAttribute('lang', this.ttsLang);
         html.setAttribute('xml:lang', this.ttsLang);
       }
@@ -529,27 +549,36 @@ export class TTSController extends EventTarget {
     // Tie preloads to the current speak session so navigating/stopping cancels
     // in-flight preloads instead of leaving uncancellable requests running (and,
     // for Fish, creating blob URLs) for a position the user already left.
+    // SEQUENTIAL on purpose: firing all paragraphs concurrently let the server
+    // generate them in arbitrary wake-up order, so the audio needed NEXT could
+    // wait behind paragraph 9. Playback-order banking removes those stalls.
     const preloadSignal = this.#currentSpeakAbortController?.signal ?? new AbortController().signal;
-    await Promise.all(ssmls.map((ssml) => this.preloadSSML(ssml, preloadSignal)));
+    for (const ssml of ssmls) {
+      if (preloadSignal.aborted) break;
+      await this.preloadSSML(ssml, preloadSignal);
+    }
   }
 
-  // Bank `depth` upcoming paragraphs to R2 from the CURRENT position, without
-  // moving playback (gather via next() then rewind — synchronous so foliate's
-  // #ranges is restored before any await). Low priority; tied to the session
-  // prefetch signal so it survives navigation but stops on shutdown.
-  async #bankAhead(depth: number, signal: AbortSignal) {
+  // Bank `depth` upcoming paragraphs (starting `skip` paragraphs ahead of the
+  // CURRENT position) to R2, without moving playback: gather via next() then
+  // rewind — synchronous so foliate's #ranges is restored before any await.
+  // Low priority; tied to the session prefetch signal so it survives
+  // navigation but stops on shutdown.
+  async #bankAhead(depth: number, signal: AbortSignal, skip = 0) {
     const tts = this.view.tts;
     if (!tts || signal.aborted) return;
     const rawSsmls: string[] = [];
-    for (let i = 0; i < depth; i++) {
+    let advanced = 0;
+    for (let i = 0; i < skip + depth; i++) {
       const ssml = tts.next();
       if (!ssml) break;
-      rawSsmls.push(ssml);
+      advanced++;
+      if (i >= skip) rawSsmls.push(ssml);
     }
-    for (let i = 0; i < rawSsmls.length; i++) {
+    for (let i = 0; i < advanced; i++) {
       tts.prev();
     }
-    if (rawSsmls.length < depth) void this.#prefetchNextSection();
+    if (advanced < skip + depth) void this.#prefetchNextSection();
     for (const raw of rawSsmls) {
       if (signal.aborted) return;
       const ssml = await this.#preprocessSSML(raw);
@@ -560,11 +589,13 @@ export class TTSController extends EventTarget {
   // Start (or restart) the idle bank-ahead loop: while the book is open but NOT
   // actively playing (paused/stopped), progressively bank the rest of the book
   // to R2 using idle GPU time — so resuming, or reaching content later, is
-  // instant. Harmless while playing: it skips those ticks (playback's own
-  // preloadNextSSML handles banking, at higher priority).
+  // instant. A moving cursor banks the NEXT slice each tick (instead of
+  // re-walking from the current position), capped so a long pause doesn't walk
+  // the whole book every 9s. Harmless while playing: those ticks are skipped
+  // (playback's own preloadNextSSML banks at higher priority).
   startIdleBanking() {
     this.stopIdleBanking();
-    this.#idleBankDepth = 6;
+    this.#idleBankCursor = 0;
     this.#idleBankTimer = setInterval(() => {
       const signal = this.#prefetchAbortController.signal;
       if (signal.aborted) {
@@ -574,9 +605,10 @@ export class TTSController extends EventTarget {
       // Only use IDLE time — during active playback the speak loop + its
       // preloadNextSSML already bank ahead, and we must not fight its iterator.
       if (this.state === 'playing') return;
-      const depth = this.#idleBankDepth;
-      this.#idleBankDepth = Math.min(depth + 6, 48);
-      void this.#bankAhead(depth, signal).catch(() => {});
+      if (this.#idleBankCursor >= 96) return; // ~2h of audio banked ahead: enough
+      const skip = this.#idleBankCursor;
+      this.#idleBankCursor += 8;
+      void this.#bankAhead(8, signal, skip).catch(() => {});
     }, 9000);
   }
 
@@ -592,7 +624,7 @@ export class TTSController extends EventTarget {
     ssml = ssml
       .replace(/<emphasis[^>]*>([^<]+)<\/emphasis>/g, '$1')
       .replace(/[–—]/g, ',')
-      .replace('<break/>', ' ')
+      .replace(/<break\b[^>]*\/?>/g, ' ')
       .replace(/\.{3,}/g, '   ')
       .replace(/……/g, '  ')
       .replace(/\*/g, ' ')
@@ -675,6 +707,18 @@ export class TTSController extends EventTarget {
                 try {
                   const { marks: rawMarks } = parseSSMLMarks(rawSsml);
                   if (rawMarks.length > 0) this.dispatchSpeakMark(rawMarks[0]);
+                  // Deterministic wait: translate THIS paragraph now through the
+                  // shared cache instead of hoping the viewport translator races
+                  // us. When it resolves, the injector cache-hits instantly and
+                  // the retry below finds the French.
+                  if (this.prefetchTranslations && rawMarks.length > 0) {
+                    const srcText = rawMarks
+                      .map((m) => m.text)
+                      .join(' ')
+                      .replaceAll('\n', '')
+                      .trim();
+                    if (srcText) await this.prefetchTranslations([srcText]).catch(() => null);
+                  }
                 } catch {
                   // Position-driving is best-effort; the retry loop still runs.
                 }
@@ -709,11 +753,19 @@ export class TTSController extends EventTarget {
             this.#consecutiveEmptySkips = 0;
             this.dispatchSpeakMark(marks[0]);
           }
-          await this.preloadSSML(ssml, signal);
+          // Fire-and-forget: awaiting here blocked the FIRST sound of every
+          // cold paragraph until several sentences were fully generated at LOW
+          // priority (~10-20s of dead air on a ~realtime GPU). The Fish speak
+          // loop pipelines its own marks at high priority anyway.
+          void this.preloadSSML(ssml, signal);
         }
-        // Only the native client surfaces an offline engine failure as a
-        // terminal 'error' code (Edge/Web throw, which the catch below handles).
-        const canSkipOnError = this.ttsClient === this.ttsNativeClient;
+        // Native AND Fish clients surface failures as a terminal 'error' code
+        // (Edge/Web throw, which the catch below handles). Without Fish here, a
+        // Claire-server hiccup (5xx/tunnel reset) mid-paragraph left the
+        // transport wedged on "playing" with no advance — perceived as skipped
+        // sentences. Skipping forward (bounded) recovers gracefully instead.
+        const canSkipOnError =
+          this.ttsClient === this.ttsNativeClient || this.ttsClient === this.ttsFishClient;
         const iter = await this.ttsClient.speak(ssml, signal);
         let lastCode;
         for await (const { code } of iter) {

@@ -32,6 +32,7 @@ vi.mock('@/services/tts/TTSUtils', () => ({
     setPreferredClient: vi.fn(),
     setPreferredVoice: vi.fn(),
     getPreferredVoice: vi.fn().mockReturnValue(null),
+    sortVoicesPreferLocaleFunc: vi.fn(() => () => 0),
   },
 }));
 
@@ -55,6 +56,10 @@ vi.mock('@/utils/node', () => ({
 
 vi.mock('@/utils/lang', () => ({
   isValidLang: vi.fn(() => true),
+  isSameLang: vi.fn(
+    (a?: string, b?: string) =>
+      (a || '').split('-')[0]!.toLowerCase() === (b || '').split('-')[0]!.toLowerCase(),
+  ),
 }));
 
 vi.mock('foliate-js/tts.js', () => ({
@@ -368,7 +373,11 @@ describe('TTSController', () => {
       vi.mocked(controller.ttsWebClient.getVoices).mockResolvedValue(webVoices);
 
       const result = await controller.getVoices('en');
-      expect(result).toEqual([...edgeVoices, ...webVoices]);
+      // The fork registers the Fish (Claire) client too; its group is listed
+      // alongside the mocked engines. Assert on the mocked ones + its presence.
+      const nonFish = result.filter((g) => g.id !== 'fish-audio');
+      expect(nonFish).toEqual([...edgeVoices, ...webVoices]);
+      expect(result.some((g) => g.id === 'fish-audio')).toBe(true);
     });
 
     test('includes native voices when available', async () => {
@@ -384,7 +393,7 @@ describe('TTSController', () => {
       vi.mocked(c.ttsWebClient.getVoices).mockResolvedValue([]);
 
       const result = await c.getVoices('en');
-      expect(result).toEqual(nativeVoices);
+      expect(result.filter((g) => g.id !== 'fish-audio')).toEqual(nativeVoices);
     });
   });
 

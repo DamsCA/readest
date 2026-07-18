@@ -25,7 +25,12 @@ export const genSSMLRaw = (text: string) => {
 
 export const parseSSMLLang = (ssml: string, primaryLang?: string): string => {
   let lang = 'en';
-  const match = ssml.match(/xml:lang\s*=\s*"([^"]+)"/);
+  // Anchor to the <speak> tag. An unanchored match grabbed the FIRST xml:lang
+  // anywhere — in translation mode that's an injected <lang xml:lang="fr">
+  // block, which poisoned the session language to the TARGET language and made
+  // filterSSMLWithLang treat English source chapters as French (the
+  // "reads English at chapter change" bug).
+  const match = ssml.match(/<speak[^>]*\bxml:lang\s*=\s*"([^"]+)"/i);
   if (match && match[1]) {
     // Normalize each subtag by its role instead of blindly uppercasing the
     // second one: 2-letter = region (UPPER), 4-letter = script (Title), so
@@ -84,14 +89,28 @@ export const parseSSMLMarks = (ssml: string, primaryLang?: string) => {
       if (text && activeMark && isValidMark(text)) {
         const offset = plainText.length;
         plainText += text;
-        marks.push({
-          offset,
-          name: activeMark,
-          text,
-          language: inferLangFromScript(text, currentLang) || currentLang,
-        });
+        const language = inferLangFromScript(text, currentLang) || currentLang;
+        const prev = marks[marks.length - 1];
+        if (prev && prev.name === activeMark && isSameLang(prev.language, language)) {
+          // Re-join fragments of one sentence split by inner tags (<break/>,
+          // surviving wrappers). Keeping the utterance whole preserves the
+          // audible sentence AND makes runtime cache keys match the
+          // whole-sentence keys used by prefetch banking.
+          const sep = /\s$/.test(prev.text) || /^[\p{P}\p{S}]/u.test(text) ? '' : ' ';
+          prev.text += sep + text;
+        } else {
+          marks.push({ offset, name: activeMark, text, language });
+        }
       } else {
-        plainText += cleanTextContent(rawText);
+        const cleaned = cleanTextContent(rawText);
+        // Punctuation/symbol-only fragment (e.g. a closing quote isolated by a
+        // wrapper tag): glue it to the current mark instead of dropping it,
+        // so the spoken sentence keeps its punctuation (prosody) intact.
+        const prev = marks[marks.length - 1];
+        if (cleaned && activeMark && prev && prev.name === activeMark) {
+          prev.text += cleaned;
+        }
+        plainText += cleaned;
       }
     } else {
       const isEnd = match[1] === '/';
@@ -218,7 +237,11 @@ export const filterSSMLWithLang = (
   // so grabbing it keeps each French sentence attached to its OWN mark — the
   // highlight range then lines up with the spoken text instead of pointing at
   // the source sentence.
-  const langBlockRegex = /(<mark\b[^>]*\/?>\s*)?<lang\s+xml:lang="([^"]+)"[^>]*>(.*?)<\/lang>/gs;
+  // Also tolerate a <break/> between the mark and its <lang> block: the
+  // injector's line-break option becomes <break/> in SSML, and without this the
+  // mark was left behind (dead highlight → page-follow starves).
+  const langBlockRegex =
+    /(<mark\b[^>]*\/?>\s*(?:<break\b[^>]*\/?>\s*)?)?<lang\s+xml:lang="([^"]+)"[^>]*>(.*?)<\/lang>/gs;
   let match: RegExpExecArray | null;
 
   const tempRegex = new RegExp(langBlockRegex.source, langBlockRegex.flags);
@@ -252,9 +275,14 @@ export const filterSSMLWithLang = (
       .map((block, i) => {
         const startsWithMark = /^\s*<mark\b/i.test(block.match);
         const langThenMark = /^\s*<lang\b[^>]*>\s*<mark\b/i.test(block.match);
-        return startsWithMark || langThenMark
-          ? block.match
-          : `<mark name="ttsfilter-${i}"/>${block.match}`;
+        if (startsWithMark || langThenMark) return block.match;
+        // No leading mark: synthesize one. Reuse the first REAL mark name found
+        // inside the block when present, so foliate's setMark() can resolve it
+        // and the highlight / page-follow stay alive (a made-up name resolves
+        // to nothing — audio plays but the view stops tracking).
+        const inner = block.match.match(/<mark\b[^>]*name="([^"]+)"/i);
+        const name = inner ? inner[1] : `ttsfilter-${i}`;
+        return `<mark name="${name}"/>${block.match}`;
       })
       .join('');
     return `${speakOpenMatch[0]}${combinedContent}${speakCloseMatch[0]}`;

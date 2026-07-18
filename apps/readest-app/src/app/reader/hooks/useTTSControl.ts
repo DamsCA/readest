@@ -756,8 +756,11 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
           ttsController.setLang(lang);
           ttsController.setRate(viewSettings.ttsRate);
-          ttsController.speak(ssml, oneTime, () => handleStop(bookKey));
+          // Target lang MUST be set before speak(): the first utterance's
+          // preprocessing reads it, and relying on await-suspension ordering to
+          // sneak it in afterwards is fragile (risked reading the source lang).
           ttsController.setTargetLang(getTTSTargetLang() || '');
+          ttsController.speak(ssml, oneTime, () => handleStop(bookKey));
         }
         setTtsClientsInitialized(true);
         setTTSEnabled(bookKey, true);
