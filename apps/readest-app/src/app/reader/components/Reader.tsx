@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import * as React from 'react';
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useEnv } from '@/context/EnvContext';
@@ -68,8 +68,15 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
   const { getIsNotebookVisible, setNotebookVisible } = useNotebookStore();
   const { isDarkMode, systemUIAlwaysHidden, isRoundedWindow } = useThemeStore();
 
+  // Keep the screen awake while TTS is active. On Android the WebView (and thus
+  // the audio + the idle bank-ahead loop) is frozen once the screen sleeps, so
+  // if we let the device sleep mid-listen Claire stops reading AND stops banking
+  // the rest of the book. Force the lock whenever playback is 'playing' OR
+  // 'paused' (banking runs while paused), on top of the user's book-open setting.
+  const [ttsActive, setTtsActive] = useState(false);
+
   useTheme({ systemUIVisible: settings.alwaysShowStatusBar, appThemeColor: 'base-100' });
-  useScreenWakeLock(settings.screenWakeLock);
+  useScreenWakeLock(settings.screenWakeLock || ttsActive);
   useTransferQueue(libraryLoaded, 5000);
   // Reader needs dictionaries for word-lookup, fonts for rendering, and
   // textures for the page background. Mounted here (not in the app-
@@ -85,6 +92,19 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
       setTimeout(getSysFontsList, 3000);
     }
     initDayjs(getLocale());
+  }, []);
+
+  // Mirror any book's TTS playback into `ttsActive` so the wake lock above holds
+  // while Claire is reading or paused (and banking). 'stopped' releases it.
+  useEffect(() => {
+    const handlePlaybackState = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { state?: string };
+      setTtsActive(detail?.state === 'playing' || detail?.state === 'paused');
+    };
+    eventDispatcher.on('tts-playback-state', handlePlaybackState);
+    return () => {
+      eventDispatcher.off('tts-playback-state', handlePlaybackState);
+    };
   }, []);
 
   useEffect(() => {

@@ -110,7 +110,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   alwaysInForeground: false,
   autoCheckUpdates: true,
   updateChannel: 'stable',
-  screenWakeLock: false,
+  screenWakeLock: true, // Claire fork: keep the screen awake while a book is open
   screenBrightness: -1, // -1~100, -1 for system default
   autoScreenBrightness: true,
   swipeBrightnessGesture: true,
