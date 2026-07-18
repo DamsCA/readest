@@ -12,8 +12,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const apiKey =
-    process.env['FISHAUDIO_API_KEY'] || process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'];
+  const apiKey = process.env['FISHAUDIO_API_KEY'] || process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'];
   if (!apiKey) {
     return new Response('Fish Audio API key not configured', { status: 500 });
   }
