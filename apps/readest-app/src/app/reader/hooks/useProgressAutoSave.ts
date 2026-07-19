@@ -23,26 +23,37 @@ export const useProgressAutoSave = (bookKey: string) => {
   const lastSavedLocationRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
 
+  // The real persistence step: eagerly writes the per-book config.json (the
+  // source of truth for the EXACT reading spot). Awaitable and idempotent —
+  // returns immediately when the location hasn't moved since the last save, so
+  // it's safe to call from the debounce, on unmount, and on app-background.
+  // Kept in a ref so the (stable) debounced wrapper and the lifecycle listeners
+  // always run the latest closure without being recreated.
+  const persistRef = useRef<() => Promise<void>>(async () => {});
+  persistRef.current = async () => {
+    // Skip while previewing a deep-link target — the user's actual
+    // last-read position should not be overwritten by a transient view.
+    if (useReaderStore.getState().getViewState(bookKey)?.previewMode) return;
+    const config = getConfig(bookKey);
+    if (!config) return;
+    // setProgress writes config.location synchronously on every relocate, so
+    // by the time a progress change reaches us this is already up to date.
+    const currentLocation = config.location ?? null;
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      lastSavedLocationRef.current = currentLocation;
+      return;
+    }
+    if (currentLocation === lastSavedLocationRef.current) return;
+    const settings = useSettingsStore.getState().settings;
+    await saveConfig(envConfig, bookKey, config, settings);
+    lastSavedLocationRef.current = currentLocation;
+  };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const saveBookConfig = useCallback(
     debounce(() => {
-      setTimeout(async () => {
-        // Skip while previewing a deep-link target — the user's actual
-        // last-read position should not be overwritten by a transient view.
-        if (useReaderStore.getState().getViewState(bookKey)?.previewMode) return;
-        const config = getConfig(bookKey);
-        if (!config) return;
-        const currentLocation = config.location ?? null;
-        if (!initializedRef.current) {
-          initializedRef.current = true;
-          lastSavedLocationRef.current = currentLocation;
-          return;
-        }
-        if (currentLocation === lastSavedLocationRef.current) return;
-        const settings = useSettingsStore.getState().settings;
-        await saveConfig(envConfig, bookKey, config, settings);
-        lastSavedLocationRef.current = currentLocation;
-      }, 500);
+      void persistRef.current();
     }, 1000),
     [],
   );
@@ -65,17 +76,31 @@ export const useProgressAutoSave = (bookKey: string) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress, bookKey]);
 
-  // On unmount (book closed / navigated away), flush any pending throttled
-  // library.json write so the shelf reflects this session's last read
-  // position next time it loads. The per-book config.json is already on
-  // disk from the eager save in `saveConfig`, so this only catches the
-  // library-level rollup.
+  // Force-flush the exact reading position the instant the app is backgrounded
+  // or the book is closed. On Android the WebView is frozen/killed on background
+  // WITHOUT unmounting React, and closing the book within the ~1s debounce
+  // window used to drop the last move entirely — the per-book config.json was
+  // never rewritten, so reopening landed on a stale position. visibilitychange
+  // (hidden) is the reliable pre-freeze hook on mobile; pagehide + the unmount
+  // cleanup cover web reloads and in-app navigation.
   useEffect(() => {
-    return () => {
-      flushPendingLibrarySave().catch(() => {
-        // Best-effort on teardown — failures fall through to next launch's
-        // reconstruction from per-book config.json files.
-      });
+    const flushNow = () => {
+      saveBookConfig.cancel();
+      void persistRef.current();
+      void flushPendingLibrarySave();
     };
-  }, []);
+    const onVisibility = () => {
+      if (document.hidden) flushNow();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flushNow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flushNow);
+      // Book closed / navigated away: persist the final position + roll up the
+      // throttled library.json write.
+      flushNow();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveBookConfig]);
 };
