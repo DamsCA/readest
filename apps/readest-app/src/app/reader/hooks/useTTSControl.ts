@@ -379,17 +379,28 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       });
     };
 
+    // Forward the "minutes d'avance" (banked-ahead) signal onto the app bus so
+    // the TTS bar can show how much audio is pre-downloaded ahead of the playhead.
+    const handleBankedAhead = (e: Event) => {
+      eventDispatcher.dispatch('tts-banked-ahead', {
+        bookKey,
+        ...(e as CustomEvent).detail,
+      });
+    };
+
     ttsController.addEventListener('tts-need-auth', handleNeedAuth);
     ttsController.addEventListener('tts-speak-mark', handleSpeakMark);
     ttsController.addEventListener('tts-highlight-mark', handleHighlightMark);
     ttsController.addEventListener('tts-highlight-word', handleHighlightWord);
     ttsController.addEventListener('tts-position', handlePosition);
+    ttsController.addEventListener('tts-banked-ahead', handleBankedAhead);
     return () => {
       ttsController.removeEventListener('tts-need-auth', handleNeedAuth);
       ttsController.removeEventListener('tts-speak-mark', handleSpeakMark);
       ttsController.removeEventListener('tts-highlight-mark', handleHighlightMark);
       ttsController.removeEventListener('tts-highlight-word', handleHighlightWord);
       ttsController.removeEventListener('tts-position', handlePosition);
+      ttsController.removeEventListener('tts-banked-ahead', handleBankedAhead);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsController, bookKey]);

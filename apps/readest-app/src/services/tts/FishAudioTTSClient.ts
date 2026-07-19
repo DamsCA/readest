@@ -232,6 +232,44 @@ export class FishAudioTTSClient implements TTSClient {
   // generated twice concurrently (e.g. playback catching up to a preload).
   #inFlight = new Map<string, { promise: Promise<string>; priority: 'high' | 'low' }>();
 
+  // "Minutes d'avance" indicator: sentences banked ahead of the playhead by
+  // low-priority preloads (idle bank-ahead during a pause, playback lookahead),
+  // keyed by cacheKey -> character count. Keying by the FINAL synthesized text
+  // means banking (low) and playback (high) converge on the same key, so a
+  // sentence added when banked is removed when played — correct even in
+  // translation mode (both sides see the French text). Summed and converted to
+  // an estimated listen time that the TTS bar shows so the banking is visible.
+  #bankedAhead = new Map<string, number>();
+  #bankedNotifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  #noteBanked(key: string, chars: number) {
+    if (this.#bankedAhead.has(key)) return;
+    // Bound memory: a deep pause bank could otherwise grow unbounded. Drop the
+    // oldest (closest-behind) entry — over-count after a seek self-corrects.
+    if (this.#bankedAhead.size >= 512) {
+      const oldest = this.#bankedAhead.keys().next().value;
+      if (oldest !== undefined) this.#bankedAhead.delete(oldest);
+    }
+    this.#bankedAhead.set(key, chars);
+    this.#scheduleBankedNotify();
+  }
+
+  #noteConsumed(key: string) {
+    if (this.#bankedAhead.delete(key)) this.#scheduleBankedNotify();
+  }
+
+  #scheduleBankedNotify() {
+    if (this.#bankedNotifyTimer) return;
+    this.#bankedNotifyTimer = setTimeout(() => {
+      this.#bankedNotifyTimer = null;
+      let chars = 0;
+      for (const c of this.#bankedAhead.values()) chars += c;
+      // ~14 chars/sec of speech at rate 1.0 (FR/EN average); scale by rate.
+      const minutes = chars / (14 * (this.#rate || 1)) / 60;
+      this.controller?.dispatchEvent(new CustomEvent('tts-banked-ahead', { detail: { minutes } }));
+    }, 700);
+  }
+
   constructor(controller?: TTSController, appService?: AppService | null) {
     this.controller = controller;
     this.appService = appService;
@@ -500,6 +538,9 @@ export class FishAudioTTSClient implements TTSClient {
         const voiceId = this.getVoiceIdFromLang(mark.language);
         try {
           await this.#synthesize(voiceId, mark.text, signal, 'low');
+          // Reached only on success (throws are caught below): this sentence is
+          // now banked ahead of the playhead — count it toward "minutes d'avance".
+          this.#noteBanked(this.#cacheKey(voiceId, mark.text), mark.text.length);
         } catch (err) {
           console.warn('Fish Audio preload failed for mark', i, err);
         }
@@ -552,6 +593,9 @@ export class FishAudioTTSClient implements TTSClient {
         }
 
         this.controller?.dispatchSpeakMark(mark);
+        // This sentence is now playing — it's no longer "ahead", so drop it from
+        // the banked-ahead tally (keyed by the same final text as when banked).
+        this.#noteConsumed(this.#cacheKey(voiceId, mark.text));
         yield {
           code: 'boundary',
           message: `Start chunk: ${mark.name}`,
@@ -887,5 +931,13 @@ export class FishAudioTTSClient implements TTSClient {
       URL.revokeObjectURL(url);
     }
     this.#audioCache.clear();
+    // Reset the banked-ahead tally + notify zero so the TTS bar clears its
+    // "minutes d'avance" when the book is closed.
+    this.#bankedAhead.clear();
+    if (this.#bankedNotifyTimer) {
+      clearTimeout(this.#bankedNotifyTimer);
+      this.#bankedNotifyTimer = null;
+    }
+    this.controller?.dispatchEvent(new CustomEvent('tts-banked-ahead', { detail: { minutes: 0 } }));
   }
 }
