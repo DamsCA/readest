@@ -258,16 +258,27 @@ export class FishAudioTTSClient implements TTSClient {
     if (this.#bankedAhead.delete(key)) this.#scheduleBankedNotify();
   }
 
+  #emitBankedNow() {
+    let chars = 0;
+    for (const c of this.#bankedAhead.values()) chars += c;
+    // ~14 chars/sec of speech at rate 1.0 (FR/EN average); scale by rate.
+    const minutes = chars / (14 * (this.#rate || 1)) / 60;
+    this.controller?.dispatchEvent(new CustomEvent('tts-banked-ahead', { detail: { minutes } }));
+  }
+
   #scheduleBankedNotify() {
     if (this.#bankedNotifyTimer) return;
     this.#bankedNotifyTimer = setTimeout(() => {
       this.#bankedNotifyTimer = null;
-      let chars = 0;
-      for (const c of this.#bankedAhead.values()) chars += c;
-      // ~14 chars/sec of speech at rate 1.0 (FR/EN average); scale by rate.
-      const minutes = chars / (14 * (this.#rate || 1)) / 60;
-      this.controller?.dispatchEvent(new CustomEvent('tts-banked-ahead', { detail: { minutes } }));
+      this.#emitBankedNow();
     }, 700);
+  }
+
+  // Re-emit the current banked-ahead value immediately, so a control panel that
+  // opens mid-pause shows the runway right away instead of waiting for the next
+  // bank/consume tick.
+  emitBankedAhead() {
+    this.#emitBankedNow();
   }
 
   constructor(controller?: TTSController, appService?: AppService | null) {

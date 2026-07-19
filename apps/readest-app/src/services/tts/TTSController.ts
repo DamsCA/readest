@@ -869,6 +869,10 @@ export class TTSController extends EventTarget {
 
   async pause() {
     this.state = 'paused';
+    // Surface the current "minutes d'avance" immediately so the control panel
+    // shows the banked runway the moment the user pauses (banking then keeps it
+    // growing via its own ticks).
+    (this.ttsFishClient as FishAudioTTSClient).emitBankedAhead?.();
     if (!(await this.ttsClient.pause().catch((e) => this.error(e)))) {
       await this.stop();
       this.state = 'stop-paused';

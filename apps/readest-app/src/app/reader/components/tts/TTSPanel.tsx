@@ -1,6 +1,13 @@
 import clsx from 'clsx';
 import { useState, ChangeEvent, useEffect } from 'react';
-import { MdPlayCircle, MdPauseCircle, MdFastRewind, MdFastForward, MdAlarm } from 'react-icons/md';
+import {
+  MdPlayCircle,
+  MdPauseCircle,
+  MdFastRewind,
+  MdFastForward,
+  MdAlarm,
+  MdOutlineCloudDownload,
+} from 'react-icons/md';
 import { TbChevronCompactDown, TbChevronCompactUp } from 'react-icons/tb';
 import { RiVoiceAiFill } from 'react-icons/ri';
 import { MdCheck } from 'react-icons/md';
@@ -11,6 +18,7 @@ import { TranslationFunc, useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useDefaultIconSize, useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { getLanguageName } from '@/utils/lang';
+import { eventDispatcher } from '@/utils/event';
 
 type TTSPanelProps = {
   bookKey: string;
@@ -127,6 +135,25 @@ const TTSPanel = ({
   const [rate, setRate] = useState(viewSettings?.ttsRate ?? 1.0);
   const [selectedVoice, setSelectedVoice] = useState(viewSettings?.ttsVoice ?? '');
 
+  // "Minutes d'avance": audio pre-downloaded ahead of the playhead by the banker
+  // (grows while paused, consumed while playing). Emitted by the Claire client.
+  const [bankedMinutes, setBankedMinutes] = useState(0);
+  useEffect(() => {
+    const onBanked = (event: CustomEvent) => {
+      const detail = event.detail as { bookKey?: string; minutes?: number };
+      if (detail?.bookKey && detail.bookKey !== bookKey) return;
+      setBankedMinutes(detail?.minutes ?? 0);
+    };
+    eventDispatcher.on('tts-banked-ahead', onBanked);
+    return () => eventDispatcher.off('tts-banked-ahead', onBanked);
+  }, [bookKey]);
+  const bankedLabel =
+    bankedMinutes >= 1
+      ? `~${Math.round(bankedMinutes)} min d'avance`
+      : bankedMinutes > 0
+        ? "<1 min d'avance"
+        : null;
+
   const [timeoutCountdown, setTimeoutCountdown] = useState(() => {
     return getCountdownTime(timeoutTimestamp);
   });
@@ -204,6 +231,15 @@ const TTSPanel = ({
 
   return (
     <div className='flex w-full flex-col items-center justify-center gap-2 rounded-2xl px-4 pt-4 sm:gap-1'>
+      {bankedLabel && (
+        <div
+          className='text-base-content/60 flex items-center gap-1 text-xs'
+          title='Audio déjà téléchargé en avance (lecture hors-ligne possible)'
+        >
+          <MdOutlineCloudDownload size={14} />
+          <span>{bankedLabel}</span>
+        </div>
+      )}
       <div className='flex w-full flex-col items-center gap-0.5'>
         <input
           className='range'
