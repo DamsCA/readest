@@ -94,6 +94,22 @@ const resolveClaireServerUrl = async (
 // the PC off. Only brand-new, never-read text needs the server.
 const PERSIST_CACHE_NAME = 'claire-tts-audio-v1';
 
+// Normalize a sentence for the audio CACHE KEY (and thus for what's sent to the
+// server, so app ↔ server r2_key stay consistent). Banking reconstructs its text
+// from SSML marks while playback reads the injected translation DOM, so the two
+// diverge on trivial formatting — list bullets ("• foo" vs "- foo"), leading
+// whitespace, and collapsed runs of spaces/newlines. Left unnormalized, the
+// banked audio lands under a key playback never looks up, so it regenerates the
+// sentence live mid-read (the "N min d'avance yet it stalls" bug). Only leading
+// list markers + whitespace are touched — the spoken content is identical, so
+// reuse is safe and this can't collide two genuinely different sentences. A
+// clean sentence normalizes to itself, so existing cache entries keep their key.
+const normalizeTTSText = (s: string): string =>
+  s
+    .replace(/\s+/g, ' ')
+    .replace(/^(?:[•·‣◦⁃∙▪●*]+\s*|[-–—]+\s+)/u, '')
+    .trim();
+
 const hashText = (s: string): string => {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
@@ -295,7 +311,10 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   #cacheKey(voiceId: string, text: string) {
-    return `${voiceId}:${text}`;
+    // Normalize so banked/played variants of the same sentence share one key,
+    // and so the gauge's noteBanked/noteConsumed (called with raw mark text)
+    // line up across the two paths. See normalizeTTSText.
+    return `${voiceId}:${normalizeTTSText(text)}`;
   }
 
   async #synthesize(
@@ -304,6 +323,10 @@ export class FishAudioTTSClient implements TTSClient {
     signal: AbortSignal,
     priority: 'high' | 'low' = 'high',
   ): Promise<string> {
+    // Normalize ONCE up front so every downstream key (memory cacheKey, on-device
+    // persist hash, R2 hash) and the text sent to the server all agree — banking
+    // and playback then converge on the same key despite formatting differences.
+    text = normalizeTTSText(text);
     const cacheKey = this.#cacheKey(voiceId, text);
     const cached = this.#audioCache.get(cacheKey);
     if (cached) {
