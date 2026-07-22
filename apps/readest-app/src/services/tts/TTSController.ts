@@ -540,19 +540,22 @@ export class TTSController extends EventTarget {
       void this.#prefetchNextSection();
     }
 
+    const ssmls: string[] = [];
+    for (const raw of rawSsmls) {
+      const ssml = await this.#preprocessSSML(raw);
+      if (!ssml) break;
+      ssmls.push(ssml);
+    }
     // Tie preloads to the current speak session so navigating/stopping cancels
     // in-flight preloads instead of leaving uncancellable requests running (and,
     // for Fish, creating blob URLs) for a position the user already left.
     // SEQUENTIAL on purpose: firing all paragraphs concurrently let the server
     // generate them in arbitrary wake-up order, so the audio needed NEXT could
     // wait behind paragraph 9. Playback-order banking removes those stalls.
-    // #preloadRawAhead translates untranslated-yet paragraphs so the lookahead
-    // no longer STOPS at the first paragraph below the viewport (which used to
-    // leave the near future un-banked -> live generation -> mid-read stall).
     const preloadSignal = this.#currentSpeakAbortController?.signal ?? new AbortController().signal;
-    for (const raw of rawSsmls) {
+    for (const ssml of ssmls) {
       if (preloadSignal.aborted) break;
-      await this.#preloadRawAhead(raw, preloadSignal);
+      await this.preloadSSML(ssml, preloadSignal);
     }
   }
 
@@ -578,57 +581,8 @@ export class TTSController extends EventTarget {
     if (advanced < skip + depth) void this.#prefetchNextSection();
     for (const raw of rawSsmls) {
       if (signal.aborted) return;
-      await this.#preloadRawAhead(raw, signal);
-    }
-  }
-
-  // Preload ONE paragraph's audio, translating it ahead if needed.
-  //
-  // In translation mode, paragraphs below the viewport have no French injected
-  // in the live DOM yet, so filterSSMLWithLang (inside #preprocessSSML) returns
-  // an empty utterance and they'd never be banked — playback then reaches them
-  // cold and has to translate + generate live (the "2 min d'avance but it still
-  // stalled" bug: the banked total wasn't CONTIGUOUS with the playhead). When
-  // that happens, translate the paragraph's source text directly and bank the
-  // French audio with the SAME sentence segmentation playback uses, so the cache
-  // keys match byte-for-byte (identical to #prefetchNextSection's approach).
-  async #preloadRawAhead(raw: string, signal: AbortSignal) {
-    // Best-effort banking: a preload/translate failure (server hiccup, tunnel
-    // reset) must never surface as an unhandled rejection — some preloadNextSSML
-    // call sites are fire-and-forget. Playback just regenerates the paragraph.
-    try {
       const ssml = await this.#preprocessSSML(raw);
-      // Gate on real MARKS, not string truthiness: in translation mode
-      // #preprocessSSML → filterSSMLWithLang returns a truthy-but-markless empty
-      // utterance ("<speak…></speak>") for a paragraph whose French isn't injected
-      // in the live DOM yet. `if (ssml)` would swallow that and skip the fallback.
-      if (ssml && parseSSMLMarks(ssml).marks.length > 0) {
-        await this.preloadSSML(ssml, signal);
-        return;
-      }
-      if (!this.ttsTargetLang || !this.prefetchTranslations) return;
-      // Translate the WHOLE paragraph as ONE string. The reader's injector does
-      // the same (translate([el.textContent])) and MT is context-dependent, so
-      // translating sentence-by-sentence yields DIFFERENT French — hence different
-      // audio cache keys than playback ever looks up (banked audio wasted, still
-      // stalls). Reconstruct the paragraph, translate once, then segment exactly
-      // like #prefetchNextSection / #speak's empty-retry warm path so keys match.
-      const { marks } = parseSSMLMarks(raw);
-      const paraText = marks
-        .map((m) => m.text)
-        .join(' ')
-        .replaceAll('\n', '')
-        .trim();
-      if (!paraText) return;
-      const translated = await this.prefetchTranslations([paraText]).catch(() => null);
-      if (!translated?.[0] || signal.aborted) return;
-      const blockLang = (this.ttsLang || 'en').split('-')[0] || 'en';
-      const sentences = prefetchSentenceTexts(translated[0], blockLang);
-      if (sentences.length === 0) return;
-      const body = sentences.map((s, j) => `<mark name="ba${j}"/>${s}`).join('');
-      await this.preloadSSML(`<speak xml:lang="${this.ttsTargetLang}">${body}</speak>`, signal);
-    } catch {
-      // swallow — banking is opportunistic
+      if (ssml) await this.preloadSSML(ssml, signal);
     }
   }
 
