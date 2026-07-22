@@ -138,14 +138,19 @@ export function useTextTranslation(
 
         if (lastIdx === -1) return;
 
-        // Translate well past the visible range (not just +2) so that when TTS
-        // follows the reading position, upcoming paragraphs are already in French
-        // by the time the audio prefetch reaches them — no stall waiting on the
-        // translator. Concurrency is still capped by MAX_CONCURRENT_TRANSLATIONS,
+        // Translate well past the visible range so that when TTS follows the
+        // reading position, upcoming paragraphs are already in French by the time
+        // the audio prefetch reaches them — no stall waiting on the translator.
+        // This is what makes banked audio actually REUSABLE in translation mode:
+        // the banker/lookahead read the LIVE DOM via view.tts.next(), so only a
+        // paragraph whose French is already injected here yields the exact text
+        // (and thus the exact audio cache key) playback will later synthesize.
+        // Reach far enough to stay ahead of preloadNextSSML's lookahead (~10) plus
+        // the visible span. Concurrency is capped by MAX_CONCURRENT_TRANSLATIONS
         // and already-translated paragraphs are skipped, so this only front-loads
         // work that would happen anyway.
         const startIdx = Math.max(0, firstIdx - 1);
-        const endIdx = Math.min(nodes.length - 1, lastIdx + 8);
+        const endIdx = Math.min(nodes.length - 1, lastIdx + 16);
 
         for (let i = startIdx; i <= endIdx; i++) {
           const node = nodes[i];
