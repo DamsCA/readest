@@ -9,6 +9,8 @@ import {
   MdOutlineCloudDownload,
   MdMovie,
   MdOutlineMovie,
+  MdShortText,
+  MdTextFields,
 } from 'react-icons/md';
 import { TbChevronCompactDown, TbChevronCompactUp } from 'react-icons/tb';
 import { RiVoiceAiFill } from 'react-icons/ri';
@@ -21,6 +23,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useDefaultIconSize, useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { getLanguageName } from '@/utils/lang';
 import { eventDispatcher } from '@/utils/event';
+import { saveViewSettings } from '@/helpers/settings';
+import type { TTSHighlightGranularity } from '@/services/tts/types';
 
 type TTSPanelProps = {
   bookKey: string;
@@ -181,12 +185,22 @@ const TTSPanel = ({
   const toggleCinematic = () => {
     const next = !cinematic;
     setCinematic(next);
-    const vs = getViewSettings(bookKey)!;
-    vs.cinematicMode = next;
-    settings.globalViewSettings.cinematicMode = next;
-    setViewSettings(bookKey, vs);
-    setSettings(settings);
-    saveSettings(envConfig, settings);
+    // saveViewSettings re-applies getStyles immediately (injects/removes the
+    // spotlight CSS) and builds a fresh settings object so the change actually
+    // takes effect — an in-place mutation kept the same ref and did nothing.
+    void saveViewSettings(envConfig, bookKey, 'cinematicMode', next);
+  };
+
+  const [granularity, setGranularity] = useState<TTSHighlightGranularity>(
+    viewSettings?.ttsHighlightGranularity ?? 'sentence',
+  );
+  const toggleGranularity = () => {
+    // Word-level karaoke is SYNTHETIC (the model gives no real word timings), so
+    // it drifts/races on French. Sentence-level lights the whole spoken sentence
+    // — always in sync. One tap to switch.
+    const next: TTSHighlightGranularity = granularity === 'word' ? 'sentence' : 'word';
+    setGranularity(next);
+    void saveViewSettings(envConfig, bookKey, 'ttsHighlightGranularity', next);
   };
 
   const handleSelectVoice = (voice: string, lang: string) => {
@@ -311,6 +325,22 @@ const TTSPanel = ({
           aria-label={_('Next Paragraph')}
         >
           <MdFastForward size={iconSize32} />
+        </button>
+        <button
+          onClick={toggleGranularity}
+          className='rounded-full p-1 opacity-70 transition-transform duration-200 hover:scale-105'
+          title={
+            granularity === 'word'
+              ? _('Highlight: word-by-word (tap for sentence)')
+              : _('Highlight: full sentence (tap for word-by-word)')
+          }
+          aria-label={_('Toggle highlight granularity')}
+        >
+          {granularity === 'word' ? (
+            <MdTextFields size={iconSize32} />
+          ) : (
+            <MdShortText size={iconSize32} />
+          )}
         </button>
         <button
           onClick={toggleCinematic}
