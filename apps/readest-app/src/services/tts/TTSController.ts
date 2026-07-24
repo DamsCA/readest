@@ -213,6 +213,11 @@ export class TTSController extends EventTarget {
 
   #getHighlighter() {
     return (range: Range) => {
+      // Cinematic spotlight: mark the spoken paragraph so the injected CSS can
+      // lift it out of the dimmed page. Runs before the suppress check so it
+      // tracks the block during word-by-word narration too (idempotent per
+      // block). Inert unless cinematic mode injected the spotlight CSS.
+      this.#setCurrentBlock(range);
       // Suppress the sentence highlight that foliate's setMark draws when the
       // active client highlights word-by-word. The flag is only set around the
       // synchronous setMark call, so word draws (dispatchSpeakWord) and paused
@@ -240,6 +245,43 @@ export class TTSController extends EventTarget {
     const content = this.#getPrimaryContent();
     const overlayer = content?.overlayer as Overlayer | undefined;
     overlayer?.remove(HIGHLIGHT_KEY);
+  }
+
+  // --- Cinematic reading spotlight (rack focus) -----------------------------
+  // Element currently lifted out of the dimmed page. Tracked so we can clear the
+  // class off the previous block when narration moves on.
+  #currentBlockEl: Element | null = null;
+
+  // Toggle the <html>.tts-spotlight gate that arms the injected dim CSS. On =
+  // narrating (dim the page); off = clear so the page reads normally.
+  #setSpotlight(on: boolean) {
+    try {
+      const doc = this.#getPrimaryContent()?.doc;
+      doc?.documentElement?.classList.toggle('tts-spotlight', on);
+      if (!on) {
+        this.#currentBlockEl?.classList.remove('tts-current-block');
+        this.#currentBlockEl = null;
+      }
+    } catch {
+      // Doc may be detached mid-navigation; the next play re-arms it.
+    }
+  }
+
+  // Mark the spoken range's block ancestor so the spotlight CSS keeps it lit.
+  #setCurrentBlock(range: Range) {
+    try {
+      let node: Node | null = range?.startContainer ?? null;
+      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      const el = node as Element | null;
+      const block =
+        el?.closest?.('p, li, blockquote, h1, h2, h3, h4, h5, h6, dd, figcaption, td') ?? el;
+      if (!block || block === this.#currentBlockEl) return;
+      this.#currentBlockEl?.classList.remove('tts-current-block');
+      block.classList.add('tts-current-block');
+      this.#currentBlockEl = block;
+    } catch {
+      // Ranges can briefly span documents during a section change; ignore.
+    }
   }
 
   updateHighlightOptions(options: TTSHighlightOptions) {
@@ -655,6 +697,7 @@ export class TTSController extends EventTarget {
       try {
         console.log('[TTS] speak');
         this.state = 'playing';
+        this.#setSpotlight(true);
 
         signal.addEventListener('abort', () => {
           resolve();
@@ -869,6 +912,9 @@ export class TTSController extends EventTarget {
 
   async pause() {
     this.state = 'paused';
+    // Lift the cinematic dim while paused so the reader can scan the whole page;
+    // resume() re-arms it. (stop() is NOT used here — it fires per paragraph.)
+    this.#setSpotlight(false);
     // Surface the current "minutes d'avance" immediately so the control panel
     // shows the banked runway the moment the user pauses (banking then keeps it
     // growing via its own ticks).
@@ -881,6 +927,7 @@ export class TTSController extends EventTarget {
 
   async resume() {
     this.state = 'playing';
+    this.#setSpotlight(true);
     await this.ttsClient.resume().catch((e) => this.error(e));
   }
 
@@ -1213,6 +1260,7 @@ export class TTSController extends EventTarget {
     this.stopIdleBanking();
     this.#prefetchAbortController.abort();
     await this.stop();
+    this.#setSpotlight(false);
     this.#clearHighlighter();
     this.#ttsSectionIndex = -1;
     this.view.tts = null;

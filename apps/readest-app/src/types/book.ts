@@ -282,6 +282,10 @@ export interface ViewConfig {
 
   showHeader: boolean;
   showFooter: boolean;
+  // Cinematic reading mode: while TTS narrates, dim everything but the spoken
+  // sentence (rack-focus spotlight), hide the reader chrome, and frame the page
+  // with letterbox + vignette so the book reads like a film.
+  cinematicMode: boolean;
   showRemainingTime: boolean;
   showRemainingPages: boolean;
   showProgressInfo: boolean;

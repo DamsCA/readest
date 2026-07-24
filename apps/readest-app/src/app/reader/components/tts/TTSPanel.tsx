@@ -7,6 +7,8 @@ import {
   MdFastForward,
   MdAlarm,
   MdOutlineCloudDownload,
+  MdMovie,
+  MdOutlineMovie,
 } from 'react-icons/md';
 import { TbChevronCompactDown, TbChevronCompactUp } from 'react-icons/tb';
 import { RiVoiceAiFill } from 'react-icons/ri';
@@ -175,6 +177,18 @@ const TTSPanel = ({
     saveSettings(envConfig, settings);
   };
 
+  const [cinematic, setCinematic] = useState(!!viewSettings?.cinematicMode);
+  const toggleCinematic = () => {
+    const next = !cinematic;
+    setCinematic(next);
+    const vs = getViewSettings(bookKey)!;
+    vs.cinematicMode = next;
+    settings.globalViewSettings.cinematicMode = next;
+    setViewSettings(bookKey, vs);
+    setSettings(settings);
+    saveSettings(envConfig, settings);
+  };
+
   const handleSelectVoice = (voice: string, lang: string) => {
     onSetVoice(voice, lang);
     setSelectedVoice(voice);
@@ -297,6 +311,18 @@ const TTSPanel = ({
           aria-label={_('Next Paragraph')}
         >
           <MdFastForward size={iconSize32} />
+        </button>
+        <button
+          onClick={toggleCinematic}
+          className={clsx(
+            'rounded-full p-1 transition-transform duration-200 hover:scale-105',
+            cinematic ? 'text-primary' : 'opacity-70',
+          )}
+          title={_('Cinematic Mode')}
+          aria-label={_('Cinematic Mode')}
+          aria-pressed={cinematic}
+        >
+          {cinematic ? <MdMovie size={iconSize32} /> : <MdOutlineMovie size={iconSize32} />}
         </button>
         <div className='dropdown dropdown-top'>
           <button

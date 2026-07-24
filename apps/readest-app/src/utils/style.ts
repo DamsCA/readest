@@ -896,7 +896,31 @@ export const getStyles = (
   // the footnote aside's border show as a stray horizontal line (#4438). Keep it
   // ahead of the inlined custom `@font-face` rules.
   const epubNamespace = `@namespace epub "http://www.idpf.org/2007/ops";`;
-  return `${epubNamespace}\n${customFontFaces}\n${pageLayoutStyles}\n${paragraphLayoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${warichuStyles}\n${rubyStyles}\n${userStylesheet}`;
+  // Cinematic reading spotlight (rack focus). Injected only in cinematic mode;
+  // it's inert until the TTS controller stamps `tts-spotlight` on <html> (while
+  // narrating) and `tts-current-block` on the spoken paragraph, so normal
+  // (non-narrating) reading is never dimmed. Blocks fade to a low opacity and
+  // the spoken one lifts back to full — the page reads like a film.
+  const cinematicStyles = viewSettings.cinematicMode
+    ? `
+      html.tts-spotlight p, html.tts-spotlight li, html.tts-spotlight blockquote,
+      html.tts-spotlight h1, html.tts-spotlight h2, html.tts-spotlight h3,
+      html.tts-spotlight h4, html.tts-spotlight td, html.tts-spotlight figcaption {
+        opacity: 0.28;
+        transition: opacity 0.55s ease;
+      }
+      html.tts-spotlight .tts-current-block,
+      html.tts-spotlight .tts-current-block p,
+      html.tts-spotlight .tts-current-block li {
+        opacity: 1 !important;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html.tts-spotlight p, html.tts-spotlight li, html.tts-spotlight blockquote,
+        html.tts-spotlight h1, html.tts-spotlight h2, html.tts-spotlight h3,
+        html.tts-spotlight h4, html.tts-spotlight td, html.tts-spotlight figcaption { transition: none; }
+      }`
+    : '';
+  return `${epubNamespace}\n${customFontFaces}\n${pageLayoutStyles}\n${paragraphLayoutStyles}\n${fontStyles}\n${colorStyles}\n${translationStyles}\n${warichuStyles}\n${rubyStyles}\n${cinematicStyles}\n${userStylesheet}`;
 };
 
 // Build a CSS chunk of `@font-face` rules for the given user custom

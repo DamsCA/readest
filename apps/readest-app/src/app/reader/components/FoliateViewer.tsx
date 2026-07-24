@@ -836,6 +836,7 @@ const FoliateViewer: React.FC<{
     viewSettings?.applyThemeToPDF,
     viewSettings?.contrast,
     viewSettings?.hideScrollbar,
+    viewSettings?.cinematicMode,
   ]);
 
   useEffect(() => {
