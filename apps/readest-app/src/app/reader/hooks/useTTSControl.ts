@@ -752,7 +752,10 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
         ttsController.updateHighlightOptions(
           getTTSHighlightOptions(viewSettings.ttsHighlightOptions, viewSettings.isEink),
         );
-        ttsController.setHighlightGranularity(viewSettings.ttsHighlightGranularity ?? 'word');
+        // Default MUST match DEFAULT_VIEW_SETTINGS ('sentence'). It said 'word'
+        // here, so a book whose settings predate the field silently re-armed the
+        // synthetic word karaoke — defeating the sentence-highlight default.
+        ttsController.setHighlightGranularity(viewSettings.ttsHighlightGranularity ?? 'sentence');
         const ssml =
           oneTime && ttsSpeakRange
             ? genSSMLRaw(ttsSpeakRange.toString().trim())

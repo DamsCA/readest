@@ -231,7 +231,7 @@ export const filterSSMLWithLang = (
   }
 
   // Check if target matches any <lang> block
-  const langBlocks: Array<{ match: string; lang: string; content: string }> = [];
+  const langBlocks: Array<{ match: string; lang: string; content: string; index: number }> = [];
   // Also capture the <mark> that immediately precedes a <lang> block: foliate
   // emits the translated sentence's mark just OUTSIDE (before) its <lang> block,
   // so grabbing it keeps each French sentence attached to its OWN mark — the
@@ -252,6 +252,7 @@ export const filterSSMLWithLang = (
         match: match[0]!, // includes the preceding <mark> when present
         lang: match[2]!,
         content: match[3]!,
+        index: match.index, // where the block starts, to find the mark BEFORE it
       });
     }
   }
@@ -276,12 +277,18 @@ export const filterSSMLWithLang = (
         const startsWithMark = /^\s*<mark\b/i.test(block.match);
         const langThenMark = /^\s*<lang\b[^>]*>\s*<mark\b/i.test(block.match);
         if (startsWithMark || langThenMark) return block.match;
-        // No leading mark: synthesize one. Reuse the first REAL mark name found
-        // inside the block when present, so foliate's setMark() can resolve it
-        // and the highlight / page-follow stay alive (a made-up name resolves
-        // to nothing — audio plays but the view stops tracking).
-        const inner = block.match.match(/<mark\b[^>]*name="([^"]+)"/i);
-        const name = inner ? inner[1] : `ttsfilter-${i}`;
+        // No leading mark: synthesize one from the last REAL mark PRECEDING the
+        // block. Reusing a mark found INSIDE the block duplicated that name in
+        // the output, and parseSSMLMarks merges same-name neighbours — so two
+        // different sentences collapsed into one utterance: one clip for two
+        // sentences, setMark() resolving to the SECOND one (highlight sitting a
+        // full sentence ahead of the voice), a cache key matching nothing, and
+        // tts.resume() truncating at that mark (dropping the paragraph's first
+        // translated sentence on every play-after-pause).
+        const prior = [
+          ...ssml.slice(0, block.index).matchAll(/<mark\b[^>]*name="([^"]+)"/gi),
+        ].pop();
+        const name = prior ? prior[1] : `ttsfilter-${i}`;
         return `<mark name="${name}"/>${block.match}`;
       })
       .join('');

@@ -588,6 +588,9 @@ export class FishAudioTTSClient implements TTSClient {
     };
     for (let i = 0; i < LOOKAHEAD; i++) prefetchMark(i);
 
+    // Consecutive per-sentence synthesis failures. One bad sentence must not
+    // discard the rest of the paragraph, but a wedged server must still stop.
+    let consecutiveMarkErrors = 0;
     for (let markIdx = 0; markIdx < marks.length; markIdx++) {
       const mark = marks[markIdx]!;
       // Keep the pipeline full: start generating the sentence LOOKAHEAD ahead.
@@ -729,16 +732,21 @@ export class FishAudioTTSClient implements TTSClient {
           }
         }
         yield result;
+        if (result.code === 'end') consecutiveMarkErrors = 0;
         if (signal.aborted) break;
         [cur, nxt] = [nxt, cur];
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn('Fish Audio TTS error for mark:', mark.text, message);
-        // Surface a terminal 'error' (never a fake 'end'): the controller now
-        // skips forward for the Fish client, bounded by its consecutive-error
-        // cap, so one bad sentence can't silently vanish or wedge playback.
+        // Surface a terminal 'error' (never a fake 'end') so the controller can
+        // react. But do NOT break on the first failure: breaking here discarded
+        // every REMAINING sentence of the paragraph — the controller only sees
+        // the last code, treats it as "advance", and jumps to the next
+        // paragraph. One transient 5xx/tunnel reset on sentence 2 of 7 silently
+        // deleted sentences 2-7. Continue to the next sentence instead, bounded
+        // so a wedged tunnel (60s per attempt) can't stall for minutes.
         yield { code: 'error', message } as TTSMessageEvent;
-        break;
+        if (signal.aborted || ++consecutiveMarkErrors >= 2) break;
       } finally {
         if (abortHandler) {
           signal.removeEventListener('abort', abortHandler);

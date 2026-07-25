@@ -99,13 +99,6 @@ export class TTSController extends EventTarget {
   // content-addressed — a prefetch that outlives navigation is still value.
   #prefetchAbortController = new AbortController();
   #prefetchedNextSection: number = -1;
-  // Idle bank-ahead: keeps generating upcoming audio to R2 even while paused /
-  // stopped (idle GPU time), so the rest of the book is progressively banked and
-  // future reading is instant. Self-skips while actively playing (playback's own
-  // preloadNextSSML covers that). Cleared on shutdown.
-  #idleBankTimer: ReturnType<typeof setInterval> | null = null;
-  #idleBankCursor: number = 0;
-
   // Word-level highlight state for the currently spoken chunk. Armed by a
   // successful dispatchSpeakMark, populated by prepareSpeakWords when a TTS
   // client has word-boundary metadata for the chunk.
@@ -557,7 +550,11 @@ export class TTSController extends EventTarget {
   // playing) are spent banking upcoming audio to R2. On a modest GPU generation
   // is ~real-time, so a deep queue is what smooths first-time reads. These run at
   // low priority, so they never delay the sentence being heard.
-  async preloadNextSSML(count: number = 10) {
+  // count=4 (was 10): each next()/prev() re-clones + re-segments a block
+  // SYNCHRONOUSLY, so 10 meant 21 fragment rebuilds on the main thread at every
+  // paragraph advance — landing in the same task as the transition and starving
+  // both the audio 'ended' handler and the highlight. 4 still banks a runway.
+  async preloadNextSSML(count: number = 4) {
     const tts = this.view.tts;
     if (!tts) return;
 
@@ -601,65 +598,14 @@ export class TTSController extends EventTarget {
     }
   }
 
-  // Bank `depth` upcoming paragraphs (starting `skip` paragraphs ahead of the
-  // CURRENT position) to R2, without moving playback: gather via next() then
-  // rewind — synchronous so foliate's #ranges is restored before any await.
-  // Low priority; tied to the session prefetch signal so it survives
-  // navigation but stops on shutdown.
-  async #bankAhead(depth: number, signal: AbortSignal, skip = 0) {
-    const tts = this.view.tts;
-    if (!tts || signal.aborted) return;
-    const rawSsmls: string[] = [];
-    let advanced = 0;
-    for (let i = 0; i < skip + depth; i++) {
-      const ssml = tts.next();
-      if (!ssml) break;
-      advanced++;
-      if (i >= skip) rawSsmls.push(ssml);
-    }
-    for (let i = 0; i < advanced; i++) {
-      tts.prev();
-    }
-    if (advanced < skip + depth) void this.#prefetchNextSection();
-    for (const raw of rawSsmls) {
-      if (signal.aborted) return;
-      const ssml = await this.#preprocessSSML(raw);
-      if (ssml) await this.preloadSSML(ssml, signal);
-    }
-  }
-
-  // Start (or restart) the idle bank-ahead loop: while the book is open but NOT
-  // actively playing (paused/stopped), progressively bank the rest of the book
-  // to R2 using idle GPU time — so resuming, or reaching content later, is
-  // instant. A moving cursor banks the NEXT slice each tick (instead of
-  // re-walking from the current position), capped so a long pause doesn't walk
-  // the whole book every 9s. Harmless while playing: those ticks are skipped
-  // (playback's own preloadNextSSML banks at higher priority).
-  startIdleBanking() {
-    this.stopIdleBanking();
-    this.#idleBankCursor = 0;
-    this.#idleBankTimer = setInterval(() => {
-      const signal = this.#prefetchAbortController.signal;
-      if (signal.aborted) {
-        this.stopIdleBanking();
-        return;
-      }
-      // Only use IDLE time — during active playback the speak loop + its
-      // preloadNextSSML already bank ahead, and we must not fight its iterator.
-      if (this.state === 'playing') return;
-      if (this.#idleBankCursor >= 96) return; // ~2h of audio banked ahead: enough
-      const skip = this.#idleBankCursor;
-      this.#idleBankCursor += 8;
-      void this.#bankAhead(8, signal, skip).catch(() => {});
-    }, 9000);
-  }
-
-  stopIdleBanking() {
-    if (this.#idleBankTimer) {
-      clearInterval(this.#idleBankTimer);
-      this.#idleBankTimer = null;
-    }
-  }
+  // NOTE: the idle bank-ahead loop (#bankAhead + startIdleBanking) was REMOVED.
+  // Every 9s while paused it re-walked the chapter with foliate's iterator —
+  // each next()/prev() re-clones and re-segments a block synchronously, so a
+  // tick froze the main thread for hundreds of ms, delaying the audio 'ended'
+  // handler and the highlight. Once its cursor passed the block count it banked
+  // nothing at all while still paying the full cost. preloadNextSSML still
+  // banks the upcoming paragraphs during playback, which is the runway that
+  // actually matters.
 
   async #preprocessSSML(ssml?: string) {
     if (!ssml) return;
@@ -794,13 +740,22 @@ export class TTSController extends EventTarget {
           } else {
             this.#emptyRetries = 0;
             this.#consecutiveEmptySkips = 0;
-            this.dispatchSpeakMark(marks[0]);
+            // NO optimistic dispatchSpeakMark here. It highlighted (and turned
+            // the page to) the paragraph's first sentence BEFORE any audio was
+            // synthesized — seconds ahead of the voice on a cold paragraph,
+            // which is exactly the "highlight races ahead / it skipped
+            // sentences" report. Every client dispatches its own mark at the
+            // moment its audio actually starts.
           }
           // Fire-and-forget: awaiting here blocked the FIRST sound of every
           // cold paragraph until several sentences were fully generated at LOW
-          // priority (~10-20s of dead air on a ~realtime GPU). The Fish speak
-          // loop pipelines its own marks at high priority anyway.
-          void this.preloadSSML(ssml, signal);
+          // priority (~10-20s of dead air on a ~realtime GPU).
+          // Fish pipelines its own marks at high priority (its LOOKAHEAD), so
+          // preloading the SAME ssml at 'low' only made #synthesize's
+          // high-never-waits-on-low rule generate the paragraph's first
+          // sentence TWICE on the single GPU. Edge has no lookahead and this is
+          // its only warm-up, so keep it for the other clients.
+          if (this.ttsClient !== this.ttsFishClient) void this.preloadSSML(ssml, signal);
         }
         // Native AND Fish clients surface failures as a terminal 'error' code
         // (Edge/Web throw, which the catch below handles). Without Fish here, a
@@ -881,9 +836,6 @@ export class TTSController extends EventTarget {
     if (!oneTime) {
       this.preloadNextSSML();
       this.dispatchSpeakMark();
-      // Keep banking the rest of the book during idle time (pauses/stops), not
-      // just while playing — so future reading is instant.
-      this.startIdleBanking();
     }
   }
 
@@ -1257,7 +1209,6 @@ export class TTSController extends EventTarget {
   }
 
   async shutdown() {
-    this.stopIdleBanking();
     this.#prefetchAbortController.abort();
     await this.stop();
     this.#setSpotlight(false);
