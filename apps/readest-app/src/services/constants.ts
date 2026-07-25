@@ -339,7 +339,6 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
 
   showHeader: true,
   showFooter: true,
-  cinematicMode: false,
   showRemainingTime: false,
   showRemainingPages: false,
   showProgressInfo: true,

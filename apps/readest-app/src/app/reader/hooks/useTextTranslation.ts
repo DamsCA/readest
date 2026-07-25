@@ -6,7 +6,7 @@ import { useBookProgress } from '@/store/readerProgressStore';
 import { useTranslator } from '@/hooks/useTranslator';
 import { useTranslation } from '@/hooks/useTranslation';
 import { eventDispatcher } from '@/utils/event';
-import { walkTextNodes } from '@/utils/walk';
+import { blockSourceText, walkTextNodes } from '@/utils/walk';
 import { debounce } from '@/utils/debounce';
 import { getLocale } from '@/utils/misc';
 
@@ -212,7 +212,11 @@ export function useTextTranslation(
 
   const translateElement = async (el: HTMLElement) => {
     if (!enabled.current) return;
-    const text = el.textContent?.replaceAll('\n', '').trim();
+    // blockSourceText, not textContent: the latter glues child fragments with no
+    // separator (a two-part heading became "Chapter 15You Are a Perfect...").
+    // TTSController's prefetch uses the same helper — they must agree or the
+    // pre-generated audio is keyed on a different string and never reused.
+    const text = blockSourceText(el);
     if (!text) return;
 
     if (el.classList.contains('translation-target')) {

@@ -1,7 +1,7 @@
 import { FoliateView } from '@/types/view';
 import { AppService } from '@/types/system';
 import { filterSSMLWithLang, parseSSMLMarks, prefetchSentenceTexts } from '@/utils/ssml';
-import { walkTextNodes } from '@/utils/walk';
+import { blockSourceText, walkTextNodes } from '@/utils/walk';
 import { Overlayer } from 'foliate-js/overlayer.js';
 import {
   TTSGranularity,
@@ -208,11 +208,6 @@ export class TTSController extends EventTarget {
 
   #getHighlighter() {
     return (range: Range) => {
-      // Cinematic spotlight: mark the spoken paragraph so the injected CSS can
-      // lift it out of the dimmed page. Runs before the suppress check so it
-      // tracks the block during word-by-word narration too (idempotent per
-      // block). Inert unless cinematic mode injected the spotlight CSS.
-      this.#setCurrentBlock(range);
       // Suppress the sentence highlight that foliate's setMark draws when the
       // active client highlights word-by-word. The flag is only set around the
       // synchronous setMark call, so word draws (dispatchSpeakWord) and paused
@@ -240,43 +235,6 @@ export class TTSController extends EventTarget {
     const content = this.#getPrimaryContent();
     const overlayer = content?.overlayer as Overlayer | undefined;
     overlayer?.remove(HIGHLIGHT_KEY);
-  }
-
-  // --- Cinematic reading spotlight (rack focus) -----------------------------
-  // Element currently lifted out of the dimmed page. Tracked so we can clear the
-  // class off the previous block when narration moves on.
-  #currentBlockEl: Element | null = null;
-
-  // Toggle the <html>.tts-spotlight gate that arms the injected dim CSS. On =
-  // narrating (dim the page); off = clear so the page reads normally.
-  #setSpotlight(on: boolean) {
-    try {
-      const doc = this.#getPrimaryContent()?.doc;
-      doc?.documentElement?.classList.toggle('tts-spotlight', on);
-      if (!on) {
-        this.#currentBlockEl?.classList.remove('tts-current-block');
-        this.#currentBlockEl = null;
-      }
-    } catch {
-      // Doc may be detached mid-navigation; the next play re-arms it.
-    }
-  }
-
-  // Mark the spoken range's block ancestor so the spotlight CSS keeps it lit.
-  #setCurrentBlock(range: Range) {
-    try {
-      let node: Node | null = range?.startContainer ?? null;
-      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-      const el = node as Element | null;
-      const block =
-        el?.closest?.('p, li, blockquote, h1, h2, h3, h4, h5, h6, dd, figcaption, td') ?? el;
-      if (!block || block === this.#currentBlockEl) return;
-      this.#currentBlockEl?.classList.remove('tts-current-block');
-      block.classList.add('tts-current-block');
-      this.#currentBlockEl = block;
-    } catch {
-      // Ranges can briefly span documents during a section change; ignore.
-    }
   }
 
   updateHighlightOptions(options: TTSHighlightOptions) {
@@ -427,7 +385,10 @@ export class TTSController extends EventTarget {
         const elements = walkTextNodes(doc.body as HTMLElement, ['pre', 'code', 'math']);
         const texts: string[] = [];
         for (const el of elements) {
-          const text = el.textContent?.replaceAll('\n', '').trim();
+          // Same helper as the reader's injector. If these two source strings
+          // differ, the translations differ, the audio keys differ, and every
+          // byte pre-generated here is thrown away at playback.
+          const text = blockSourceText(el);
           if (text) texts.push(text);
           if (texts.length >= 12) break;
         }
@@ -451,26 +412,18 @@ export class TTSController extends EventTarget {
           const ssml = `<speak xml:lang="${this.ttsTargetLang}">${body}</speak>`;
           await this.preloadSSML(ssml, signal);
         }
-      } else if (!this.ttsTargetLang) {
-        // Source-language book: walk a throwaway foliate TTS over the
-        // background doc and preload its opening utterances directly.
-        const { TTS } = await import('foliate-js/tts.js');
-        const { textWalker } = await import('foliate-js/text-walker.js');
-        let granularity: TTSGranularity = this.view.language.isCJK ? 'sentence' : 'word';
-        const supported = this.ttsClient.getGranularities();
-        if (!supported.includes(granularity)) granularity = supported[0]!;
-        const bgTts = new TTS(doc, textWalker, this.#createTTSNodeFilter(), () => {}, granularity);
-        let count = 0;
-        let raw: string | undefined = bgTts.start();
-        while (raw && count < 8 && !signal.aborted) {
-          const processed = await this.#preprocessSSML(raw);
-          if (processed) {
-            await this.preloadSSML(processed, signal);
-            count++;
-          }
-          raw = bgTts.next();
-        }
       }
+      // The source-language prefetch branch that used to live here is DELETED.
+      // It was gated on `!this.ttsTargetLang`, but that field is transiently ''
+      // (it is only written inside an `if (ssml)` in useTTSControl, and reset to
+      // '' whenever getTTSTargetLang() momentarily returns null) while this
+      // fire-and-forget prefetch reads it much later. In translation mode it
+      // therefore fired anyway and banked ENGLISH audio that playback — which
+      // always goes through filterSSMLWithLang — can never look up: pure wasted
+      // GPU, generated serially right at the chapter boundary, queued ahead of
+      // the live French request. That is what pushed the real chapter opening
+      // past its request timeout. In genuine source-language mode
+      // preloadNextSSML already banks the runway.
       console.log('[TTS] prefetched next section', nextIndex);
     } catch (err) {
       // Best-effort: allow a later retry for this section.
@@ -645,7 +598,6 @@ export class TTSController extends EventTarget {
       try {
         console.log('[TTS] speak');
         this.state = 'playing';
-        this.#setSpotlight(true);
 
         signal.addEventListener('abort', () => {
           resolve();
@@ -721,6 +673,11 @@ export class TTSController extends EventTarget {
                       .map((m) => m.text)
                       .join(' ')
                       .replaceAll('\n', '')
+                      // Collapse runs: parseSSMLMarks keeps each mark's TRAILING
+                      // space, so join(' ') inserted a second one — a different
+                      // translation-cache key than the injector's el.textContent,
+                      // costing a duplicate DeepL round trip on every rescue.
+                      .replace(/\s+/g, ' ')
                       .trim();
                     if (srcText) {
                       const translated = await this.prefetchTranslations([srcText]).catch(
@@ -731,8 +688,18 @@ export class TTSController extends EventTarget {
                         const blockLang = (this.ttsLang || 'en').split('-')[0] || 'en';
                         const sentences = prefetchSentenceTexts(french, blockLang);
                         if (sentences.length > 0) {
+                          // CLAMP to a real mark name. French usually splits into
+                          // MORE sentences than the English had marks, and an
+                          // invented `tr${j}` name doesn't exist in foliate's
+                          // ranges — setMark() returns undefined and the
+                          // highlight freezes on sentence 1 while the voice reads
+                          // on. Reusing the last real name degrades the highlight
+                          // to paragraph granularity instead of killing it.
                           const body = sentences
-                            .map((s, j) => `<mark name="${rawMarks[j]?.name ?? `tr${j}`}"/>${s}`)
+                            .map(
+                              (s, j) =>
+                                `<mark name="${rawMarks[Math.min(j, rawMarks.length - 1)]!.name}"/>${s}`,
+                            )
                             .join('');
                           this.#emptyRetries = 0;
                           this.#consecutiveEmptySkips = 0;
@@ -902,9 +869,6 @@ export class TTSController extends EventTarget {
 
   async pause() {
     this.state = 'paused';
-    // Lift the cinematic dim while paused so the reader can scan the whole page;
-    // resume() re-arms it. (stop() is NOT used here — it fires per paragraph.)
-    this.#setSpotlight(false);
     // Surface the current "minutes d'avance" immediately so the control panel
     // shows the banked runway the moment the user pauses (banking then keeps it
     // growing via its own ticks).
@@ -917,7 +881,6 @@ export class TTSController extends EventTarget {
 
   async resume() {
     this.state = 'playing';
-    this.#setSpotlight(true);
     await this.ttsClient.resume().catch((e) => this.error(e));
   }
 
@@ -1253,7 +1216,6 @@ export class TTSController extends EventTarget {
   async shutdown() {
     this.#prefetchAbortController.abort();
     await this.stop();
-    this.#setSpotlight(false);
     this.#clearHighlighter();
     this.#ttsSectionIndex = -1;
     this.view.tts = null;

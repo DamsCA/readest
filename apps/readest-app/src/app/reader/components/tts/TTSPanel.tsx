@@ -7,8 +7,6 @@ import {
   MdFastForward,
   MdAlarm,
   MdOutlineCloudDownload,
-  MdMovie,
-  MdOutlineMovie,
   MdShortText,
   MdTextFields,
 } from 'react-icons/md';
@@ -181,16 +179,6 @@ const TTSPanel = ({
     saveSettings(envConfig, settings);
   };
 
-  const [cinematic, setCinematic] = useState(!!viewSettings?.cinematicMode);
-  const toggleCinematic = () => {
-    const next = !cinematic;
-    setCinematic(next);
-    // saveViewSettings re-applies getStyles immediately (injects/removes the
-    // spotlight CSS) and builds a fresh settings object so the change actually
-    // takes effect — an in-place mutation kept the same ref and did nothing.
-    void saveViewSettings(envConfig, bookKey, 'cinematicMode', next);
-  };
-
   const [granularity, setGranularity] = useState<TTSHighlightGranularity>(
     viewSettings?.ttsHighlightGranularity ?? 'sentence',
   );
@@ -341,18 +329,6 @@ const TTSPanel = ({
           ) : (
             <MdShortText size={iconSize32} />
           )}
-        </button>
-        <button
-          onClick={toggleCinematic}
-          className={clsx(
-            'rounded-full p-1 transition-transform duration-200 hover:scale-105',
-            cinematic ? 'text-primary' : 'opacity-70',
-          )}
-          title={_('Cinematic Mode')}
-          aria-label={_('Cinematic Mode')}
-          aria-pressed={cinematic}
-        >
-          {cinematic ? <MdMovie size={iconSize32} /> : <MdOutlineMovie size={iconSize32} />}
         </button>
         <div className='dropdown dropdown-top'>
           <button

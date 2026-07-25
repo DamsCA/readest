@@ -377,9 +377,15 @@ export class FishAudioTTSClient implements TTSClient {
 
     // Combine the caller's signal with a hard timeout: a wedged tunnel
     // otherwise hangs the await forever and playback stalls mid-paragraph.
+    // Set when OUR deadline fired (as opposed to a transport error or the
+    // caller aborting), so the retry loop can tell the two apart.
+    let deadlineFired = false;
     const fetchWithTimeout = async (url: string, opts: RequestInit, timeoutMs: number) => {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const timer = setTimeout(() => {
+        deadlineFired = true;
+        ctrl.abort();
+      }, timeoutMs);
       const onAbort = () => ctrl.abort();
       if (signal.aborted) ctrl.abort();
       else signal.addEventListener('abort', onAbort);
@@ -436,10 +442,16 @@ export class FishAudioTTSClient implements TTSClient {
             attempt === 0
               ? serverUrl
               : (await resolveClaireServerUrl(tauriFetch, signal)) || serverUrl;
+          // Priority-aware deadline. 60s for everything meant a slow chapter
+          // opening blew the deadline, got retried blindly (see below), and the
+          // reader heard up to TWO MINUTES of silence before the sentence was
+          // finally skipped. Playback gets a much tighter budget so it fails
+          // fast and recovers; background banking can afford to wait.
+          deadlineFired = false;
           response = await fetchWithTimeout(
             `${target}/v1/tts`,
             { method: 'POST', headers, body },
-            60000,
+            priority === 'high' ? 25000 : 60000,
           );
           if (!response.ok) {
             // 502/503/504 from Cloudflare = the tunnel points at a dead server.
@@ -456,6 +468,12 @@ export class FishAudioTTSClient implements TTSClient {
         } catch (err) {
           lastErr = err;
           if (signal.aborted) break;
+          // Do NOT retry our own deadline. The server is single-GPU and is still
+          // generating this exact sentence; re-POSTing it only queues a second
+          // copy behind the first, doubling the wait (60s + 1.2s + 60s was the
+          // observed two-minute chapter-opening stall). Transport errors — a
+          // moved tunnel, a 5xx — are worth one retry.
+          if (deadlineFired) break;
           // Stale tunnel URL is the usual cause — drop the discovery cache so
           // the retry (or the next call) re-resolves immediately.
           _discoveredServerUrl = '';
