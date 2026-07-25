@@ -589,6 +589,10 @@ describe('TTSController', () => {
 
     const armWithSentence = async (range: Range, markName = '0') => {
       await controller.initViewTTS(0);
+      // These tests exercise WORD-level highlighting explicitly. The controller
+      // now defaults to 'sentence' (the Fish client's word timings are synthetic
+      // and drifted ahead of the voice), so word mode must be requested.
+      controller.setHighlightGranularity('word');
       mockView.tts = {
         setMark: vi.fn().mockReturnValue(range),
         getLastRange: vi.fn().mockImplementation(() => range.cloneRange()),
@@ -755,8 +759,10 @@ describe('TTSController', () => {
     });
 
     test('granularity "sentence" forces sentence highlighting (skips word-by-word)', async () => {
-      controller.setHighlightGranularity('sentence');
       await armWithSentence(makeSentenceRange());
+      // AFTER arming: the shared helper opts into word mode for this block, so
+      // the sentence choice under test has to be applied on top of it.
+      controller.setHighlightGranularity('sentence');
       getOverlayer().add.mockClear();
       // Even when the client reports word boundaries and calls prepareSpeakWords,
       // the user's "sentence" choice keeps highlighting at the sentence level: the
@@ -790,6 +796,10 @@ describe('TTSController', () => {
 
     const armWithSentence = async (range: Range, markName = '0') => {
       await controller.initViewTTS(0);
+      // These tests exercise WORD-level highlighting explicitly. The controller
+      // now defaults to 'sentence' (the Fish client's word timings are synthetic
+      // and drifted ahead of the voice), so word mode must be requested.
+      controller.setHighlightGranularity('word');
       mockView.tts = {
         setMark: vi.fn().mockReturnValue(range),
         getLastRange: vi.fn().mockImplementation(() => range.cloneRange()),
@@ -910,6 +920,10 @@ describe('TTSController', () => {
 
     const armWithSentence = async (range: Range, markName = '0') => {
       await controller.initViewTTS(0);
+      // These tests exercise WORD-level highlighting explicitly. The controller
+      // now defaults to 'sentence' (the Fish client's word timings are synthetic
+      // and drifted ahead of the voice), so word mode must be requested.
+      controller.setHighlightGranularity('word');
       mockView.tts = {
         setMark: vi.fn().mockReturnValue(range),
         getLastRange: vi.fn().mockImplementation(() => range.cloneRange()),

@@ -785,10 +785,17 @@ export class FishAudioTTSClient implements TTSClient {
     if (!controller) return;
     const words = this.#computeSyntheticWords(text);
     // Empty list draws the sentence-highlight fallback — call it regardless.
-    controller.prepareSpeakWords(words.map((w) => w.text));
+    // The return value says whether word tracking is actually armed: in
+    // sentence mode (the default) setMark already drew the highlight, so
+    // starting the rAF loop would burn 60fps per sentence for nothing.
+    if (!controller.prepareSpeakWords(words.map((w) => w.text))) return;
     if (words.length === 0) return;
     const gen = ++this.#wordTrackingGen;
-    const LEAD = 0.12; // highlight slightly ahead reads "correct"
+    // No artificial lead: these word positions are already interpolated guesses
+    // (the model returns no timings), and a deliberate 120ms head start stacked
+    // on that estimate is a large fraction of a short sentence — it read as the
+    // highlight running ahead of the voice.
+    const LEAD = 0;
     const HEAD = 0.1; // generated audio carries leading silence
     const TAIL = 0.25; // ... and trailing silence
     let lastIndex = 0; // word 0 was highlighted by prepareSpeakWords

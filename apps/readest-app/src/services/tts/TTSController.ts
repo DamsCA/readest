@@ -112,11 +112,13 @@ export class TTSController extends EventTarget {
   // re-apply the word instead of redrawing the whole sentence over it.
   #wordHighlightActive = false;
   #lastSpeakWordRange: Range | null = null;
-  // User-chosen highlight granularity. 'word' (default) highlights word-by-word
-  // when the active client reports word boundaries (Edge); 'sentence' keeps the
-  // highlight at the sentence level even then. Sentence highlighting is assumed
-  // supported by every client, so 'word' falls back to it automatically.
-  #highlightGranularity: TTSHighlightGranularity = 'word';
+  // User-chosen highlight granularity. 'sentence' (default) keeps the highlight
+  // on the whole spoken sentence — always in sync. 'word' highlights word-by-word
+  // when the active client reports word boundaries, but for the Claire/Fish
+  // client those boundaries are SYNTHETIC (interpolated from audio position, no
+  // real timings), so it drifts ahead of the voice. Must match
+  // DEFAULT_VIEW_SETTINGS: a mismatched initializer silently re-armed word mode.
+  #highlightGranularity: TTSHighlightGranularity = 'sentence';
 
   state: TTSState = 'stopped';
   ttsLang: string = '';
@@ -679,10 +681,19 @@ export class TTSController extends EventTarget {
         if (!oneTime) {
           if (!plainText || marks.length === 0) {
             resolve();
+            // Nothing translatable in this block at all (scene divider, <pre>,
+            // punctuation-only). Waiting on a translation that will never come
+            // burned ~5s of dead air per block AND counted toward the skip cap.
+            // Advance immediately instead.
+            const { marks: srcMarks } = parseSSMLMarks(rawSsml ?? '');
+            if (this.ttsTargetLang && srcMarks.length === 0) {
+              this.#emptyRetries = 0;
+              if (signal.aborted) return;
+              return await this.forward();
+            }
             // Translation mode: an empty utterance almost always means this
-            // paragraph isn't translated YET. Wait briefly and retry the SAME
-            // position a few times before advancing, so a new book doesn't skip
-            // its opening lines while the translator catches up.
+            // paragraph isn't translated YET. Translate it ourselves and speak
+            // the result directly rather than waiting on the DOM injector.
             if (this.ttsTargetLang && this.#emptyRetries < TTS_MAX_EMPTY_RETRIES) {
               // CRITICAL at chapter boundaries: the translator only translates
               // paragraphs VISIBLE in the view. Right after a section change the
@@ -694,22 +705,46 @@ export class TTSController extends EventTarget {
               // picks it up, and the retry below then finds the French.
               if (this.#emptyRetries === 0 && rawSsml) {
                 try {
-                  const { marks: rawMarks } = parseSSMLMarks(rawSsml);
+                  const rawMarks = srcMarks;
                   if (rawMarks.length > 0) this.dispatchSpeakMark(rawMarks[0]);
-                  // Deterministic wait: translate THIS paragraph now through the
-                  // shared cache instead of hoping the viewport translator races
-                  // us. When it resolves, the injector cache-hits instantly and
-                  // the retry below finds the French.
+                  // Deterministic: translate THIS paragraph now through the same
+                  // provider/cache the injector uses, then SPEAK THE RESULT
+                  // DIRECTLY. Merely warming the cache and waiting for the DOM
+                  // injector cost ~5.4s of dead air per paragraph, and when the
+                  // injector never ran for it (translation equals the source, or
+                  // the viewport observer never reached it) the paragraph was
+                  // dropped and never spoken at all. Segmented with
+                  // prefetchSentenceTexts so audio cache keys stay byte-identical
+                  // to the banked ones.
                   if (this.prefetchTranslations && rawMarks.length > 0) {
                     const srcText = rawMarks
                       .map((m) => m.text)
                       .join(' ')
                       .replaceAll('\n', '')
                       .trim();
-                    if (srcText) await this.prefetchTranslations([srcText]).catch(() => null);
+                    if (srcText) {
+                      const translated = await this.prefetchTranslations([srcText]).catch(
+                        () => null,
+                      );
+                      const french = translated?.[0];
+                      if (french && !signal.aborted && this.state === 'playing') {
+                        const blockLang = (this.ttsLang || 'en').split('-')[0] || 'en';
+                        const sentences = prefetchSentenceTexts(french, blockLang);
+                        if (sentences.length > 0) {
+                          const body = sentences
+                            .map((s, j) => `<mark name="${rawMarks[j]?.name ?? `tr${j}`}"/>${s}`)
+                            .join('');
+                          this.#emptyRetries = 0;
+                          this.#consecutiveEmptySkips = 0;
+                          return await this.#speak(
+                            `<speak xml:lang="${this.ttsTargetLang}">${body}</speak>`,
+                          );
+                        }
+                      }
+                    }
                   }
                 } catch {
-                  // Position-driving is best-effort; the retry loop still runs.
+                  // Best-effort; the retry ladder below still runs.
                 }
               }
               this.#emptyRetries++;
@@ -774,7 +809,10 @@ export class TTSController extends EventTarget {
           lastCode = code;
         }
 
-        if (lastCode === 'end' && this.state === 'playing' && !oneTime) {
+        // `!signal.aborted` mirrors the error branch below: without it an abort
+        // landing between the last yield and here lets a stopped session advance
+        // a second time — skipping a paragraph and killing the fresh session.
+        if (lastCode === 'end' && !signal.aborted && this.state === 'playing' && !oneTime) {
           this.#consecutiveSpeakErrors = 0;
           resolve();
           await this.forward();
@@ -1128,14 +1166,17 @@ export class TTSController extends EventTarget {
   // swaps the visual highlight from the sentence to the spoken word —
   // ttsLocation, media-session metadata and mark navigation keep their
   // sentence-level semantics.
-  prepareSpeakWords(words: string[]) {
-    if (!this.#speakWordsArmed) return;
+  // Returns whether word-level tracking is actually armed, so a client can skip
+  // starting its per-frame tracking loop when the highlight stays sentence-level
+  // (otherwise a 60fps rAF loop runs for every sentence and does nothing).
+  prepareSpeakWords(words: string[]): boolean {
+    if (!this.#speakWordsArmed) return false;
     // User forced sentence-level highlighting: the sentence highlight was drawn
     // at mark dispatch (not suppressed), so there's nothing to do here — leave
     // word mode off even though the client reported word boundaries.
-    if (this.#highlightGranularity === 'sentence') return;
+    if (this.#highlightGranularity === 'sentence') return false;
     const range = this.view.tts?.getLastRange();
-    if (!range) return;
+    if (!range) return false;
     this.#speakWordBaseRange = range;
     const matchText = rangeTextExcludingInert(range);
     this.#speakWordOffsets = computeWordOffsets(matchText, words);
@@ -1160,12 +1201,13 @@ export class TTSController extends EventTarget {
       // suppressed at mark dispatch, so draw it now as the fallback.
       this.#wordHighlightActive = false;
       this.#getHighlighter()(range.cloneRange());
-    } else {
-      // Highlight the first word immediately so the suppressed sentence
-      // highlight never appears before playback reaches the first boundary.
-      this.#wordHighlightActive = true;
-      this.dispatchSpeakWord(0);
+      return false;
     }
+    // Highlight the first word immediately so the suppressed sentence
+    // highlight never appears before playback reaches the first boundary.
+    this.#wordHighlightActive = true;
+    this.dispatchSpeakWord(0);
+    return true;
   }
 
   dispatchSpeakWord(index: number) {

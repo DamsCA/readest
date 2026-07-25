@@ -21,7 +21,7 @@ const TTSPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }
     viewSettings.ttsMediaMetadata ?? 'sentence',
   );
   const [ttsHighlightGranularity, setTtsHighlightGranularity] = useState<TTSHighlightGranularity>(
-    viewSettings.ttsHighlightGranularity ?? 'word',
+    viewSettings.ttsHighlightGranularity ?? 'sentence',
   );
   const [ttsHighlightStyle, setTtsHighlightStyle] = useState(
     viewSettings.ttsHighlightOptions.style,

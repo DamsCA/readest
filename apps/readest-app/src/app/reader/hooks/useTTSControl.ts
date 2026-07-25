@@ -526,11 +526,18 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   // Section change callback
   const handleSectionChange = useCallback(
     async (sectionIndex: number) => {
-      if (!followingTTSLocationRef.current) return;
       const view = getView(bookKey);
       const sections = view?.book.sections;
       if (!sections || sectionIndex < 0 || sectionIndex >= sections.length) return;
       sectionChangingTimestampRef.current = Date.now();
+      // TTS advancing into a new chapter IS the reason to move the view. This
+      // used to early-return when the user had scrolled away from the narration,
+      // so the view never navigated and #initTTSForSection bound TTS to a
+      // DETACHED createDocument() the translation injector can never reach —
+      // every paragraph of that chapter filtered to empty and was skipped (a
+      // whole chapter of silence). handleHighlightMark's cross-section branch
+      // already re-arms following unconditionally; this was the outlier.
+      followingTTSLocationRef.current = true;
       const resolved = view.resolveNavigation(sectionIndex);
       // Await so TTSController's `await onSectionChange` doesn't proceed to
       // speak the new section before the view has finished navigating to it.

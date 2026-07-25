@@ -158,6 +158,17 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
     settings.globalViewSettings.annotationQuickAction = 'dictionary';
   }
 
+  // Coerce a persisted `'word'` TTS highlight granularity to `'sentence'`.
+  // Word-level karaoke is SYNTHETIC here (the Claire/fish-speech model returns
+  // no real word timings, so positions are interpolated) and drifts ahead of the
+  // voice. The default was flipped to 'sentence', but persisted settings win over
+  // defaults on load, so anyone who read before the flip stayed on word mode
+  // forever. The setting had no UI when it was written, so nobody chose it
+  // deliberately; a one-tap toggle in the TTS panel opts back in.
+  if ((settings.globalViewSettings.ttsHighlightGranularity as string) === 'word') {
+    settings.globalViewSettings.ttsHighlightGranularity = 'sentence';
+  }
+
   if (!settings.kosync.deviceId) {
     settings.kosync.deviceId = uuidv4();
     await saveSettings(ctx.fs, settings);
