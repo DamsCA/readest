@@ -495,6 +495,15 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   ]);
 
   useEffect(() => {
+    // Don't clobber a known-good target language with '' just because
+    // viewSettings is transiently unavailable (it is undefined for a tick while
+    // a book's view initialises). getTTSTargetLang() returns null BOTH for
+    // "translation is off" and for "I don't know yet" — only the first should
+    // reach the controller. When it leaked, #preprocessSSML stopped filtering by
+    // language, so banking generated the ENGLISH source as well as the French
+    // (seen in the server log: both languages banked for the same sentences) —
+    // wasted GPU on audio playback can never look up.
+    if (!getViewSettings(bookKey)) return;
     ttsControllerRef.current?.setTargetLang(getTTSTargetLang() || '');
   }, [getTTSTargetLang]);
 

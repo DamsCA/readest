@@ -65,7 +65,9 @@ let _discoveryInFlight: Promise<string> | null = null;
 
 const resolveClaireServerUrl = async (
   tauriFetch: typeof fetch | null,
-  signal?: AbortSignal,
+  // Intentionally unused: the shared discovery below must not be cancellable by
+  // any single caller. Kept so call sites read consistently.
+  _signal?: AbortSignal,
 ): Promise<string> => {
   const baked = getClaireServerUrl();
   if (baked) return baked;
@@ -78,15 +80,18 @@ const resolveClaireServerUrl = async (
   if (_discoveryInFlight) return _discoveryInFlight;
 
   _discoveryInFlight = (async () => {
-    // Bounded by hand rather than AbortSignal.any/AbortSignal.timeout: this runs
-    // in the device's System WebView on Android, which can predate both. A hung
-    // R2 used to hang playback indefinitely — this await sits in front of every
-    // audio request.
+    // Bounded by its OWN 4s deadline only — deliberately NOT chained to the
+    // caller's signal. This promise is SHARED by every concurrent caller, so
+    // honouring one caller's abort cancels discovery for all of them. The first
+    // caller is usually a low-priority preload, and every paragraph advance
+    // aborts those signals: playback then received an empty URL, threw
+    // "server URL not discovered", and the paragraph was abandoned after two
+    // such errors — skipped words AND no highlight, hence no page-follow, with
+    // ZERO requests ever reaching the server.
+    // Bounded by hand rather than AbortSignal.timeout: this runs in the device's
+    // System WebView on Android, which can predate it.
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    const onAbort = () => ctrl.abort();
-    if (signal?.aborted) ctrl.abort();
-    else signal?.addEventListener('abort', onAbort);
     try {
       const url = `${r2}/server-url.txt`;
       const opts = { method: 'GET', signal: ctrl.signal } as RequestInit;
@@ -103,7 +108,6 @@ const resolveClaireServerUrl = async (
       // Discovery failed — fall back to whatever we last knew (may be empty).
     } finally {
       clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
     }
     return _discoveredServerUrl;
   })().finally(() => {
