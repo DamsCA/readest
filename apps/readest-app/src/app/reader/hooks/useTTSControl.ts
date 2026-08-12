@@ -388,6 +388,16 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       });
     };
 
+    // Session really over (end of book / a safety cap tripped). Route through
+    // handleStop rather than a bespoke reset: it is the existing "session over"
+    // path, is null-controller safe, and is what also emits
+    // tts-playback-state 'stopped', deinits the media session and releases the
+    // iOS background-audio session.
+    const handleEnded = () => {
+      void handleStop(bookKey);
+    };
+
+    ttsController.addEventListener('tts-ended', handleEnded);
     ttsController.addEventListener('tts-need-auth', handleNeedAuth);
     ttsController.addEventListener('tts-speak-mark', handleSpeakMark);
     ttsController.addEventListener('tts-highlight-mark', handleHighlightMark);
@@ -395,6 +405,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     ttsController.addEventListener('tts-position', handlePosition);
     ttsController.addEventListener('tts-banked-ahead', handleBankedAhead);
     return () => {
+      ttsController.removeEventListener('tts-ended', handleEnded);
       ttsController.removeEventListener('tts-need-auth', handleNeedAuth);
       ttsController.removeEventListener('tts-speak-mark', handleSpeakMark);
       ttsController.removeEventListener('tts-highlight-mark', handleHighlightMark);

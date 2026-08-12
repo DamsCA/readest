@@ -222,12 +222,11 @@ export class FishAudioTTSClient implements TTSClient {
   #audioB: HTMLAudioElement | null = null;
   #audioElement: HTMLAudioElement | null = null; // the CURRENTLY-playing one
   #isPlaying = false;
-  #pausedAt = 0;
-  #startedAt = 0;
+  // User pressed pause. Distinct from #isPlaying: a pause can land while a
+  // sentence is still being SYNTHESIZED, i.e. before any audio exists.
+  #paused = false;
   // Synthetic word-boundary tracking (karaoke highlight): paced from
   // audio.currentTime against char-weighted word fractions of the sentence.
-  #wordTrackingRafId: number | null = null;
-  #wordTrackingGen = 0;
   // After several consecutive R2 misses, skip the R2 probe for LOW-priority
   // preloads (cold books pay a wasted RTT per sentence otherwise). Highs keep
   // probing, and any hit re-arms probing for everyone.
@@ -685,7 +684,6 @@ export class FishAudioTTSClient implements TTSClient {
             const finish = (ev: TTSMessageEvent) => {
               if (resolved) return;
               resolved = true;
-              this.#stopWordTracking();
               audio.onended = null;
               audio.onerror = null;
               finishCurrent = null;
@@ -706,7 +704,6 @@ export class FishAudioTTSClient implements TTSClient {
               console.warn('Fish Audio playback error:', e);
               finish({ code: 'error', message: 'Audio playback error' });
             };
-            this.#isPlaying = true;
             audio.volume = 1;
             if (audio.src !== url) {
               audio.src = url;
@@ -714,6 +711,13 @@ export class FishAudioTTSClient implements TTSClient {
             if (!this.appService?.isLinuxApp) {
               audio.playbackRate = this.#rate;
             }
+            // The user paused while this sentence was still being synthesized.
+            // Park it: the promise stays pending with onended/onerror armed, src
+            // set and #audioElement pointing here, so resume() starts exactly
+            // this element. MUST be before `#isPlaying = true` — bailing after
+            // would make resume() early-return and deadlock playback.
+            if (this.#paused) return;
+            this.#isPlaying = true;
             audio
               .play()
               .then(() => {
@@ -722,12 +726,14 @@ export class FishAudioTTSClient implements TTSClient {
                 }
               })
               .catch((err) => {
+                // A pause landing inside the play() window rejects with
+                // AbortError. Leave the promise PARKED so resume() restarts this
+                // same element (its onended is still armed) instead of finishing
+                // the sentence and skipping it.
+                if (!this.#isPlaying) return;
                 console.error('Failed to play Fish Audio audio:', err);
                 finish({ code: 'error', message: 'Playback failed: ' + err.message });
               });
-            // Synthetic word boundaries: karaoke highlight + mid-sentence
-            // page-follow, paced from the audio position.
-            this.#startWordTracking(audio, mark.text);
             // The clip may have ended in the microtask gap (ultra-short audio).
             if (audio.ended) {
               finish({ code: 'end', message: `Chunk finished: ${mark.name}` });
@@ -758,6 +764,13 @@ export class FishAudioTTSClient implements TTSClient {
         }
         yield result;
         if (result.code === 'end') consecutiveMarkErrors = 0;
+        // A play() rejection (audio-focus loss, autoplay gating) produces
+        // 'Playback failed: ...', which the regenerate gate above deliberately
+        // does NOT match. Without a bound the loop advanced, every following
+        // mark was an in-memory LOOKAHEAD cache hit, and the paragraph raced to
+        // its end dispatching highlights with NO AUDIO — the "it skips words"
+        // report. Bound at 2, matching the synthesis-failure policy below.
+        if (result.code === 'error' && ++consecutiveMarkErrors >= 2) break;
         if (signal.aborted) break;
         [cur, nxt] = [nxt, cur];
       } catch (error) {
@@ -781,104 +794,25 @@ export class FishAudioTTSClient implements TTSClient {
     await this.stopInternal();
   }
 
-  // --- Synthetic word-boundary tracking (karaoke highlight) ---
-  // The MP3s carry no word timings, so we interpolate: split the sentence into
-  // words, weight each by character count (+ pause padding after punctuation),
-  // and map audio.currentTime onto those cumulative fractions. Accuracy is
-  // within about one word — enough for karaoke highlighting and for the
-  // word-driven mid-sentence page-follow.
-  #computeSyntheticWords(text: string): { text: string; frac: number }[] {
-    const tokens = text.split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
-    const weights = tokens.map((t) => {
-      const strong = /[.!?…:]["»)\]]*$/.test(t);
-      const weak = /[,;]["»)\]]*$/.test(t);
-      return t.length + 1 + (strong ? 6 : weak ? 3 : 0);
-    });
-    const total = weights.reduce((a, b) => a + b, 0);
-    let acc = 0;
-    return tokens.map((t, i) => {
-      const frac = acc / total;
-      acc += weights[i]!;
-      return { text: t, frac };
-    });
-  }
-
-  #startWordTracking(audio: HTMLAudioElement, text: string) {
-    this.#stopWordTracking();
-    const controller = this.controller;
-    if (!controller) return;
-    const words = this.#computeSyntheticWords(text);
-    // Empty list draws the sentence-highlight fallback — call it regardless.
-    // The return value says whether word tracking is actually armed: in
-    // sentence mode (the default) setMark already drew the highlight, so
-    // starting the rAF loop would burn 60fps per sentence for nothing.
-    if (!controller.prepareSpeakWords(words.map((w) => w.text))) return;
-    if (words.length === 0) return;
-    const gen = ++this.#wordTrackingGen;
-    // No artificial lead: these word positions are already interpolated guesses
-    // (the model returns no timings), and a deliberate 120ms head start stacked
-    // on that estimate is a large fraction of a short sentence — it read as the
-    // highlight running ahead of the voice.
-    const LEAD = 0;
-    const HEAD = 0.1; // generated audio carries leading silence
-    const TAIL = 0.25; // ... and trailing silence
-    let lastIndex = 0; // word 0 was highlighted by prepareSpeakWords
-    const tick = () => {
-      if (gen !== this.#wordTrackingGen) return;
-      const d = audio.duration;
-      if (!audio.paused && Number.isFinite(d) && d > 0) {
-        const span = Math.max(0.5, d - HEAD - TAIL);
-        const frac = Math.min(1, Math.max(0, (audio.currentTime + LEAD - HEAD) / span));
-        let index = lastIndex;
-        while (index + 1 < words.length && words[index + 1]!.frac <= frac) index++;
-        if (index !== lastIndex) {
-          lastIndex = index;
-          controller.dispatchSpeakWord(index);
-        }
-      }
-      this.#wordTrackingRafId = requestAnimationFrame(tick);
-    };
-    this.#wordTrackingRafId = requestAnimationFrame(tick);
-  }
-
-  #stopWordTracking() {
-    this.#wordTrackingGen++;
-    if (this.#wordTrackingRafId !== null) {
-      cancelAnimationFrame(this.#wordTrackingRafId);
-      this.#wordTrackingRafId = null;
-    }
-  }
-
-  // Gentle volume ramp so pause/resume doesn't chop the audio mid-syllable.
-  async #fadeVolume(audio: HTMLAudioElement, to: number, ms: number) {
-    const from = audio.volume;
-    const steps = Math.max(1, Math.floor(ms / 16));
-    for (let i = 1; i <= steps; i++) {
-      audio.volume = from + ((to - from) * i) / steps;
-      await new Promise((r) => setTimeout(r, 16));
-    }
-    audio.volume = to;
-  }
-
   async pause() {
+    // FIRST, above the early return: a pause tapped during a synthesis gap (the
+    // first sentence of every cold paragraph, where speak() already called
+    // stopInternal so #isPlaying is false) used to be silently dropped — the
+    // transport showed 'paused' and Claire started talking seconds later.
+    this.#paused = true;
     if (!this.#isPlaying || !this.#audioElement) return true;
-    this.#pausedAt = this.#audioElement.currentTime - this.#startedAt;
-    // Gentle fade-out instead of a hard chop mid-syllable.
-    await this.#fadeVolume(this.#audioElement, 0, 140);
     this.#audioElement.pause();
-    this.#audioElement.volume = 1;
     this.#isPlaying = false;
     return true;
   }
 
   async resume() {
-    if (this.#isPlaying || !this.#audioElement) return true;
-    this.#audioElement.volume = 0;
+    this.#paused = false;
+    // After stopInternal removed the attribute a stale element reports src === ''
+    // — playing it would reject and wedge the session.
+    if (this.#isPlaying || !this.#audioElement?.src) return true;
     await this.#audioElement.play().catch(() => {});
     this.#isPlaying = true;
-    void this.#fadeVolume(this.#audioElement, 1, 160);
-    this.#startedAt = this.#audioElement.currentTime - this.#pausedAt;
     return true;
   }
 
@@ -888,9 +822,9 @@ export class FishAudioTTSClient implements TTSClient {
 
   private async stopInternal() {
     this.#isPlaying = false;
-    this.#pausedAt = 0;
-    this.#startedAt = 0;
-    this.#stopWordTracking();
+    // speak() calls stopInternal at its start, so a stale true would mute a
+    // fresh session.
+    this.#paused = false;
     // Clean BOTH buffered elements. Never invoke onended here: with
     // double-buffering it would chain-start the primed next sentence.
     for (const a of [this.#audioA, this.#audioB]) {
@@ -954,10 +888,14 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   supportsWordBoundaries(): boolean {
-    // Synthetic boundaries: interpolated from audio position (see
-    // #startWordTracking). Enables word-karaoke highlighting and the
-    // word-driven mid-sentence page-follow.
-    return true;
+    // false: fish-speech returns NO word timings. The old "synthetic" karaoke
+    // interpolated positions from character counts, and requestAnimationFrame is
+    // throttled or halted when the screen is off — so the highlight froze during
+    // background playback then jumped. Structurally untunable, now deleted.
+    // This flag also gates #suppressMarkHighlight in TTSController: returning
+    // true with no tracker running would suppress the sentence highlight and
+    // draw nothing at all.
+    return false;
   }
 
   getGranularities(): TTSGranularity[] {

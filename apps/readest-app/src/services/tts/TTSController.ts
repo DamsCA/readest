@@ -475,6 +475,9 @@ export class TTSController extends EventTarget {
   ) {
     if (!(await initSection())) {
       await this.stop();
+      // Guarded: backward() at the first paragraph legitimately lands here in a
+      // paused state and recovers on the next play tap.
+      if (isPlaying) this.#end();
       return;
     }
     let ssml = this.view.tts?.start();
@@ -623,6 +626,7 @@ export class TTSController extends EventTarget {
               await this.#speak(this.view.tts?.start());
             } else {
               await this.stop();
+              this.#end();
             }
           }
           console.log('[TTS] no SSML, skipping for', this.#nossmlCnt);
@@ -737,7 +741,8 @@ export class TTSController extends EventTarget {
             if (this.#consecutiveEmptySkips > TTS_MAX_CONSECUTIVE_EMPTY_SKIPS) {
               this.#consecutiveEmptySkips = 0;
               console.warn('[TTS] too many empty paragraphs in a row, stopping');
-              return await this.stop();
+              await this.stop();
+              return this.#end();
             }
             if (signal.aborted) return; // a newer session took over while we waited
             return await this.forward();
@@ -808,6 +813,7 @@ export class TTSController extends EventTarget {
           } else {
             this.#consecutiveSpeakErrors = 0;
             await this.stop();
+            this.#end();
           }
         }
         resolve();
@@ -884,6 +890,15 @@ export class TTSController extends EventTarget {
   async resume() {
     this.state = 'playing';
     await this.ttsClient.resume().catch((e) => this.error(e));
+  }
+
+  // Session really is over (end of book, or a safety cap tripped) — tell the UI.
+  // NEVER call this from stop(): stop() runs on every paragraph advance. Call it
+  // AFTER an awaited stop() on the terminal paths only. Without it the hook kept
+  // isPlaying = true over silence: tap 1 paused, tap 2 resumed a src-less
+  // element, and the session was dead until TTS was toggled off and on.
+  #end() {
+    this.dispatchEvent(new CustomEvent('tts-ended'));
   }
 
   async stop() {
