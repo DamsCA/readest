@@ -202,7 +202,14 @@ export class FishAudioTTSClient implements TTSClient {
   controller?: TTSController;
   appService?: AppService | null;
 
-  #voices: TTSVoice[] = FISH_AUDIO_VOICES;
+  // COPY, never the module array by reference: getAllVoices() mutates
+  // voice.disabled = !this.initialized on these objects. Shared, a dying
+  // controller's shutdown (initialized = false) stamped Claire as disabled on
+  // the very objects the NEW book's controller was already holding — setVoice
+  // then missed Fish, fell through to Edge/Native/Web, and persisted that as the
+  // GLOBAL preferred client. That is why Claire was replaced by a robotic voice
+  // on book switch, and why it stayed broken across restarts.
+  #voices: TTSVoice[] = FISH_AUDIO_VOICES.map((v) => ({ ...v }));
   #primaryLang = 'en';
   #speakingLang = '';
   #currentVoiceId = FISH_AUDIO_DEFAULT_VOICE_ID;

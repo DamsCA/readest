@@ -37,7 +37,10 @@ export class EdgeTTSClient implements TTSClient {
 
   async init(protocol: EDGE_TTS_PROTOCOL = 'wss') {
     this.#edgeTTS = new EdgeSpeechTTS(protocol);
-    this.#voices = EdgeSpeechTTS.voices;
+    // Copy, not the shared static array — getAllVoices() mutates voice.disabled
+    // on these objects, so sharing them lets one client instance disable voices
+    // for every other one (see the same fix in FishAudioTTSClient).
+    this.#voices = EdgeSpeechTTS.voices.map((v) => ({ ...v }));
     try {
       await this.#edgeTTS.create({
         lang: 'en',

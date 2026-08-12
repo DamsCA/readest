@@ -675,8 +675,17 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       const primaryLang = bookData.book.primaryLanguage;
 
       if (ttsControllerRef.current) {
-        ttsControllerRef.current.stop();
+        // AWAIT a real shutdown, not a fire-and-forget stop(). stop() leaves the
+        // old controller alive: its #prefetchAbortController (aborted only in
+        // shutdown) keeps banking next-chapter audio against the single GPU
+        // while the new book tries to speak, and its two <audio> elements plus
+        // up to 128 un-revoked blob URLs leak. Order matters: shutdown() sets
+        // view.tts = null and clears the highlighter on the SAME FoliateView the
+        // new controller is about to use, so letting it land later would race
+        // initViewTTS and silently kill the fresh session.
+        const previous = ttsControllerRef.current;
         ttsControllerRef.current = null;
+        await previous.shutdown().catch(() => {});
       }
 
       try {
@@ -799,9 +808,21 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
   const handleTTSStop = async (event: CustomEvent) => {
     const { bookKey: ttsBookKey } = event.detail;
-    if (ttsControllerRef.current && bookKey === ttsBookKey) {
+    if (bookKey !== ttsBookKey) return;
+    if (ttsControllerRef.current) {
       handleStop(bookKey);
+      return;
     }
+    // No controller, but ttsEnabled lives in the store keyed by book and
+    // SURVIVES the component remount, while ttsControllerRef dies with it.
+    // Once those two cross (flag true, ref null — a viewer recreate, or a start
+    // that lost its race) the footer button, which decides purely from
+    // ttsEnabled, dispatched 'tts-stop' into this no-op forever: the icon stayed
+    // lit, nothing played, and TTS could never be started again for that book.
+    // Always repair the flag.
+    setTTSEnabled(bookKey, false);
+    setShowIndicator(false);
+    emitPlaybackState('stopped');
   };
 
   // Playback callbacks

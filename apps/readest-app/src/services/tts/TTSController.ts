@@ -167,7 +167,9 @@ export class TTSController extends EventTarget {
     // client unless the user has explicitly chosen another one.
     if (await this.ttsFishClient.init()) {
       availableClients.push(this.ttsFishClient);
-      this.ttsFishVoices = await this.ttsFishClient.getAllVoices();
+      // (ttsFishVoices is read once at the end of init; the duplicate early read
+      // that used to be here only widened the window for a concurrent shutdown
+      // to invalidate it.)
     }
     if (await this.ttsEdgeClient.init()) {
       availableClients.push(this.ttsEdgeClient);
