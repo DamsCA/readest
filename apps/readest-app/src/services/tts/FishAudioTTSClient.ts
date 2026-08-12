@@ -57,6 +57,12 @@ let _discoveredServerAt = 0;
 // time it restarts) is picked up quickly instead of failing for minutes.
 const SERVER_URL_TTL_MS = 60 * 1000;
 
+// In-flight discovery, shared by every concurrent caller. The TTL guard below
+// only caches NON-empty results, so before the first success — or after a 5xx
+// clears the cache — every #fetchAudio refetched server-url.txt, 3-5 at a time
+// (the LOOKAHEAD pipeline), none of them bounded.
+let _discoveryInFlight: Promise<string> | null = null;
+
 const resolveClaireServerUrl = async (
   tauriFetch: typeof fetch | null,
   signal?: AbortSignal,
@@ -69,23 +75,42 @@ const resolveClaireServerUrl = async (
   if (_discoveredServerUrl && now - _discoveredServerAt < SERVER_URL_TTL_MS) {
     return _discoveredServerUrl;
   }
-  try {
-    const url = `${r2}/server-url.txt`;
-    const resp = tauriFetch
-      ? await tauriFetch(url, { method: 'GET', signal })
-      : await fetch(url, { method: 'GET', signal });
-    if (resp.ok) {
-      const discovered = (await resp.text()).trim().replace(/\/+$/, '');
-      if (/^https?:\/\//.test(discovered)) {
-        _discoveredServerUrl = discovered;
-        _discoveredServerAt = now;
-        return discovered;
+  if (_discoveryInFlight) return _discoveryInFlight;
+
+  _discoveryInFlight = (async () => {
+    // Bounded by hand rather than AbortSignal.any/AbortSignal.timeout: this runs
+    // in the device's System WebView on Android, which can predate both. A hung
+    // R2 used to hang playback indefinitely — this await sits in front of every
+    // audio request.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const onAbort = () => ctrl.abort();
+    if (signal?.aborted) ctrl.abort();
+    else signal?.addEventListener('abort', onAbort);
+    try {
+      const url = `${r2}/server-url.txt`;
+      const opts = { method: 'GET', signal: ctrl.signal } as RequestInit;
+      const resp = tauriFetch ? await tauriFetch(url, opts) : await fetch(url, opts);
+      if (resp.ok) {
+        const discovered = (await resp.text()).trim().replace(/\/+$/, '');
+        if (/^https?:\/\//.test(discovered)) {
+          _discoveredServerUrl = discovered;
+          _discoveredServerAt = Date.now();
+          return discovered;
+        }
       }
+    } catch {
+      // Discovery failed — fall back to whatever we last knew (may be empty).
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
     }
-  } catch {
-    // Discovery failed — fall back to whatever we last knew (may be empty).
-  }
-  return _discoveredServerUrl;
+    return _discoveredServerUrl;
+  })().finally(() => {
+    _discoveryInFlight = null;
+  });
+
+  return _discoveryInFlight;
 };
 
 // Persistent, cross-session audio cache ("generate once, keep forever"): a
@@ -403,16 +428,24 @@ export class FishAudioTTSClient implements TTSClient {
       }
     };
 
-    // 0) Cloud (R2) first: if this exact sentence was ever generated, its MP3
-    //    is already banked in R2 — play it with the PC off / offline. The key
-    //    matches the Claire server's r2_key(text). On a cold book every probe
-    //    is a wasted RTT, so after a few consecutive misses LOW-priority
-    //    preloads skip it (playback keeps probing; any hit re-arms everyone).
+    // 0) Cloud (R2), BANKING ONLY. If this sentence was ever generated its MP3
+    //    is in R2 (key = the Claire server's r2_key(text)), so a low-priority
+    //    pass can fetch it instead of asking the GPU — and whatever it finds
+    //    lands in the on-device persistent cache, where playback hits it
+    //    locally with no round trip.
+    //    Playback (and the whole intra-paragraph LOOKAHEAD, also 'high') no
+    //    longer probes: the old gate was
+    //      !(priority === 'low' && misses >= 3)
+    //    whose inner conjunct is always false for 'high', so the miss-breaker
+    //    could NEVER engage for playback by construction. On a cold book every
+    //    single sentence paid a guaranteed-404 Cloudflare RTT — with a 12s
+    //    deadline stacking on top of the 25s server deadline — before the GPU
+    //    was even asked.
     const r2Url = getClaireR2Url();
-    if (r2Url && !(priority === 'low' && this.#r2ConsecMisses >= 3)) {
+    if (r2Url && priority === 'low' && this.#r2ConsecMisses < 3) {
       try {
         const url = `${r2Url}/audio/${hashText(text)}.mp3`;
-        const r2resp = await fetchWithTimeout(url, { method: 'GET' }, 12000);
+        const r2resp = await fetchWithTimeout(url, { method: 'GET' }, 2500);
         if (r2resp.ok) {
           const buffer = await r2resp.arrayBuffer();
           if (isValidAudio(buffer)) {
@@ -425,6 +458,15 @@ export class FishAudioTTSClient implements TTSClient {
         // R2 miss/unreachable (or just-generated, not yet propagated) → generate.
         this.#r2ConsecMisses++;
       }
+    }
+
+    // R2 is configured, so Claire IS the intended engine: an empty serverUrl
+    // means discovery failed, not "no server". Falling through to the Fish Audio
+    // path here sent `Authorization: Bearer ` (the release build embeds no Fish
+    // key) → 401 → several paragraphs of silence. Fail loudly instead; the next
+    // sentence re-attempts discovery naturally because the cache is empty.
+    if (!serverUrl && getClaireR2Url()) {
+      throw new Error('Claire server URL not discovered (R2 server-url.txt)');
     }
 
     if (serverUrl) {
