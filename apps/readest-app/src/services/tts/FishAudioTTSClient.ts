@@ -260,6 +260,12 @@ export class FishAudioTTSClient implements TTSClient {
   // preloads (cold books pay a wasted RTT per sentence otherwise). Highs keep
   // probing, and any hit re-arms probing for everyone.
   #r2ConsecMisses = 0;
+  // DIAGNOSTIC: identifies THIS client instance (one per TTSController, i.e. one
+  // per TTS session) in the server log. If two ids appear interleaved, two
+  // sessions are speaking at once — which would explain duplicate requests for
+  // the same sentence and words being dropped as they fight over the shared
+  // foliate iterator.
+  #sessionId = Math.random().toString(36).slice(2, 8);
   // Small cache of synthesized audio object URLs keyed by `${voiceId}:${text}`,
   // populated by preload so playback can start without a round-trip.
   #audioCache = new Map<string, string>();
@@ -484,6 +490,8 @@ export class FishAudioTTSClient implements TTSClient {
       // Playback ('high') preempts preload ('low') on the server's GPU queue so
       // the sentence being listened to never waits behind prefetched ones.
       headers['X-Claire-Priority'] = priority;
+      headers['X-Claire-Session'] = this.#sessionId;
+      headers['X-Claire-Lang'] = this.#speakingLang || this.#primaryLang || '?';
 
       let lastErr: unknown = null;
       for (let attempt = 0; attempt < 2; attempt++) {
