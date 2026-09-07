@@ -1,5 +1,3 @@
-import { getUserLocale } from '@/utils/misc';
-import { isSameLang } from '@/utils/lang';
 import { TTSClient, TTSMessageEvent } from './TTSClient';
 import { TTSGranularity, TTSVoice, TTSVoicesGroup } from './types';
 import { AppService } from '@/types/system';
@@ -7,20 +5,34 @@ import { parseSSMLMarks } from '@/utils/ssml';
 import { TTSController } from './TTSController';
 import { TTSUtils } from './TTSUtils';
 
-// Google Cloud Text-to-Speech. Chosen to replace the self-hosted Claire stack:
-// comparable voice quality, but an API key is the ENTIRE infrastructure — no
-// GPU, no WSL, no Cloudflare tunnel, no R2 bucket, no watchdog. Those were the
-// source of essentially every outage: a 4GB VRAM ceiling, host RAM pressure
-// killing the server, and a tunnel URL that changed on every restart.
-const GOOGLE_TTS_SYNTH_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
-const GOOGLE_TTS_VOICES_URL = 'https://texttospeech.googleapis.com/v1/voices';
+// Gemini TTS, via the Gemini API. Two reasons it replaced Cloud Text-to-Speech
+// here, both measured rather than assumed:
+//
+//  1. BILINGUAL. Cloud TTS was queried directly: 2066 voices, ZERO of them
+//     multilingual — every voice is locked to one languageCode. These books are
+//     English EPUBs narrated in French, so the French carries English names and
+//     quotations, and a locale-locked voice mangles them. Gemini voices switch
+//     language mid-sentence with no configuration.
+//  2. NO INFRASTRUCTURE. An API key is the whole deployment — no GPU, no WSL, no
+//     Cloudflare tunnel, no R2 bucket, no watchdog. Those accounted for
+//     essentially every outage of the previous month.
+//
+// It also takes a plain-language style instruction, which is how the narration
+// tone is set (see NARRATION_STYLE).
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 
 const getApiKey = () => process.env['NEXT_PUBLIC_GOOGLE_TTS_API_KEY'] || '';
 
-// Used only when voices.list cannot be reached (offline, or the key is not yet
-// authorized). The live list is always preferred so voices Google adds later
-// show up without a rebuild.
-const FALLBACK_FR_FEMALE: TTSVoice[] = [
+// Prepended to every sentence. The model follows it without reading it aloud.
+const NARRATION_STYLE =
+  "Lis ce passage comme une narratrice d'audiobook : voix douce, posée, intime. ";
+
+// Gemini's prebuilt voices are language-independent: the same voice speaks every
+// supported language, which is exactly the property Cloud TTS lacked. The API
+// exposes no voices.list endpoint for them, so the roster is declared here.
+// Female-presenting voices only, per the owner's request.
+const GEMINI_FEMALE_VOICES = [
   'Achernar',
   'Aoede',
   'Autonoe',
@@ -35,15 +47,13 @@ const FALLBACK_FR_FEMALE: TTSVoice[] = [
   'Sulafat',
   'Vindemiatrix',
   'Zephyr',
-].map((n) => ({
-  id: `fr-FR-Chirp3-HD-${n}`,
-  name: `${n} (Chirp 3 HD)`,
-  lang: 'fr-FR',
-}));
+];
+
+const DEFAULT_VOICE = 'Kore';
 
 // Persistent audio cache: "generate once, keep forever". Also the cost control —
-// re-reading a passage never spends a second character of the monthly quota.
-const PERSIST_CACHE_NAME = 'google-tts-audio-v1';
+// re-reading a passage never spends a second token of quota.
+const PERSIST_CACHE_NAME = 'gemini-tts-audio-v1';
 
 const hashText = (s: string): string => {
   let h = 5381;
@@ -52,7 +62,7 @@ const hashText = (s: string): string => {
 };
 
 const persistRequest = (voiceId: string, text: string) =>
-  new Request(`https://google-tts.local/${encodeURIComponent(voiceId)}/${hashText(text)}`);
+  new Request(`https://gemini-tts.local/${encodeURIComponent(voiceId)}/${hashText(text)}`);
 
 let _persistCachePromise: Promise<Cache> | null = null;
 const openPersistCache = (): Promise<Cache> | null => {
@@ -78,32 +88,48 @@ const writePersistedAudio = async (voiceId: string, text: string, buffer: ArrayB
   try {
     await (await cacheP).put(
       persistRequest(voiceId, text),
-      new Response(buffer, { headers: { 'Content-Type': 'audio/mpeg' } }),
+      new Response(buffer, { headers: { 'Content-Type': 'audio/wav' } }),
     );
   } catch {
     // Quota or private mode — playback still works, it just re-synthesizes.
   }
 };
 
-// A truncated body persisted as-is would make that exact sentence fail on every
-// future read — a deterministic, permanent skip. Validate before caching.
-const isValidAudio = (buffer: ArrayBuffer): boolean => {
-  if (buffer.byteLength < 512) return false;
-  const b = new Uint8Array(buffer, 0, 3);
-  const isId3 = b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33;
-  const isMpegFrame = b[0] === 0xff && (b[1]! & 0xe0) === 0xe0;
-  return isId3 || isMpegFrame;
-};
-
-const base64ToBuffer = (b64: string): ArrayBuffer => {
+const base64ToBytes = (b64: string): Uint8Array => {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
+  return bytes;
 };
 
-// parseSSMLMarks never decodes entities, but Google's input.text is PLAIN text —
-// sending an escaped ampersand would have the voice read it out literally.
+// Gemini returns raw 24kHz 16-bit mono PCM, which <audio> cannot play. Wrap it
+// in a WAV header (44 bytes) so it becomes a normal playable blob.
+const pcmToWav = (pcm: Uint8Array, sampleRate = 24000): ArrayBuffer => {
+  const out = new ArrayBuffer(44 + pcm.length);
+  const view = new DataView(out);
+  const ascii = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  ascii(0, 'RIFF');
+  view.setUint32(4, 36 + pcm.length, true);
+  ascii(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); // PCM header size
+  view.setUint16(20, 1, true); // format = PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  ascii(36, 'data');
+  view.setUint32(40, pcm.length, true);
+  new Uint8Array(out, 44).set(pcm);
+  return out;
+};
+
+const isValidAudio = (buffer: ArrayBuffer): boolean => buffer.byteLength > 1024;
+
+// parseSSMLMarks never decodes entities, but the model receives PLAIN text —
+// an escaped ampersand would otherwise be read out literally.
 const decodeEntities = (s: string) =>
   s
     .replace(/&lt;/g, '<')
@@ -122,11 +148,15 @@ export class GoogleTTSClient implements TTSClient {
   controller?: TTSController;
   appService?: AppService | null;
 
-  #voices: TTSVoice[] = FALLBACK_FR_FEMALE.map((v) => ({ ...v }));
-  #voicesLoaded = false;
+  #voices: TTSVoice[] = GEMINI_FEMALE_VOICES.map((n) => ({
+    id: n,
+    // Language-neutral label: the same voice speaks French and English.
+    name: `${n} (Gemini · bilingue)`,
+    lang: 'mul',
+  }));
   #primaryLang = 'en';
   #speakingLang = '';
-  #currentVoiceId = FALLBACK_FR_FEMALE[0]!.id;
+  #currentVoiceId = DEFAULT_VOICE;
   #rate = 1.0;
 
   #audioA: HTMLAudioElement | null = null;
@@ -146,37 +176,7 @@ export class GoogleTTSClient implements TTSClient {
 
   async init() {
     this.initialized = !!getApiKey();
-    if (this.initialized) void this.#loadVoices().catch(() => {});
     return this.initialized;
-  }
-
-  // Ask Google for every voice it actually offers, so the picker shows the full
-  // set and any voice added later appears without a rebuild.
-  async #loadVoices() {
-    const key = getApiKey();
-    if (!key || this.#voicesLoaded) return;
-    const resp = await fetch(`${GOOGLE_TTS_VOICES_URL}?key=${encodeURIComponent(key)}`);
-    if (!resp.ok) return;
-    const data = (await resp.json()) as {
-      voices?: { name: string; languageCodes: string[]; ssmlGender?: string }[];
-    };
-    const all = data.voices ?? [];
-    if (!all.length) return;
-    const pretty = (name: string) => {
-      // "fr-FR-Chirp3-HD-Aoede" -> "Aoede (Chirp 3 HD)"
-      const m = name.match(/^[a-z]{2}-[A-Z]{2}-(.+?)-([^-]+)$/);
-      if (!m) return name;
-      const family = m[1]!.replace('Chirp3-HD', 'Chirp 3 HD').replace(/-/g, ' ');
-      return `${m[2]} (${family})`;
-    };
-    this.#voices = all
-      .filter((v) => (v.ssmlGender || '').toUpperCase() === 'FEMALE')
-      .map((v) => ({
-        id: v.name,
-        name: pretty(v.name),
-        lang: v.languageCodes[0] || 'en-US',
-      }));
-    this.#voicesLoaded = true;
   }
 
   async #synthesize(voiceId: string, rawText: string, signal: AbortSignal): Promise<string> {
@@ -190,40 +190,40 @@ export class GoogleTTSClient implements TTSClient {
     if (persisted) return this.#storeInMemory(cacheKey, persisted);
 
     const key = getApiKey();
-    if (!key) throw new Error('Google TTS API key missing');
+    if (!key) throw new Error('Gemini TTS API key missing');
 
-    const languageCode = voiceId.split('-').slice(0, 2).join('-') || 'fr-FR';
-    const audioConfig: Record<string, unknown> = { audioEncoding: 'MP3' };
-    // Only send a rate when it differs from normal: some voice families reject
-    // an explicit speakingRate, and there is no reason to risk it at 1.0.
-    if (this.#rate !== 1.0) {
-      audioConfig['speakingRate'] = Math.min(4, Math.max(0.25, this.#rate));
-    }
-
-    const resp = await fetch(`${GOOGLE_TTS_SYNTH_URL}?key=${encodeURIComponent(key)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: { text },
-        voice: { languageCode, name: voiceId },
-        audioConfig,
-      }),
-      signal,
-    });
+    const resp = await fetch(
+      `${GEMINI_BASE}/${GEMINI_TTS_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: NARRATION_STYLE + text }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceId } } },
+          },
+        }),
+        signal,
+      },
+    );
     if (!resp.ok) {
       const detail = await resp.text().catch(() => '');
-      throw new Error(`Google TTS failed (${resp.status}): ${detail.slice(0, 200)}`);
+      throw new Error(`Gemini TTS failed (${resp.status}): ${detail.slice(0, 200)}`);
     }
-    const data = (await resp.json()) as { audioContent?: string };
-    if (!data.audioContent) throw new Error('Google TTS returned no audio');
-    const buffer = base64ToBuffer(data.audioContent);
-    if (!isValidAudio(buffer)) throw new Error('Google TTS returned invalid audio');
+    const data = (await resp.json()) as {
+      candidates?: { content?: { parts?: { inlineData?: { data?: string } }[] } }[];
+    };
+    const b64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!b64) throw new Error('Gemini TTS returned no audio');
+    const buffer = pcmToWav(base64ToBytes(b64));
+    if (!isValidAudio(buffer)) throw new Error('Gemini TTS returned invalid audio');
     await writePersistedAudio(voiceId, text, buffer);
     return this.#storeInMemory(cacheKey, buffer);
   }
 
   #storeInMemory(cacheKey: string, buffer: ArrayBuffer): string {
-    const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/mpeg' }));
+    const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
     const previous = this.#memCache.get(cacheKey);
     if (previous && previous !== url) URL.revokeObjectURL(previous);
     this.#memCache.set(cacheKey, url);
@@ -244,7 +244,7 @@ export class GoogleTTSClient implements TTSClient {
     const { marks } = parseSSMLMarks(ssml, this.#primaryLang);
 
     if (preload) {
-      for (const mark of marks.slice(0, 4)) {
+      for (const mark of marks.slice(0, 3)) {
         if (signal.aborted) return;
         try {
           await this.#synthesize(this.getVoiceIdFromLang(mark.language), mark.text, signal);
@@ -316,6 +316,7 @@ export class GoogleTTSClient implements TTSClient {
 
           audio.volume = 1;
           if (audio.src !== url) audio.src = url;
+          audio.playbackRate = Math.min(4, Math.max(0.25, this.#rate));
           // The user paused while this sentence was still being synthesized.
           // Park it: the promise stays pending with handlers armed and src set,
           // so resume() starts exactly this element. MUST come before
@@ -338,7 +339,7 @@ export class GoogleTTSClient implements TTSClient {
         [cur, nxt] = [nxt, cur];
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn('Google TTS error for mark:', mark.text, message);
+        console.warn('Gemini TTS error for mark:', mark.text, message);
         yield { code: 'error', message } as TTSMessageEvent;
         if (signal.aborted || ++consecutiveErrors >= 2) break;
       } finally {
@@ -390,36 +391,33 @@ export class GoogleTTSClient implements TTSClient {
   }
 
   async setPitch(_pitch: number) {
-    // Chirp 3 HD voices ignore pitch; accepted for interface compatibility.
+    // Gemini voices expose no pitch control; accepted for interface parity.
   }
 
   async setVoice(voice: string) {
     this.#currentVoiceId = voice;
   }
 
+  // Voices are language-independent, so the book's language never restricts the
+  // choice — it only decides which stored preference to look up.
   getVoiceIdFromLang = (lang: string): string => {
     const preferred = TTSUtils.getPreferredVoice(this.name, lang);
     if (preferred && this.#voices.some((v) => v.id === preferred)) return preferred;
-    const match = this.#voices.find((v) => isSameLang(v.lang, lang));
-    return this.#currentVoiceId || match?.id || FALLBACK_FR_FEMALE[0]!.id;
+    return this.#currentVoiceId || DEFAULT_VOICE;
   };
 
   async getAllVoices(): Promise<TTSVoice[]> {
-    await this.#loadVoices().catch(() => {});
     this.#voices.forEach((v) => (v.disabled = !this.initialized));
     return this.#voices;
   }
 
-  async getVoices(lang: string): Promise<TTSVoicesGroup[]> {
+  async getVoices(_lang: string): Promise<TTSVoicesGroup[]> {
     const all = await this.getAllVoices();
-    const locale = getUserLocale(lang) || 'fr-FR';
-    const filtered = all.filter((v) => isSameLang(v.lang, lang));
-    if (!filtered.length) return [];
     return [
       {
-        id: 'google-tts',
-        name: 'Google (voix féminines)',
-        voices: filtered.sort(TTSUtils.sortVoicesPreferLocaleFunc(locale)),
+        id: 'gemini-tts',
+        name: 'Gemini — voix féminines bilingues',
+        voices: all,
         disabled: !this.initialized,
       },
     ];
@@ -430,8 +428,8 @@ export class GoogleTTSClient implements TTSClient {
   }
 
   supportsWordBoundaries(): boolean {
-    // The REST API returns no word timings. Sentence-level highlighting is
-    // always in sync; a synthetic word tracker is not — that lesson cost a month.
+    // No word timings are returned. Sentence-level highlighting is always in
+    // sync; a synthetic word tracker is not — that lesson cost a month.
     return false;
   }
 
