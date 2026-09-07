@@ -128,7 +128,6 @@ export class GoogleTTSClient implements TTSClient {
   #speakingLang = '';
   #currentVoiceId = FALLBACK_FR_FEMALE[0]!.id;
   #rate = 1.0;
-  #pitch = 1.0;
 
   #audioA: HTMLAudioElement | null = null;
   #audioB: HTMLAudioElement | null = null;
@@ -390,8 +389,8 @@ export class GoogleTTSClient implements TTSClient {
     this.#rate = rate;
   }
 
-  async setPitch(pitch: number) {
-    this.#pitch = pitch;
+  async setPitch(_pitch: number) {
+    // Chirp 3 HD voices ignore pitch; accepted for interface compatibility.
   }
 
   async setVoice(voice: string) {
@@ -413,7 +412,7 @@ export class GoogleTTSClient implements TTSClient {
 
   async getVoices(lang: string): Promise<TTSVoicesGroup[]> {
     const all = await this.getAllVoices();
-    const locale = getUserLocale() || 'fr-FR';
+    const locale = getUserLocale(lang) || 'fr-FR';
     const filtered = all.filter((v) => isSameLang(v.lang, lang));
     if (!filtered.length) return [];
     return [
