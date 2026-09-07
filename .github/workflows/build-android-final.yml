@@ -45,6 +45,7 @@ jobs:
           echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> $f
           echo "NEXT_PUBLIC_CLAIRE_R2_URL=${{ vars.CLAIRE_R2_URL }}" >> $f
           echo "NEXT_PUBLIC_CLAIRE_TOKEN=${{ vars.CLAIRE_TOKEN }}" >> $f
+          echo "NEXT_PUBLIC_GOOGLE_TTS_API_KEY=${{ secrets.GOOGLE_TTS_API_KEY }}" >> $f
           # Point the in-app updater at this fork's GitHub Releases (latest.json
           # + APK are published there) instead of the official Readest server.
           echo "NEXT_PUBLIC_UPDATER_BASE_URL=https://github.com/${{ github.repository }}/releases/latest/download" >> $f

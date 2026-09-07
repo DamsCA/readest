@@ -15,6 +15,7 @@ import { WebSpeechClient } from './WebSpeechClient';
 import { NativeTTSClient } from './NativeTTSClient';
 import { EdgeTTSClient } from './EdgeTTSClient';
 import { FishAudioTTSClient } from './FishAudioTTSClient';
+import { GoogleTTSClient } from './GoogleTTSClient';
 import { TTSUtils } from './TTSUtils';
 import { TTSClient } from './TTSClient';
 import { isSameLang, isValidLang } from '@/utils/lang';
@@ -127,10 +128,12 @@ export class TTSController extends EventTarget {
   ttsWebClient: TTSClient;
   ttsEdgeClient: TTSClient;
   ttsFishClient: TTSClient;
+  ttsGoogleClient: TTSClient;
   ttsNativeClient: TTSClient | null = null;
   ttsWebVoices: TTSVoice[] = [];
   ttsEdgeVoices: TTSVoice[] = [];
   ttsFishVoices: TTSVoice[] = [];
+  ttsGoogleVoices: TTSVoice[] = [];
   ttsNativeVoices: TTSVoice[] = [];
   ttsTargetLang: string = '';
 
@@ -147,6 +150,7 @@ export class TTSController extends EventTarget {
     this.ttsWebClient = new WebSpeechClient(this);
     this.ttsEdgeClient = new EdgeTTSClient(this, appService);
     this.ttsFishClient = new FishAudioTTSClient(this, appService);
+    this.ttsGoogleClient = new GoogleTTSClient(this, appService);
     // Native TTS is backed by Android TextToSpeech and iOS AVSpeechSynthesizer.
     // TODO: implement native TTS client for desktop platforms.
     if (appService?.isAndroidApp || appService?.isIOSApp) {
@@ -165,6 +169,12 @@ export class TTSController extends EventTarget {
     // Fish Audio is the preferred default client (reliable paid-grade API with
     // the curated "Claire" voice), so it leads the list and becomes the active
     // client unless the user has explicitly chosen another one.
+    // Google leads: an API key is its entire infrastructure, so it has none of
+    // the failure modes (GPU ceiling, WSL RAM pressure, a tunnel URL that moves)
+    // that repeatedly took the self-hosted Claire server offline.
+    if (await this.ttsGoogleClient.init()) {
+      availableClients.push(this.ttsGoogleClient);
+    }
     if (await this.ttsFishClient.init()) {
       availableClients.push(this.ttsFishClient);
       // (ttsFishVoices is read once at the end of init; the duplicate early read
@@ -194,6 +204,7 @@ export class TTSController extends EventTarget {
     this.ttsWebVoices = await this.ttsWebClient.getAllVoices();
     this.ttsEdgeVoices = await this.ttsEdgeClient.getAllVoices();
     this.ttsFishVoices = await this.ttsFishClient.getAllVoices();
+    this.ttsGoogleVoices = await this.ttsGoogleClient.getAllVoices();
   }
 
   #getPrimaryContent() {
@@ -971,18 +982,29 @@ export class TTSController extends EventTarget {
   }
 
   async getVoices(lang: string) {
+    const ttsGoogleVoices = await this.ttsGoogleClient.getVoices(lang);
     const ttsFishVoices = await this.ttsFishClient.getVoices(lang);
     const ttsWebVoices = await this.ttsWebClient.getVoices(lang);
     const ttsEdgeVoices = await this.ttsEdgeClient.getVoices(lang);
     const ttsNativeVoices = (await this.ttsNativeClient?.getVoices(lang)) ?? [];
 
-    // Fish Audio (Claire) leads the list so it surfaces at the top of the menu.
-    const voicesGroups = [...ttsFishVoices, ...ttsNativeVoices, ...ttsEdgeVoices, ...ttsWebVoices];
+    // Google leads the menu: it is the engine with no infrastructure to fail,
+    // and its group lists every female voice the API actually offers.
+    const voicesGroups = [
+      ...ttsGoogleVoices,
+      ...ttsFishVoices,
+      ...ttsNativeVoices,
+      ...ttsEdgeVoices,
+      ...ttsWebVoices,
+    ];
     return voicesGroups;
   }
 
   async setVoice(voiceId: string, lang: string) {
     this.state = 'setvoice-paused';
+    const useGoogleTTS = !!this.ttsGoogleVoices.find(
+      (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
+    );
     const useFishTTS = !!this.ttsFishVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
@@ -992,7 +1014,10 @@ export class TTSController extends EventTarget {
     const useNativeTTS = !!this.ttsNativeVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
-    if (useFishTTS) {
+    if (useGoogleTTS) {
+      this.ttsClient = this.ttsGoogleClient;
+      await this.ttsClient.setRate(this.ttsRate);
+    } else if (useFishTTS) {
       this.ttsClient = this.ttsFishClient;
       await this.ttsClient.setRate(this.ttsRate);
     } else if (useEdgeTTS) {
