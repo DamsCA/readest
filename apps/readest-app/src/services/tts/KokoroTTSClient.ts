@@ -198,12 +198,45 @@ export class KokoroTTSClient implements TTSClient {
   }
 
   async init() {
-    // Configured is enough to be initialized: the PC may be asleep now and
-    // awake by the time the user actually presses play, and a strict health
-    // check here would grey out the whole engine for the session.
-    this.initialized = !!getR2Url() || !!getBakedServerUrl();
+    // The server MUST answer before this engine reports itself available.
+    //
+    // An earlier version returned true as soon as an R2 URL was configured,
+    // reasoning that the PC might wake up later. That shipped in claire.36 and
+    // broke reading outright: an available-but-dead Kokoro won the
+    // `voiceId === ''` branch in TTSController.setVoice, which then persisted
+    // 'kokoro-tts' as the preferred client — so every subsequent launch also
+    // selected a server that was not running, and nothing was ever read aloud.
+    // Being honest about availability is what keeps that from recurring.
+    if (!getR2Url() && !getBakedServerUrl()) {
+      this.initialized = false;
+      return false;
+    }
+    this.initialized = await this.#serverAnswers();
     if (this.initialized) void this.#refreshVoices();
     return this.initialized;
+  }
+
+  async #serverAnswers(): Promise<boolean> {
+    try {
+      const tauriFetch = isTauriAppPlatform()
+        ? (await import('@tauri-apps/plugin-http')).fetch
+        : null;
+      const serverUrl = await resolveServerUrl(tauriFetch);
+      if (!serverUrl) return false;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const doFetch = tauriFetch ?? fetch;
+      const resp = await doFetch(`${serverUrl}/health`, { method: 'GET', signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) return false;
+      const body = (await resp.json()) as { status?: string; ready?: boolean };
+      // `ready` is false while the model is still loading onto the GPU, which
+      // takes ~2 min from cold. Offering the engine before then would hand the
+      // reader a server that answers and still cannot speak.
+      return body.status === 'ok' && body.ready === true;
+    } catch {
+      return false;
+    }
   }
 
   // Best-effort: keeps the menu honest if the server's roster ever changes,

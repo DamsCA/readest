@@ -212,6 +212,12 @@ export class TTSController extends EventTarget {
       );
       if (preferredClient) {
         this.ttsClient = preferredClient;
+      } else if (preferredClientName === this.ttsKokoroClient.name) {
+        // Kokoro was chosen once but its server is not answering now (PC off,
+        // or still loading). claire.36 could persist this preference without the
+        // server ever having answered; repair it rather than leaving the reader
+        // pinned to a dead engine on every launch.
+        TTSUtils.setPreferredClient(this.ttsClient.name);
       }
     }
     this.ttsWebVoices = await this.ttsWebClient.getAllVoices();
@@ -983,10 +989,10 @@ export class TTSController extends EventTarget {
   }
 
   async setPrimaryLang(lang: string) {
-    // Google and Kokoro were missing here: their #primaryLang stayed at the
-    // 'en' default, which is what parseSSMLMarks uses to label every mark that
-    // carries no explicit language.
-    if (this.ttsGoogleClient.initialized) this.ttsGoogleClient.setPrimaryLang(lang);
+    // Kokoro only. Google is deliberately NOT here: adding it in claire.36
+    // changed how parseSSMLMarks labels marks for the engine actually in use,
+    // and that went out in the same build that broke reading. One change at a
+    // time — Gemini keeps its claire.35 behaviour until Kokoro is proven good.
     if (this.ttsKokoroClient.initialized) this.ttsKokoroClient.setPrimaryLang(lang);
     if (this.ttsFishClient.initialized) this.ttsFishClient.setPrimaryLang(lang);
     if (this.ttsEdgeClient.initialized) this.ttsEdgeClient.setPrimaryLang(lang);
@@ -1024,9 +1030,14 @@ export class TTSController extends EventTarget {
 
   async setVoice(voiceId: string, lang: string) {
     this.state = 'setvoice-paused';
-    const useKokoroTTS = !!this.ttsKokoroVoices.find(
-      (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
-    );
+    // Every other engine also matches on `voiceId === ''`, the "no voice chosen
+    // yet" case. Kokoro deliberately does NOT: it needs a PC that is switched on,
+    // so it may only be reached by picking one of its voices on purpose. Letting
+    // it answer the empty case is exactly what broke claire.36 — it captured the
+    // default, then setPreferredClient below persisted it, and reading died.
+    const useKokoroTTS =
+      voiceId !== '' &&
+      !!this.ttsKokoroVoices.find((voice) => voice.id === voiceId && !voice.disabled);
     const useGoogleTTS = !!this.ttsGoogleVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
@@ -1039,11 +1050,11 @@ export class TTSController extends EventTarget {
     const useNativeTTS = !!this.ttsNativeVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
-    if (useKokoroTTS) {
-      this.ttsClient = this.ttsKokoroClient;
-      await this.ttsClient.setRate(this.ttsRate);
-    } else if (useGoogleTTS) {
+    if (useGoogleTTS) {
       this.ttsClient = this.ttsGoogleClient;
+      await this.ttsClient.setRate(this.ttsRate);
+    } else if (useKokoroTTS) {
+      this.ttsClient = this.ttsKokoroClient;
       await this.ttsClient.setRate(this.ttsRate);
     } else if (useFishTTS) {
       this.ttsClient = this.ttsFishClient;
