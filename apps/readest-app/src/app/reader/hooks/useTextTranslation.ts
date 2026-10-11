@@ -9,6 +9,7 @@ import { eventDispatcher } from '@/utils/event';
 import { blockSourceText, walkTextNodes } from '@/utils/walk';
 import { debounce } from '@/utils/debounce';
 import { getLocale } from '@/utils/misc';
+import { createTranslationWrapper } from '@/utils/translationDom';
 
 export function useTextTranslation(
   bookKey: string,
@@ -275,23 +276,12 @@ export function useTextTranslation(
       const translatedText = translated[0];
       if (!translatedText || text === translatedText) return;
 
-      const wrapper = document.createElement('font');
-      wrapper.className = `translation-target ${!enabled.current ? 'hidden' : ''}`;
-      wrapper.setAttribute('translation-element-mark', '1');
-      wrapper.setAttribute('lang', targetLang || getLocale());
-      if (widthLineBreak) {
-        wrapper.appendChild(document.createElement('br'));
-      }
-
-      const blockWrapper = document.createElement('font');
-      blockWrapper.className = `translation-target ${targetBlockClassName}`;
-
-      const inner = document.createElement('font');
-      inner.className = 'translation-target target-inner target-inner-theme-none';
-      inner.textContent = translatedText;
-
-      blockWrapper.appendChild(inner);
-      wrapper.appendChild(blockWrapper);
+      const wrapper = createTranslationWrapper(document, translatedText, {
+        lang: targetLang || getLocale(),
+        hidden: !enabled.current,
+        lineBreak: widthLineBreak,
+        blockClassName: targetBlockClassName,
+      });
 
       if (el.querySelector('.translation-target')) {
         return;

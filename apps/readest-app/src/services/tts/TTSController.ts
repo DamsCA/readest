@@ -11,6 +11,7 @@ import {
   TTSVoice,
 } from './types';
 import { createRejectFilter } from '@/utils/node';
+import { ttsTextWalker } from '@/utils/ttsTextWalker';
 import { WebSpeechClient } from './WebSpeechClient';
 import { NativeTTSClient } from './NativeTTSClient';
 import { EdgeTTSClient } from './EdgeTTSClient';
@@ -337,16 +338,18 @@ export class TTSController extends EventTarget {
     }
 
     const { TTS } = await import('foliate-js/tts.js');
-    const { textWalker } = await import('foliate-js/text-walker.js');
     let granularity: TTSGranularity = this.view.language.isCJK ? 'sentence' : 'word';
     const supportedGranularities = this.ttsClient.getGranularities();
     if (!supportedGranularities.includes(granularity)) {
       granularity = supportedGranularities[0]!;
     }
 
+    // ttsTextWalker, not foliate's textWalker: it keeps every sentence on one
+    // side of the source/translation boundary, so a French sentence's mark
+    // (which the page-follow scrolls to) starts in the French.
     this.view.tts = new TTS(
       doc,
-      textWalker,
+      ttsTextWalker,
       this.#createTTSNodeFilter(),
       this.#getHighlighter(),
       granularity,
