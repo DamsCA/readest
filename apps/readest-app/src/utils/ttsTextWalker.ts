@@ -28,7 +28,13 @@ type Segmenter = (
   ) => Range,
 ) => Iterable<[string, Range]>;
 
-const SHOW = NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT | NodeFilter.SHOW_CDATA_SECTION;
+// No DOM global may be touched at module load: TTSController imports this
+// statically, and Next prerenders the reader page in Node, where NodeFilter
+// does not exist ("ReferenceError: NodeFilter is not defined" failed the
+// build). foliate's text-walker.js gets away with it only because it is
+// loaded with a dynamic import, i.e. in the browser.
+const whatToShow = () =>
+  NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT | NodeFilter.SHOW_CDATA_SECTION;
 
 const defaultAcceptNode = (node: Node): number => {
   if (node.nodeType === Node.ELEMENT_NODE) {
@@ -70,7 +76,9 @@ export function* ttsTextWalker(
     ? (x as Range).commonAncestorContainer
     : ((x as Document).body ?? (x as DocumentFragment));
   const doc = root.ownerDocument ?? (root as Document);
-  const walker = doc.createTreeWalker(root, SHOW, { acceptNode: filterFunc ?? defaultAcceptNode });
+  const walker = doc.createTreeWalker(root, whatToShow(), {
+    acceptNode: filterFunc ?? defaultAcceptNode,
+  });
   const nodes = isRange ? walkRange(x as Range, walker) : walkDocument(walker);
 
   let named = 0;
