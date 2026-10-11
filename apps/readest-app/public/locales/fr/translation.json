@@ -1839,5 +1839,10 @@
   "Styles": "Styles",
   "Word": "Mot",
   "Sentence": "Phrase",
-  "Granularity": "Granularité"
+  "Granularity": "Granularité",
+  "{{engine}} voice unavailable ({{reason}}). Reading stopped.": "Voix {{engine}} indisponible ({{reason}}). Lecture arrêtée.",
+  "no credit left": "crédit épuisé",
+  "quota exceeded": "quota dépassé",
+  "access refused": "accès refusé",
+  "connection lost": "connexion perdue"
 }

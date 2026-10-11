@@ -31,6 +31,16 @@ const FISH_AUDIO_DEFAULT_VOICE_ID = FISH_AUDIO_VOICES[0]!.id;
 
 const getApiKey = () => process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'] || '';
 
+// Cloudflare Worker that holds the Fish key server-side (relay/fish-audio).
+// The fork is public, so a key compiled into the APK would be published; the
+// relay keeps it off the device, forces the free model and rate-limits per IP.
+// When set, it takes precedence over a baked-in key.
+const getFishRelayUrl = () =>
+  (process.env['NEXT_PUBLIC_FISH_RELAY_URL'] || '').replace(/\/+$/, '');
+// Sent as X-Relay-Token. It ships inside the public APK, so it only screens out
+// scanners — the relay's own limits are what actually protect the account.
+const getFishRelayToken = () => process.env['NEXT_PUBLIC_FISH_RELAY_TOKEN'] || '';
+
 // URL of the self-hosted Claire server running on the user's own GPU (WSL2),
 // e.g. "http://192.168.0.130:8880". When set, it is the primary (free) engine;
 // Fish Audio is only used as a fallback while its free tier lasts.
@@ -272,6 +282,28 @@ export class FishAudioTTSClient implements TTSClient {
   // In-flight requests keyed by cacheKey, so the same sentence is never
   // generated twice concurrently (e.g. playback catching up to a preload).
   #inFlight = new Map<string, { promise: Promise<string>; priority: 'high' | 'low' }>();
+  // Set once Fish Audio refuses the ACCOUNT (401/402/403, or 429 that survives a
+  // retry). Such refusals never fix themselves mid-book, so every later request
+  // fails fast instead of hammering the API, and the reader is told once.
+  //
+  // Without this, an account-level outage looked like a broken app: cached
+  // sentences played, every other one was skipped in under a second, and the
+  // reader heard fragments with no explanation. That is exactly how the Gemini
+  // outage of Oct 2026 presented ("it reads a few sentences then skips a lot").
+  #engineDown = false;
+  // Sentences in a row where NEITHER attempt reached the server at all (no
+  // network, DNS failure, stalled connection). On a phone this is the common
+  // failure: without it, losing signal skipped up to 5 paragraphs one by one —
+  // losing the reader's place — before stopping with no explanation.
+  #consecutiveUnreachable = 0;
+
+  #reportEngineDown(status: number) {
+    if (this.#engineDown) return;
+    this.#engineDown = true;
+    this.controller?.dispatchEvent(
+      new CustomEvent('tts-engine-down', { detail: { engine: 'Fish Audio', status } }),
+    );
+  }
 
   // "Minutes d'avance" indicator: sentences banked ahead of the playhead by
   // low-priority preloads (idle bank-ahead during a pause, playback lookahead),
@@ -328,10 +360,19 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   async init() {
-    // Available when the self-hosted Claire server is configured, when a Fish
-    // key is baked into the build (Tauri), or on the web platform (proxy route).
+    // A new reading session gets a fresh chance: a refusal seen last session
+    // may since have been fixed (credit topped up, key replaced, back online).
+    this.#engineDown = false;
+    this.#consecutiveUnreachable = 0;
+    // Available when the self-hosted Claire server is configured, when the Fish
+    // relay or a Fish key is baked into the build (Tauri), or on the web
+    // platform (proxy route).
     this.initialized =
-      !!getClaireR2Url() || !!getClaireServerUrl() || !!getApiKey() || isWebAppPlatform();
+      !!getClaireR2Url() ||
+      !!getClaireServerUrl() ||
+      !!getFishRelayUrl() ||
+      !!getApiKey() ||
+      isWebAppPlatform();
     return this.initialized;
   }
 
@@ -544,40 +585,91 @@ export class FishAudioTTSClient implements TTSClient {
       throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
     }
 
-    // Fish Audio fallback (free tier). Tauri calls the API directly via the
-    // native HTTP plugin; web goes through the key-hiding proxy route.
+    // Fish Audio cloud — the main engine since the self-hosted Claire server was
+    // retired (Sept 2026). Tauri calls the API directly via the native HTTP
+    // plugin; web goes through the key-hiding proxy route.
+    //
+    // Measured on 10 Oct 2026 with the free model: 10/10 sentences, x1.6 real
+    // time back to back, 8/8 accepted at 8 concurrent requests, and an API
+    // credit of 0.000000 after the run — s2.1-pro-free really is free.
+    //
+    // This path used to have neither a deadline nor a retry. Tolerable for a
+    // rarely-used fallback, not for the only engine: a stalled connection hung
+    // playback forever, and a single transient 5xx skipped the sentence.
+    if (this.#engineDown) throw new Error('Fish Audio unavailable for this account');
+
     const payload = JSON.stringify({
       text,
       reference_id: voiceId,
       format: 'mp3',
       mp3_bitrate: 128,
     });
-    if (tauriFetch) {
-      response = await tauriFetch(FISH_AUDIO_TTS_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${getApiKey()}`,
-          'Content-Type': 'application/json',
-          model: FISH_AUDIO_MODEL,
-        },
-        body: payload,
-        signal,
-      });
-    } else {
-      response = await fetch(`${getAPIBaseUrl()}/fishaudio/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-        signal,
-      });
+    let lastErr: unknown = null;
+    // Whether ANY attempt got an HTTP answer. An answer — even an error one —
+    // proves the network works; only "nothing came back" counts as unreachable.
+    let reached = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (signal.aborted) break;
+      try {
+        const relay = getFishRelayUrl();
+        if (tauriFetch) {
+          // A sentence takes ~2.5 s, plus one relay hop. Playback gets a tight
+          // budget so a stall fails fast and recovers; background preloads can
+          // afford to wait. The relay forces the model and holds the key, so
+          // neither is sent from the device in that case.
+          response = await fetchWithTimeout(
+            relay ? `${relay}/v1/tts` : FISH_AUDIO_TTS_URL,
+            {
+              method: 'POST',
+              headers: relay
+                ? { 'Content-Type': 'application/json', 'X-Relay-Token': getFishRelayToken() }
+                : {
+                    Authorization: `Bearer ${getApiKey()}`,
+                    'Content-Type': 'application/json',
+                    model: FISH_AUDIO_MODEL,
+                  },
+              body: payload,
+            },
+            priority === 'high' ? 20000 : 45000,
+          );
+        } else {
+          response = await fetch(`${getAPIBaseUrl()}/fishaudio/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            signal,
+          });
+        }
+        reached = true;
+        this.#consecutiveUnreachable = 0;
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          // Account-level refusals: retrying cannot help. 429 gets ONE retry
+          // first, since a burst of parallel preloads can trip it transiently.
+          const status = response.status;
+          if (status === 401 || status === 402 || status === 403 || (status === 429 && attempt > 0)) {
+            this.#reportEngineDown(status);
+          }
+          throw new Error(`Fish Audio TTS failed (${status}): ${detail.slice(0, 200)}`);
+        }
+        const buffer = await response.arrayBuffer();
+        if (!buffer.byteLength) throw new Error('No audio data received.');
+        return { buffer, type: 'audio/mpeg' };
+      } catch (err) {
+        lastErr = err;
+        if (signal.aborted || this.#engineDown) break;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
+      }
     }
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`Fish Audio TTS failed (${response.status}): ${detail.slice(0, 200)}`);
+    // Both attempts, 1.5 s apart, got no answer at all. A caller's abort (seek,
+    // stop, paragraph change) is not a network failure and must not count.
+    // Parallel lookahead requests share the counter, so a real outage trips it
+    // within a sentence or two instead of skipping paragraphs.
+    if (!reached && !signal.aborted) {
+      this.#consecutiveUnreachable++;
+      if (this.#consecutiveUnreachable >= 2) this.#reportEngineDown(0);
     }
-    const buffer = await response.arrayBuffer();
-    if (!buffer.byteLength) throw new Error('No audio data received.');
-    return { buffer, type: 'audio/mpeg' };
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
 
   #storeInMemory(cacheKey: string, buffer: ArrayBuffer, type: string): string {

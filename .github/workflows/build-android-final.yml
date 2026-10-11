@@ -1,10 +1,21 @@
 name: Build Android (Claire — release + auto-update)
 
-# Final personal build: signed release arm64 APK configured for the user's
-# self-hosted Claire server (discovered via R2) + Cloudflare R2 cloud cache.
-# No Fish Audio key is embedded, so the APK is safe to publish publicly, which
-# lets the Tauri auto-updater fetch updates. Publishes the APK + latest.json to
-# a GitHub Release so "install once, update forever" works.
+# Final personal build: signed release arm64 APK. Publishes the APK +
+# latest.json to a GitHub Release so "install once, update forever" works.
+#
+# Voice (Oct 2026): Fish Audio's free model with the "Claire" voice, reached
+# through a Cloudflare Worker relay (relay/fish-audio). The Fish key lives in
+# the Worker's secrets and is NOT embedded — this fork is public, so anything
+# compiled into the APK is effectively published. The relay URL and its
+# X-Relay-Token are build *variables*, not secrets: they ship in the APK.
+#
+# No longer configured, and why:
+#   - Claire self-hosted server + Kokoro: retired and archived (Sept 2026).
+#     With CLAIRE_R2_URL set, the Fish client chased their dead tunnels and
+#     never reached Fish Audio at all.
+#   - Gemini: the Google project answers 403 "denied access" / 429 "quota"
+#     (measured 10 Oct 2026, 0/8 requests). Left in, it stayed the default
+#     engine and caused the "reads a few sentences, skips the rest" outage.
 on:
   workflow_dispatch:
   push:
@@ -39,13 +50,17 @@ jobs:
       - name: copy pdfjs-dist and simplecc-dist to public directory
         run: pnpm --filter @readest/readest-app setup-vendors
 
-      - name: create .env.local (Claire config, NO Fish key)
+      - name: create .env.local (Fish Audio via relay, no key)
         run: |
           f=apps/readest-app/.env.local
           echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> $f
-          echo "NEXT_PUBLIC_CLAIRE_R2_URL=${{ vars.CLAIRE_R2_URL }}" >> $f
-          echo "NEXT_PUBLIC_CLAIRE_TOKEN=${{ vars.CLAIRE_TOKEN }}" >> $f
-          echo "NEXT_PUBLIC_GOOGLE_TTS_API_KEY=${{ secrets.GOOGLE_TTS_API_KEY }}" >> $f
+          # Refuse to ship a voiceless app: without the relay, Fish reports
+          # itself unavailable and the reader silently falls back to Edge.
+          if [ -z "${{ vars.FISH_RELAY_URL }}" ] || [ -z "${{ vars.FISH_RELAY_TOKEN }}" ]; then
+            echo "::error::repository variables FISH_RELAY_URL / FISH_RELAY_TOKEN are not set" && exit 1
+          fi
+          echo "NEXT_PUBLIC_FISH_RELAY_URL=${{ vars.FISH_RELAY_URL }}" >> $f
+          echo "NEXT_PUBLIC_FISH_RELAY_TOKEN=${{ vars.FISH_RELAY_TOKEN }}" >> $f
           # Point the in-app updater at this fork's GitHub Releases (latest.json
           # + APK are published there) instead of the official Readest server.
           echo "NEXT_PUBLIC_UPDATER_BASE_URL=https://github.com/${{ github.repository }}/releases/latest/download" >> $f

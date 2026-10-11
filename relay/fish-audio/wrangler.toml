@@ -1,0 +1,15 @@
+# Relais Fish Audio de l'app Readest — voir src/index.js pour le pourquoi.
+# Deploiement : npx wrangler deploy (depuis ce dossier)
+# Secrets (jamais dans ce fichier) :
+#   npx wrangler secret put FISH_KEY      # cle API Fish Audio
+#   npx wrangler secret put RELAY_TOKEN   # jeton que l'app envoie en X-Relay-Token
+name = "readest-fish-relay"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# 120 requetes / minute / IP. Lecture a vitesse x2 avec prechargement : ~30.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

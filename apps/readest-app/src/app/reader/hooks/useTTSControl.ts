@@ -209,6 +209,33 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       });
     };
 
+    // The voice engine refused the ACCOUNT (no credit, access denied, quota), or
+    // could not be reached at all (status 0). Stop and say so: carrying on only
+    // plays the cached sentences and skips every other one — losing the
+    // reader's place — which reads as a broken app rather than a dead engine.
+    const handleEngineDown = (e: Event) => {
+      const { engine, status } = (e as CustomEvent).detail || {};
+      const reason =
+        status === 0
+          ? _('connection lost')
+          : status === 402
+            ? _('no credit left')
+            : status === 429
+              ? _('quota exceeded')
+              : _('access refused');
+      eventDispatcher.dispatch('toast', {
+        message: _('{{engine}} voice unavailable ({{reason}}). Reading stopped.', {
+          engine: engine || 'TTS',
+          reason,
+        }),
+        type: 'error',
+        timeout: 10000,
+      });
+      // Same path as the Stop button, so every piece of state is unwound the
+      // way it already is for a deliberate stop.
+      eventDispatcher.dispatch('tts-stop', { bookKey });
+    };
+
     const handleSpeakMark = (e: Event) => {
       const progress = getProgress(bookKey);
       const viewSettings = getViewSettings(bookKey);
@@ -399,6 +426,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
 
     ttsController.addEventListener('tts-ended', handleEnded);
     ttsController.addEventListener('tts-need-auth', handleNeedAuth);
+    ttsController.addEventListener('tts-engine-down', handleEngineDown);
     ttsController.addEventListener('tts-speak-mark', handleSpeakMark);
     ttsController.addEventListener('tts-highlight-mark', handleHighlightMark);
     ttsController.addEventListener('tts-highlight-word', handleHighlightWord);
@@ -407,6 +435,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     return () => {
       ttsController.removeEventListener('tts-ended', handleEnded);
       ttsController.removeEventListener('tts-need-auth', handleNeedAuth);
+      ttsController.removeEventListener('tts-engine-down', handleEngineDown);
       ttsController.removeEventListener('tts-speak-mark', handleSpeakMark);
       ttsController.removeEventListener('tts-highlight-mark', handleHighlightMark);
       ttsController.removeEventListener('tts-highlight-word', handleHighlightWord);
