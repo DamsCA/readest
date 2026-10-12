@@ -95,6 +95,33 @@ const systemPrompt = (source, target) =>
   `and keep the sentences in their order without merging or dropping any. Follow ${target} ` +
   `typography (for French: « » quotation marks and a space before ; : ! ?). Reply with the ` +
   `translation only: no notes or explanations.`;
+// L'app affiche la traduction comme texte brut : un "l&#39;homme" sorti du modele
+// s'affichait tel quel (signale le 12/10/2026 sur la plupart des apostrophes).
+const ENTITIES = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  laquo: '«',
+  raquo: '»',
+  hellip: '…',
+  mdash: '—',
+  ndash: '–',
+};
+const decodeEntities = (s) =>
+  s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]{2,8});/gi, (m, body) => {
+    if (body[0] !== '#') return ENTITIES[body.toLowerCase()] ?? m;
+    const code = /^#x/i.test(body) ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+    return code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)
+      ? String.fromCodePoint(code)
+      : m;
+  });
 // Une traduction n'est jamais beaucoup plus longue que l'original (francais :
 // environ 1,2 fois l'anglais). Au-dela, c'est que le modele a brode.
 const looksExpanded = (source, translation) => translation.length > source.length * 2.5 + 40;
@@ -134,7 +161,8 @@ async function handleTranslate(request, env) {
       max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
       temperature: 0.2,
     });
-    const translation = typeof out?.response === 'string' ? out.response.trim() : '';
+    const translation =
+      typeof out?.response === 'string' ? decodeEntities(decodeEntities(out.response.trim())) : '';
     if (!translation) return json(502, { error: 'empty translation' }, CORS);
     // 502 : l'app passe ce paragraphe a Google plutot que d'afficher (et faire
     // lire a voix haute) un texte invente.

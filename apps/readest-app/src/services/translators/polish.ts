@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '@/utils/htmlEntities';
+
 export type Polisher = (text: string) => string;
 
 const languagePolishers: Record<string, Polisher> = {
@@ -20,7 +22,8 @@ const languagePolishers: Record<string, Polisher> = {
 };
 
 export const basicPolish: Polisher = (text: string) => {
-  return text
+  // A translator's "l&#39;homme" would show as is: the text is never parsed as HTML.
+  return decodeHtmlEntities(text)
     .replace(/\s+/g, ' ') // Multiple spaces to single space
     .replace(/\s+([.,!?;:])/g, '$1') // Remove space before punctuation
     .trim();
