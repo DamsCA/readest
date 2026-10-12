@@ -16,7 +16,14 @@
 // Le statut de Fish Audio (402, 403, 429...) est renvoye tel quel : l'app s'en
 // sert pour arreter la lecture et l'expliquer au lieu de sauter des phrases.
 
-const FISH_TTS_URL = 'https://api.fish.audio/v1/tts';
+// Routes du relais -> point d'arrivee chez Fish. La seconde rend le meme audio
+// PLUS l'instant de chaque mot (Server-Sent Events) : c'est ce qui permet a
+// l'app de tourner la page sur le mot prononce. Le flux est renvoye tel quel,
+// sans le lire : aucun calcul ici (le forfait gratuit accorde 10 ms de CPU).
+const FISH_ROUTES = new Map([
+  ['/v1/tts', 'https://api.fish.audio/v1/tts'],
+  ['/v1/tts/stream/with-timestamp', 'https://api.fish.audio/v1/tts/stream/with-timestamp'],
+]);
 const FREE_MODEL = 's2.1-pro-free';
 const DEFAULT_VOICE = 'da05ae30d8c0428eb47498df524e448c'; // "Claire"
 // Large enough that no real sentence is ever refused (a refusal would skip it),
@@ -36,7 +43,8 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return json(200, { status: 'ok', model: FREE_MODEL, keyConfigured: !!env.FISH_KEY });
     }
-    if (request.method !== 'POST' || url.pathname !== '/v1/tts') {
+    const upstreamUrl = FISH_ROUTES.get(url.pathname);
+    if (request.method !== 'POST' || !upstreamUrl) {
       return json(404, { error: 'not found' });
     }
 
@@ -63,7 +71,7 @@ export default {
     if (!text) return json(400, { error: 'empty text' });
     if (text.length > MAX_CHARS) return json(413, { error: `text over ${MAX_CHARS} chars` });
 
-    const upstream = await fetch(FISH_TTS_URL, {
+    const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${env.FISH_KEY}`,

@@ -53,16 +53,24 @@ export const rangeTextExcludingInert = (base: Range): string => {
   return out;
 };
 
+// Typographic apostrophes are folded to ASCII on both sides before matching:
+// Fish Audio's timing segments spell "s’assit" as "s'assit", while French books
+// use ’ throughout — every elided word ("l’", "qu’", "aujourd’hui") would
+// otherwise go unmatched. A 1:1 character swap, so an offset into the folded
+// text is the same offset into the original.
+const foldForMatch = (s: string): string => s.replace(/[‘’ʼ′]/g, "'");
+
 export const computeWordOffsets = (text: string, words: string[]): (TTSWordOffset | null)[] => {
   const offsets: (TTSWordOffset | null)[] = [];
+  const folded = foldForMatch(text);
   let cursor = 0;
   for (const word of words) {
-    const trimmed = word.trim();
+    const trimmed = foldForMatch(word.trim());
     if (!trimmed) {
       offsets.push(null);
       continue;
     }
-    const index = text.indexOf(trimmed, cursor);
+    const index = folded.indexOf(trimmed, cursor);
     if (index === -1) {
       offsets.push(null);
       continue;
@@ -84,6 +92,25 @@ export const findBoundaryIndexAtTime = (
   while (low <= high) {
     const mid = (low + high) >> 1;
     if (boundaries[mid]!.offset <= ticks) {
+      result = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return result;
+};
+
+// Index of the word being spoken at `seconds` of media time: the last word that
+// has started, -1 before the first one. The seconds-based counterpart of
+// findBoundaryIndexAtTime, for Fish Audio's word timings.
+export const findWordIndexAtSeconds = (words: { start: number }[], seconds: number): number => {
+  let low = 0;
+  let high = words.length - 1;
+  let result = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (words[mid]!.start <= seconds) {
       result = mid;
       low = mid + 1;
     } else {

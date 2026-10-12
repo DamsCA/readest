@@ -6,6 +6,9 @@ import { NextRequest } from 'next/server';
 // Tauri apps bypass this route and call api.fish.audio directly through the
 // native HTTP plugin. See FishAudioTTSClient.
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
+// ?timestamps=1: same synthesis plus per-word timings, streamed back untouched
+// as Server-Sent Events (parsed by services/tts/fishTimestamps.ts).
+const FISH_AUDIO_TIMED_URL = 'https://api.fish.audio/v1/tts/stream/with-timestamp';
 const FISH_AUDIO_MODEL = 's2.1-pro-free';
 
 export const runtime = 'nodejs';
@@ -18,10 +21,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.text();
+  const timed = req.nextUrl.searchParams.get('timestamps') === '1';
 
   let upstream: Response;
   try {
-    upstream = await fetch(FISH_AUDIO_TTS_URL, {
+    upstream = await fetch(timed ? FISH_AUDIO_TIMED_URL : FISH_AUDIO_TTS_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
   return new Response(upstream.body, {
     status: 200,
     headers: {
-      'Content-Type': 'audio/mpeg',
+      'Content-Type': timed ? 'text/event-stream' : 'audio/mpeg',
       'Cache-Control': 'no-store',
     },
   });

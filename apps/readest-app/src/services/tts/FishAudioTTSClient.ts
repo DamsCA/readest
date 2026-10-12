@@ -6,11 +6,22 @@ import { AppService } from '@/types/system';
 import { parseSSMLMarks } from '@/utils/ssml';
 import { TTSController } from './TTSController';
 import { TTSUtils } from './TTSUtils';
+import { findWordIndexAtSeconds } from './wordHighlight';
+import {
+  FishWordTiming,
+  decodeWordTimings,
+  encodeWordTimings,
+  parseFishTimestampStream,
+} from './fishTimestamps';
 import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 
 // Fish Audio's most advanced model, currently free for developers
 // (s2.1-pro-free, $0.00 / M UTF-8 bytes — no API credit required).
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
+// Same synthesis plus the timing of every word (see fishTimestamps.ts), which
+// is what lets the page turn on the spoken word. Preferred over the plain route.
+const FISH_AUDIO_TIMED_PATH = '/v1/tts/stream/with-timestamp';
+const FISH_AUDIO_TIMED_URL = `https://api.fish.audio${FISH_AUDIO_TIMED_PATH}`;
 const FISH_AUDIO_MODEL = 's2.1-pro-free';
 // Max number of synthesized-sentence object URLs kept in memory (LRU-evicted).
 // Must exceed peak concurrency so the sentence being played can't be evicted,
@@ -131,7 +142,13 @@ const resolveClaireServerUrl = async (
 // sentence synthesized while the PC is on is stored on-device via the Cache
 // API, so re-reading it later plays instantly and works fully offline / with
 // the PC off. Only brand-new, never-read text needs the server.
-const PERSIST_CACHE_NAME = 'claire-tts-audio-v1';
+//
+// v2 (Oct 2026): entries carry their word timings in WORDS_HEADER. A v1 entry
+// has none, and an untimed sentence silently falls back to turning the page
+// late — so the v1 store is dropped once instead of being mixed in.
+const PERSIST_CACHE_NAME = 'claire-tts-audio-v2';
+const LEGACY_PERSIST_CACHE_NAMES = ['claire-tts-audio-v1'];
+const WORDS_HEADER = 'X-Fish-Words';
 
 const hashText = (s: string): string => {
   let h = 5381;
@@ -148,7 +165,11 @@ const persistRequest = (voiceId: string, text: string) =>
 let _persistCachePromise: Promise<Cache> | null = null;
 const openPersistCache = (): Promise<Cache> | null => {
   if (typeof caches === 'undefined') return null;
-  if (!_persistCachePromise) _persistCachePromise = caches.open(PERSIST_CACHE_NAME);
+  if (!_persistCachePromise) {
+    // Free the space held by superseded stores (best-effort, once per launch).
+    for (const name of LEGACY_PERSIST_CACHE_NAMES) void caches.delete(name).catch(() => {});
+    _persistCachePromise = caches.open(PERSIST_CACHE_NAME);
+  }
   return _persistCachePromise;
 };
 
@@ -178,7 +199,7 @@ const persistedAudioExists = async (voiceId: string, text: string): Promise<bool
 const readPersistedAudio = async (
   voiceId: string,
   text: string,
-): Promise<{ buffer: ArrayBuffer; type: string } | null> => {
+): Promise<{ buffer: ArrayBuffer; type: string; words: FishWordTiming[] | null } | null> => {
   const cacheP = openPersistCache();
   if (!cacheP) return null;
   try {
@@ -192,7 +213,11 @@ const readPersistedAudio = async (
       await cache.delete(persistRequest(voiceId, text)).catch(() => {});
       return null;
     }
-    return { buffer, type: res.headers.get('Content-Type') || 'audio/mpeg' };
+    return {
+      buffer,
+      type: res.headers.get('Content-Type') || 'audio/mpeg',
+      words: decodeWordTimings(res.headers.get(WORDS_HEADER)),
+    };
   } catch {
     return null;
   }
@@ -203,15 +228,15 @@ const writePersistedAudio = async (
   text: string,
   buffer: ArrayBuffer,
   type: string,
+  words?: FishWordTiming[] | null,
 ): Promise<void> => {
   const cacheP = openPersistCache();
   if (!cacheP) return;
   try {
     const cache = await cacheP;
-    await cache.put(
-      persistRequest(voiceId, text),
-      new Response(buffer, { headers: { 'Content-Type': type } }),
-    );
+    const headers: Record<string, string> = { 'Content-Type': type };
+    if (words?.length) headers[WORDS_HEADER] = encodeWordTimings(words);
+    await cache.put(persistRequest(voiceId, text), new Response(buffer, { headers }));
   } catch {
     // Storage unavailable/full — degrade to in-memory only, don't break playback.
   }
@@ -264,8 +289,6 @@ export class FishAudioTTSClient implements TTSClient {
   // User pressed pause. Distinct from #isPlaying: a pause can land while a
   // sentence is still being SYNTHESIZED, i.e. before any audio exists.
   #paused = false;
-  // Synthetic word-boundary tracking (karaoke highlight): paced from
-  // audio.currentTime against char-weighted word fractions of the sentence.
   // After several consecutive R2 misses, skip the R2 probe for LOW-priority
   // preloads (cold books pay a wasted RTT per sentence otherwise). Highs keep
   // probing, and any hit re-arms probing for everyone.
@@ -279,6 +302,15 @@ export class FishAudioTTSClient implements TTSClient {
   // Small cache of synthesized audio object URLs keyed by `${voiceId}:${text}`,
   // populated by preload so playback can start without a round-trip.
   #audioCache = new Map<string, string>();
+  // Word timings of the clips in #audioCache, same keys. Absent when the audio
+  // came without timings (Claire server, a relay older than the timed route):
+  // such a sentence follows the page at mark level only.
+  #wordTimings = new Map<string, FishWordTiming[]>();
+  // Detaches the word tracker of the sentence being played.
+  #stopTracking: (() => void) | null = null;
+  // Cleared when the relay answers 404 to the timed route (deployed before it
+  // existed): audio then keeps coming from the plain route, without timings.
+  #timedRoute = true;
   // In-flight requests keyed by cacheKey, so the same sentence is never
   // generated twice concurrently (e.g. playback catching up to a preload).
   #inFlight = new Map<string, { promise: Promise<string>; priority: 'high' | 'low' }>();
@@ -421,18 +453,18 @@ export class FishAudioTTSClient implements TTSClient {
       //    This is the "PC off / offline" path — no server needed.
       const persisted = await readPersistedAudio(voiceId, text);
       if (persisted) {
-        return this.#storeInMemory(cacheKey, persisted.buffer, persisted.type);
+        return this.#storeInMemory(cacheKey, persisted.buffer, persisted.type, persisted.words);
       }
 
       // 2) Generate (Claire server preferred, Fish Audio fallback), then persist
       //    forever so it never has to be generated again. Validate first: a
       //    truncated tunnel body persisted as-is would make this sentence fail
       //    on every future read.
-      const { buffer, type } = await this.#fetchAudio(voiceId, text, signal, priority);
+      const { buffer, type, words } = await this.#fetchAudio(voiceId, text, signal, priority);
       if (!isValidAudio(buffer)) throw new Error('Invalid audio data received.');
-      await writePersistedAudio(voiceId, text, buffer, type);
+      await writePersistedAudio(voiceId, text, buffer, type, words);
       if (priority === 'low') return ''; // banked — no blob needed until playback nears
-      return this.#storeInMemory(cacheKey, buffer, type);
+      return this.#storeInMemory(cacheKey, buffer, type, words);
     })();
 
     const entry = { promise: task, priority };
@@ -450,7 +482,7 @@ export class FishAudioTTSClient implements TTSClient {
     text: string,
     signal: AbortSignal,
     priority: 'high' | 'low' = 'high',
-  ): Promise<{ buffer: ArrayBuffer; type: string }> {
+  ): Promise<{ buffer: ArrayBuffer; type: string; words?: FishWordTiming[] }> {
     let response: Response;
     const isTauri = isTauriAppPlatform();
     const tauriFetch = isTauri ? (await import('@tauri-apps/plugin-http')).fetch : null;
@@ -612,13 +644,20 @@ export class FishAudioTTSClient implements TTSClient {
       if (signal.aborted) break;
       try {
         const relay = getFishRelayUrl();
+        // Ask for word timings unless the relay has shown it lacks the route.
+        const timed = this.#timedRoute;
         if (tauriFetch) {
           // A sentence takes ~2.5 s, plus one relay hop. Playback gets a tight
           // budget so a stall fails fast and recovers; background preloads can
           // afford to wait. The relay forces the model and holds the key, so
           // neither is sent from the device in that case.
+          const url = relay
+            ? `${relay}${timed ? FISH_AUDIO_TIMED_PATH : '/v1/tts'}`
+            : timed
+              ? FISH_AUDIO_TIMED_URL
+              : FISH_AUDIO_TTS_URL;
           response = await fetchWithTimeout(
-            relay ? `${relay}/v1/tts` : FISH_AUDIO_TTS_URL,
+            url,
             {
               method: 'POST',
               headers: relay
@@ -633,24 +672,46 @@ export class FishAudioTTSClient implements TTSClient {
             priority === 'high' ? 20000 : 45000,
           );
         } else {
-          response = await fetch(`${getAPIBaseUrl()}/fishaudio/tts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            signal,
-          });
+          response = await fetch(
+            `${getAPIBaseUrl()}/fishaudio/tts${timed ? '?timestamps=1' : ''}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+              signal,
+            },
+          );
         }
         reached = true;
         this.#consecutiveUnreachable = 0;
         if (!response.ok) {
+          const status = response.status;
+          // A relay deployed before the timed route answers 404: switch to the
+          // plain route for good and ask again at once (the retry stays unused).
+          if (timed && status === 404) {
+            this.#timedRoute = false;
+            attempt--;
+            continue;
+          }
           const detail = await response.text().catch(() => '');
           // Account-level refusals: retrying cannot help. 429 gets ONE retry
           // first, since a burst of parallel preloads can trip it transiently.
-          const status = response.status;
-          if (status === 401 || status === 402 || status === 403 || (status === 429 && attempt > 0)) {
+          if (
+            status === 401 ||
+            status === 402 ||
+            status === 403 ||
+            (status === 429 && attempt > 0)
+          ) {
             this.#reportEngineDown(status);
           }
           throw new Error(`Fish Audio TTS failed (${status}): ${detail.slice(0, 200)}`);
+        }
+        // The timed route answers with an event stream; anything else is the
+        // plain MP3 (e.g. a proxy that ignored ?timestamps=1).
+        if ((response.headers.get('Content-Type') || '').includes('text/event-stream')) {
+          const { audio, words } = parseFishTimestampStream(await response.text());
+          if (!audio.byteLength) throw new Error('No audio data received.');
+          return { buffer: audio.buffer as ArrayBuffer, type: 'audio/mpeg', words };
         }
         const buffer = await response.arrayBuffer();
         if (!buffer.byteLength) throw new Error('No audio data received.');
@@ -672,7 +733,12 @@ export class FishAudioTTSClient implements TTSClient {
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
 
-  #storeInMemory(cacheKey: string, buffer: ArrayBuffer, type: string): string {
+  #storeInMemory(
+    cacheKey: string,
+    buffer: ArrayBuffer,
+    type: string,
+    words?: FishWordTiming[] | null,
+  ): string {
     const url = URL.createObjectURL(new Blob([buffer], { type }));
     // Overwriting the same key (a high-priority call superseding a stray preload
     // copy) must revoke the old URL for that key so it doesn't leak.
@@ -680,7 +746,13 @@ export class FishAudioTTSClient implements TTSClient {
     if (prev && prev !== url) URL.revokeObjectURL(prev);
     // Bound the in-memory map and revoke evicted object URLs (the durable copy
     // lives in the persistent cache, so eviction here loses nothing).
+    // Delete first: Map.set on an existing key keeps its OLD position, so a
+    // superseded clip could be evicted the moment it was stored.
+    this.#audioCache.delete(cacheKey);
     this.#audioCache.set(cacheKey, url);
+    // Timings belong to THIS clip: a regenerated clip has its own pacing.
+    if (words?.length) this.#wordTimings.set(cacheKey, words);
+    else this.#wordTimings.delete(cacheKey);
     const liveA = this.#audioA?.src;
     const liveB = this.#audioB?.src;
     while (this.#audioCache.size > FISH_AUDIO_CACHE_MAX) {
@@ -688,6 +760,7 @@ export class FishAudioTTSClient implements TTSClient {
       if (oldestKey === undefined) break;
       const oldUrl = this.#audioCache.get(oldestKey);
       this.#audioCache.delete(oldestKey);
+      this.#wordTimings.delete(oldestKey);
       // Never revoke the URL we just created, nor one loaded into EITHER audio
       // element (playing or primed next) — revoking a live blob URL is exactly
       // what caused the "Audio playback error" glitch.
@@ -789,6 +862,14 @@ export class FishAudioTTSClient implements TTSClient {
         const audio = cur;
         const standby = nxt;
         this.#audioElement = audio;
+        // Follow the spoken word through this clip's timings: the view turns the
+        // page on the word that crosses it (and highlights it in word mode).
+        // Without timings this draws the sentence highlight that word mode
+        // suppressed at mark dispatch.
+        this.#startWordTracking(
+          audio,
+          this.#wordTimings.get(this.#cacheKey(voiceId, mark.text)) ?? [],
+        );
         let finishCurrent: ((ev: TTSMessageEvent) => void) | null = null;
         let primedUrl: string | null = null;
 
@@ -898,16 +979,22 @@ export class FishAudioTTSClient implements TTSClient {
           const bad = this.#audioCache.get(cacheKey);
           if (bad) {
             this.#audioCache.delete(cacheKey);
+            this.#wordTimings.delete(cacheKey);
             URL.revokeObjectURL(bad);
           }
           await deletePersistedAudio(voiceId, mark.text);
           try {
             audioUrl = await this.#synthesize(voiceId, mark.text, signal, 'high');
-            if (!signal.aborted) result = await playOnce(audioUrl);
+            if (!signal.aborted) {
+              // The regenerated clip has its own pacing: track ITS timings.
+              this.#startWordTracking(audio, this.#wordTimings.get(cacheKey) ?? []);
+              result = await playOnce(audioUrl);
+            }
           } catch {
             // Keep the original error result; the controller advances past it.
           }
         }
+        this.#stopWordTracking();
         yield result;
         if (result.code === 'end') consecutiveMarkErrors = 0;
         // A play() rejection (audio-focus loss, autoplay gating) produces
@@ -940,6 +1027,61 @@ export class FishAudioTTSClient implements TTSClient {
     await this.stopInternal();
   }
 
+  // Report the word being spoken, from audio.currentTime against the clip's
+  // word timings (media time, so playbackRate and pause/resume need no special
+  // handling). Driven by two sources on purpose:
+  //  - requestAnimationFrame, smooth enough for word-by-word highlighting, but
+  //    throttled or halted when the screen is off — that alone froze the old
+  //    synthetic karaoke during background playback;
+  //  - the element's 'timeupdate' (~4 Hz), which keeps firing while audio
+  //    plays, so a page turn is never stuck behind a halted frame loop.
+  // A pause stops both by itself; 'playing' restarts the frame loop on resume.
+  #startWordTracking(audio: HTMLAudioElement, words: FishWordTiming[]) {
+    this.#stopWordTracking();
+    const controller = this.controller;
+    if (!controller) return;
+    // Always hand the words over (see TTSController.prepareSpeakWords): with
+    // none it draws the sentence highlight that word mode suppressed.
+    const tracking = controller.prepareSpeakWords(words.map((w) => w.text));
+    if (!tracking || !words.length) return;
+    let lastIndex = -1;
+    let rafId: number | null = null;
+    const update = () => {
+      // Stale tracker (the sentence moved on, or playback stopped): stay silent
+      // rather than paint this sentence's words over the next one.
+      if (audio !== this.#audioElement || !audio.src) return;
+      const index = findWordIndexAtSeconds(words, audio.currentTime);
+      if (index >= 0 && index !== lastIndex) {
+        lastIndex = index;
+        controller.dispatchSpeakWord(index);
+      }
+    };
+    const frame = () => {
+      rafId = null;
+      update();
+      if (!audio.paused && !audio.ended) rafId = requestAnimationFrame(frame);
+    };
+    const onPlaying = () => {
+      if (rafId === null) rafId = requestAnimationFrame(frame);
+    };
+    audio.addEventListener('timeupdate', update);
+    audio.addEventListener('playing', onPlaying);
+    // With double-buffering the clip is often already playing (started inside
+    // the previous clip's 'ended' handler), so 'playing' has already fired.
+    if (!audio.paused) onPlaying();
+    this.#stopTracking = () => {
+      audio.removeEventListener('timeupdate', update);
+      audio.removeEventListener('playing', onPlaying);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = null;
+    };
+  }
+
+  #stopWordTracking() {
+    this.#stopTracking?.();
+    this.#stopTracking = null;
+  }
+
   async pause() {
     // FIRST, above the early return: a pause tapped during a synthesis gap (the
     // first sentence of every cold paragraph, where speak() already called
@@ -967,6 +1109,7 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   private async stopInternal() {
+    this.#stopWordTracking();
     this.#isPlaying = false;
     // speak() calls stopInternal at its start, so a stale true would mute a
     // fresh session.
@@ -1034,14 +1177,15 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   supportsWordBoundaries(): boolean {
-    // false: fish-speech returns NO word timings. The old "synthetic" karaoke
-    // interpolated positions from character counts, and requestAnimationFrame is
-    // throttled or halted when the screen is off — so the highlight froze during
-    // background playback then jumped. Structurally untunable, now deleted.
-    // This flag also gates #suppressMarkHighlight in TTSController: returning
-    // true with no tracker running would suppress the sentence highlight and
-    // draw nothing at all.
-    return false;
+    // true: the timed route returns the real time of every word (see
+    // fishTimestamps.ts). The old "synthetic" karaoke interpolated positions from
+    // character counts and drifted ahead of the voice; it was deleted, and this
+    // returned false until Oct 2026.
+    // This flag also gates #suppressMarkHighlight in TTSController: in word mode
+    // the sentence highlight is suppressed at mark dispatch, which is why
+    // speak() calls #startWordTracking for EVERY clip — with no timings it hands
+    // over an empty list and the controller draws the sentence instead.
+    return true;
   }
 
   getGranularities(): TTSGranularity[] {
@@ -1066,6 +1210,7 @@ export class FishAudioTTSClient implements TTSClient {
       URL.revokeObjectURL(url);
     }
     this.#audioCache.clear();
+    this.#wordTimings.clear();
     // Reset the banked-ahead tally + notify zero so the TTS bar clears its
     // "minutes d'avance" when the book is closed.
     this.#bankedAhead.clear();

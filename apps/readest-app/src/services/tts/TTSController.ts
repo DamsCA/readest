@@ -115,11 +115,19 @@ export class TTSController extends EventTarget {
   // re-apply the word instead of redrawing the whole sentence over it.
   #wordHighlightActive = false;
   #lastSpeakWordRange: Range | null = null;
+  // Sentence highlighting still FOLLOWS the spoken word. When the client has
+  // word timings, prepareSpeakWords arms this instead of word highlighting: the
+  // highlight stays on the whole sentence, but each spoken word is reported
+  // (tts-highlight-word) so the view turns the page on the word that crosses
+  // it. Without it, a sentence — or a group of sentences — spanning a page
+  // break left the view on the old page until the NEXT mark, while the voice
+  // was already reading the next page.
+  #wordFollowOnly = false;
   // User-chosen highlight granularity. 'sentence' (default) keeps the highlight
-  // on the whole spoken sentence — always in sync. 'word' highlights word-by-word
-  // when the active client reports word boundaries, but for the Claire/Fish
-  // client those boundaries are SYNTHETIC (interpolated from audio position, no
-  // real timings), so it drifts ahead of the voice. Must match
+  // on the whole spoken sentence. 'word' highlights word-by-word when the active
+  // client reports word boundaries: Edge's metadata, or Fish Audio's real word
+  // timings since Oct 2026 (its earlier boundaries were synthetic and drifted
+  // ahead of the voice, which is why the default became 'sentence'). Must match
   // DEFAULT_VIEW_SETTINGS: a mismatched initializer silently re-armed word mode.
   #highlightGranularity: TTSHighlightGranularity = 'sentence';
 
@@ -1152,6 +1160,7 @@ export class TTSController extends EventTarget {
     this.#speakWordOffsets = [];
     this.#speakWordRanges = [];
     this.#wordHighlightActive = false;
+    this.#wordFollowOnly = false;
     this.#lastSpeakWordRange = null;
   }
 
@@ -1167,13 +1176,17 @@ export class TTSController extends EventTarget {
     if (range) this.#getHighlighter()(range.cloneRange());
   }
 
-  // CFI of the currently highlighted word during word-by-word playback. Used
-  // for the "in view" check that drives the back-to-TTS button: when a sentence
-  // spans a page break, the word can be on a different page than the sentence's
-  // ttsLocation, so the word position is the accurate reference. Returns null
-  // outside word mode, where the sentence-level ttsLocation is correct.
+  // CFI of the word being spoken, while words are tracked (highlighted, or only
+  // followed under sentence highlighting). Used for the "in view" check that
+  // drives the back-to-TTS button: when a sentence spans a page break, the word
+  // can be on a different page than the sentence's ttsLocation, so the word
+  // position is the accurate reference — after the view followed the word onto
+  // the next page, the sentence start is no longer in view and the button would
+  // wrongly appear (and switch following off). Returns null when no word is
+  // tracked, where the sentence-level ttsLocation is correct.
   getCurrentHighlightCfi(): string | null {
-    if (!this.#wordHighlightActive || !this.#lastSpeakWordRange || this.#ttsSectionIndex < 0) {
+    const tracking = this.#wordHighlightActive || this.#wordFollowOnly;
+    if (!tracking || !this.#lastSpeakWordRange || this.#ttsSectionIndex < 0) {
       return null;
     }
     try {
@@ -1218,10 +1231,20 @@ export class TTSController extends EventTarget {
   // (otherwise a 60fps rAF loop runs for every sentence and does nothing).
   prepareSpeakWords(words: string[]): boolean {
     if (!this.#speakWordsArmed) return false;
-    // User forced sentence-level highlighting: the sentence highlight was drawn
-    // at mark dispatch (not suppressed), so there's nothing to do here — leave
-    // word mode off even though the client reported word boundaries.
-    if (this.#highlightGranularity === 'sentence') return false;
+    // User chose sentence-level highlighting: the sentence highlight was drawn
+    // at mark dispatch (not suppressed) and stays. Words are still tracked —
+    // without drawing them — so the view can follow the spoken word across a
+    // page break (see #wordFollowOnly).
+    if (this.#highlightGranularity === 'sentence') {
+      if (words.length === 0) return false;
+      const range = this.view.tts?.getLastRange();
+      if (!range) return false;
+      this.#speakWordBaseRange = range;
+      this.#speakWordOffsets = computeWordOffsets(rangeTextExcludingInert(range), words);
+      this.#speakWordRanges = [];
+      this.#wordFollowOnly = true;
+      return true;
+    }
     const range = this.view.tts?.getLastRange();
     if (!range) return false;
     this.#speakWordBaseRange = range;
@@ -1268,7 +1291,8 @@ export class TTSController extends EventTarget {
     }
     if (range) {
       this.#lastSpeakWordRange = range;
-      this.#getHighlighter()(range.cloneRange());
+      // Follow-only (sentence highlighting): leave the sentence highlight alone.
+      if (!this.#wordFollowOnly) this.#getHighlighter()(range.cloneRange());
       // Let the view follow the spoken word so it turns the page mid-sentence
       // when the word crosses a page boundary, instead of waiting for the next
       // sentence's mark.
@@ -1276,7 +1300,9 @@ export class TTSController extends EventTarget {
         const cfi = this.view.getCFI(this.#ttsSectionIndex, range);
         if (cfi) {
           this.dispatchEvent(new CustomEvent('tts-highlight-word', { detail: { cfi } }));
-          this.#dispatchPosition(cfi, 'word');
+          // Paragraph mode and RSVP switch to word-driven display on 'word'
+          // positions; under sentence highlighting they keep getting sentences.
+          if (!this.#wordFollowOnly) this.#dispatchPosition(cfi, 'word');
         }
       } catch {}
     }

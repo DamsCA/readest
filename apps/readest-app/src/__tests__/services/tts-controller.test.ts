@@ -784,6 +784,104 @@ describe('TTSController', () => {
     });
   });
 
+  // Sentence highlighting (the default) must still FOLLOW the spoken word:
+  // a sentence — or a group of sentences — spanning a page break used to leave
+  // the view on the old page until the next mark, while the voice was already
+  // reading the next page.
+  describe('word following under sentence highlighting', () => {
+    const getOverlayer = () =>
+      (
+        mockView.renderer.getContents() as unknown as Array<{
+          overlayer: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+        }>
+      )[0]!.overlayer;
+
+    const armSentenceMode = async () => {
+      document.body.innerHTML = '<p>Hello brave world</p>';
+      const textNode = document.body.firstElementChild!.firstChild as Text;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.setEnd(textNode, textNode.length);
+      await controller.initViewTTS(0);
+      controller.setHighlightGranularity('sentence');
+      mockView.tts = {
+        setMark: vi.fn().mockReturnValue(range),
+        getLastRange: vi.fn().mockImplementation(() => range.cloneRange()),
+      } as unknown as FoliateView['tts'];
+      controller.dispatchSpeakMark({
+        offset: 0,
+        name: '0',
+        text: 'Hello brave world',
+        language: 'en',
+      });
+    };
+
+    test('prepareSpeakWords arms following (returns true) without drawing anything', async () => {
+      await armSentenceMode();
+      getOverlayer().add.mockClear();
+      expect(controller.prepareSpeakWords(['Hello', 'brave', 'world'])).toBe(true);
+      expect(getOverlayer().add).not.toHaveBeenCalled();
+    });
+
+    test('with no word timings there is nothing to follow', async () => {
+      await armSentenceMode();
+      expect(controller.prepareSpeakWords([])).toBe(false);
+    });
+
+    test('each spoken word is reported for page following, never highlighted', async () => {
+      await armSentenceMode();
+      controller.prepareSpeakWords(['Hello', 'brave', 'world']);
+      const onWord = vi.fn();
+      const onPosition = vi.fn();
+      controller.addEventListener('tts-highlight-word', onWord);
+      controller.addEventListener('tts-position', onPosition);
+      getOverlayer().add.mockClear();
+      vi.mocked(mockView.getCFI).mockClear();
+      vi.mocked(mockView.getCFI).mockReturnValue('cfi-world');
+
+      controller.dispatchSpeakWord(2);
+
+      expect(String(vi.mocked(mockView.getCFI).mock.calls[0]![1])).toBe('world');
+      expect(onWord).toHaveBeenCalledTimes(1);
+      expect((onWord.mock.calls[0]![0] as CustomEvent).detail).toEqual({ cfi: 'cfi-world' });
+      // The sentence highlight stays; paragraph mode / RSVP keep sentence positions.
+      expect(getOverlayer().add).not.toHaveBeenCalled();
+      expect(onPosition).not.toHaveBeenCalled();
+    });
+
+    test('the followed word is the in-view reference, but re-highlighting redraws the sentence', async () => {
+      await armSentenceMode();
+      controller.prepareSpeakWords(['Hello', 'brave', 'world']);
+      vi.mocked(mockView.getCFI).mockReturnValue('cfi-world');
+      controller.dispatchSpeakWord(2);
+      // After the view followed "world" onto the next page, the sentence start
+      // is off-screen: the back-to-TTS check must use the word, or it would
+      // switch following off.
+      expect(controller.getCurrentHighlightCfi()).toBe('cfi-world');
+
+      vi.mocked(mockView.getCFI).mockClear();
+      controller.reapplyCurrentHighlight();
+      expect(String(vi.mocked(mockView.getCFI).mock.calls[0]![1])).toBe('Hello brave world');
+    });
+
+    test('a new mark stops following the previous sentence words', async () => {
+      await armSentenceMode();
+      controller.prepareSpeakWords(['Hello', 'brave', 'world']);
+      controller.dispatchSpeakWord(1);
+      controller.dispatchSpeakMark({
+        offset: 0,
+        name: '1',
+        text: 'Hello brave world',
+        language: 'en',
+      });
+      expect(controller.getCurrentHighlightCfi()).toBeNull();
+      const onWord = vi.fn();
+      controller.addEventListener('tts-highlight-word', onWord);
+      controller.dispatchSpeakWord(2);
+      expect(onWord).not.toHaveBeenCalled();
+    });
+  });
+
   describe('tts-position event', () => {
     const makeSentenceRange = () => {
       document.body.innerHTML = '<p>Hello brave world</p>';
