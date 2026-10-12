@@ -13,3 +13,14 @@ workers_dev = true
 name = "LIMITER"
 namespace_id = "1001"
 simple = { limit = 120, period = 60 }
+
+# Traduction naturelle (/v1/translate) : IA de Cloudflare, sur le forfait
+# gratuit (10 000 neurones par jour). Limite separee pour qu'une rafale de
+# traductions ne prive jamais la voix de ses requetes.
+[ai]
+binding = "AI"
+
+[[ratelimits]]
+name = "TRANSLATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }

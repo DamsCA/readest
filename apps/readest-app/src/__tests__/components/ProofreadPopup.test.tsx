@@ -227,6 +227,51 @@ describe('ProofreadPopup Component', () => {
     });
   });
 
+  // A "current selection" rule is anchored to the book's own text; an injected
+  // translation is not part of it, so such a correction vanished on re-render.
+  describe('Correcting translated text', () => {
+    const translatedSelection = () => {
+      document.body.innerHTML =
+        '<p>It is raining cats and dogs.<font class="translation-target">' +
+        '<font class="translation-target-block">Il pleut des chats et des chiens.</font></font></p>';
+      const text = document.querySelector('.translation-target-block')!.firstChild as Text;
+      const range = document.createRange();
+      range.setStart(text, 9);
+      range.setEnd(text, 32);
+      return {
+        ...defaultProps,
+        selection: { ...defaultProps.selection, text: range.toString(), range },
+      };
+    };
+
+    it('offers book-wide scopes only, book by default', () => {
+      renderWithProviders(<ProofreadPopup {...translatedSelection()} />);
+
+      expect(screen.queryByText('Current selection')).toBeNull();
+      expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('book');
+    });
+
+    it('saves a book rule whose pattern is the selected translated text', async () => {
+      renderWithProviders(<ProofreadPopup {...translatedSelection()} />);
+
+      fireEvent.change(screen.getByPlaceholderText('Enter text...'), {
+        target: { value: 'des cordes' },
+      });
+      fireEvent.click(screen.getByText('Apply'));
+
+      await waitFor(() => {
+        expect(mockOnConfirm).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scope: 'book',
+            pattern: 'des chats et des chiens',
+            replacement: 'des cordes',
+            onlyForTTS: false,
+          }),
+        );
+      });
+    });
+  });
+
   describe('Regex Toggle', () => {
     it('should render the regex checkbox (off by default)', () => {
       renderWithProviders(<ProofreadPopup {...defaultProps} />);

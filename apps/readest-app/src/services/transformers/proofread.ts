@@ -183,6 +183,65 @@ function applyReplacementSingle(
   }
 }
 
+/**
+ * Applies the book and library correction rules to one plain string: the
+ * translation injected next to each paragraph. The transformer below only sees
+ * the book's own HTML, before translation, so a correction made on translated
+ * text (a French pattern in an English book) matched nothing — the reader fixed
+ * a clumsy translation and saw no change. Same matching as the transformer.
+ * Selection-scope rules are anchored to a position in the source, and TTS-only
+ * rules never change displayed text, so neither applies here.
+ */
+/** Library-wide rules plus this book's, in the order the transformer merges them. */
+export const getCorrectionRules = (bookRules: ProofreadRule[] | undefined): ProofreadRule[] => [
+  ...(useSettingsStore.getState().settings?.globalViewSettings?.proofreadRules ?? []),
+  ...(bookRules ?? []),
+];
+
+export const applyRulesToText = (text: string, rules: ProofreadRule[] | undefined): string => {
+  if (!text || !rules?.length) return text;
+  const active = rules
+    .filter(
+      (r) =>
+        r.enabled && !r.deletedAt && !r.onlyForTTS && r.scope !== 'selection' && r.pattern.trim(),
+    )
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const ordered = [
+    ...active.filter((r) => r.scope === 'book'),
+    ...active.filter((r) => r.scope === 'library'),
+  ];
+  let out = text;
+  for (const rule of ordered) {
+    const { source, flags } = normalizePattern(
+      rule.pattern,
+      rule.isRegex,
+      rule.caseSensitive !== false,
+    );
+    let regex: RegExp;
+    try {
+      regex = new RegExp(source, flags);
+    } catch {
+      continue;
+    }
+    const matches: Array<{ index: number; length: number }> = [];
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(out)) !== null) {
+      // A user regex that can match nothing would otherwise loop forever.
+      if (match[0].length === 0) {
+        regex.lastIndex++;
+        continue;
+      }
+      if (!isValidMatch(out, match, rule)) continue;
+      matches.push({ index: match.index, length: match[0].length });
+    }
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const m = matches[i]!;
+      out = out.slice(0, m.index) + rule.replacement + out.slice(m.index + m.length);
+    }
+  }
+  return out;
+};
+
 function getTextNodes(doc: Document): Text[] {
   const walker = document.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_TEXT, {
     acceptNode: (node) => {

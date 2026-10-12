@@ -13,6 +13,13 @@ import { isPunctuationOnly, isWholeWord } from '@/utils/word';
 import Select from '@/components/Select';
 import Popup from '@/components/Popup';
 
+// Text injected by the translator (useTextTranslation) rather than the book's own.
+const isInTranslation = (range?: Range): boolean => {
+  const node = range?.commonAncestorContainer;
+  const el = node?.nodeType === Node.ELEMENT_NODE ? (node as Element) : node?.parentElement;
+  return !!el?.closest('.translation-target');
+};
+
 interface ProofreadPopupProps {
   bookKey: string;
   selection?: TextSelection;
@@ -46,7 +53,12 @@ const ProofreadPopup: React.FC<ProofreadPopupProps> = ({
   const [caseSensitive, setCaseSensitive] = useState(true);
   const [wholeWord, setWholeWord] = useState(!isPunctuationOnly(selection?.text || ''));
   const [isRegex, setIsRegex] = useState(false);
-  const [scope, setScope] = useState<ProofreadScope>('selection');
+  // Correcting a translation: a "current selection" rule is anchored to a
+  // position in the book's own text, which the translation is not part of, so
+  // it vanished on the next render. Such corrections are book-wide rules,
+  // applied to every translated paragraph (applyRulesToText).
+  const inTranslation = isInTranslation(selection?.range);
+  const [scope, setScope] = useState<ProofreadScope>(inTranslation ? 'book' : 'selection');
   const [onlyForTTS, setOnlyForTTS] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +125,7 @@ const ProofreadPopup: React.FC<ProofreadPopupProps> = ({
   };
 
   const scopeOptions = [
-    { value: 'selection', label: _('Current selection') },
+    ...(inTranslation ? [] : [{ value: 'selection', label: _('Current selection') }]),
     { value: 'book', label: _('All occurrences in this book') },
     { value: 'library', label: _('All occurrences in your library') },
   ];
@@ -245,7 +257,9 @@ const ProofreadPopup: React.FC<ProofreadPopupProps> = ({
             </span>
             <input
               type='checkbox'
-              disabled={scope === 'selection'}
+              // TTS-only rules act on the book's own text; a translation is
+              // spoken as displayed.
+              disabled={scope === 'selection' || inTranslation}
               className='toggle toggle-sm bg-gray-500 checked:bg-black hover:bg-gray-500 hover:checked:bg-black'
               style={
                 {

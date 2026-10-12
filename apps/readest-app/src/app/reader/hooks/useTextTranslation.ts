@@ -10,6 +10,7 @@ import { blockSourceText, walkTextNodes } from '@/utils/walk';
 import { debounce } from '@/utils/debounce';
 import { getLocale } from '@/utils/misc';
 import { createTranslationWrapper } from '@/utils/translationDom';
+import { applyRulesToText, getCorrectionRules } from '@/services/transformers/proofread';
 
 export function useTextTranslation(
   bookKey: string,
@@ -273,7 +274,12 @@ export function useTextTranslation(
 
     try {
       const translated = await translateRef.current([text]);
-      const translatedText = translated[0];
+      // The reader's own corrections of translated text (see applyRulesToText);
+      // the TTS prefetch applies the same, so spoken and shown text stay equal.
+      const translatedText = applyRulesToText(
+        translated[0] ?? '',
+        getCorrectionRules(getViewSettings(bookKey)?.proofreadRules),
+      );
       if (!translatedText || text === translatedText) return;
 
       const wrapper = createTranslationWrapper(document, translatedText, {

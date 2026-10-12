@@ -7,11 +7,15 @@ import { useReaderStore } from '@/store/readerStore';
 import { useBookProgress } from '@/store/readerProgressStore';
 import { useProofreadStore } from '@/store/proofreadStore';
 import { TransformContext } from '@/services/transformers/types';
-import { proofreadTransformer } from '@/services/transformers/proofread';
+import {
+  applyRulesToText,
+  getCorrectionRules,
+  proofreadTransformer,
+} from '@/services/transformers/proofread';
 import { useTranslation } from '@/hooks/useTranslation';
 import { TTSController, TTSMark, TTSHighlightOptions, TTSVoicesGroup } from '@/services/tts';
 import {
-  getTranslator,
+  resolveTranslator,
   getFromCache,
   storeInCache,
   preprocess as preprocessTranslations,
@@ -774,12 +778,15 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           try {
             const vs = getViewSettings(bookKey);
             if (!vs?.translationEnabled) return null;
-            const provider = (vs.translationProvider || 'deepl') as TranslatorName;
-            const translator = getTranslator(provider);
+            const token = localStorage.getItem('token');
+            // The provider the reader's own translations actually use: the
+            // configured one when usable, else the first available (DeepL needs
+            // a Readest account; taken as-is it failed every prefetch).
+            const translator = resolveTranslator(vs.translationProvider || 'deepl', !!token);
             if (!translator) return null;
+            const provider = translator.name as TranslatorName;
             const sourceLang = 'AUTO';
             const targetLang = vs.translateTargetLang || getLocale();
-            const token = localStorage.getItem('token');
             const processed = preprocessTranslations(texts);
             const results: (string | null)[] = new Array<string | null>(processed.length).fill(
               null,
@@ -810,9 +817,13 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
                 }),
               );
             }
-            // The injector renders polish(cached) — return the same final form
-            // so pre-generated audio keys match the spoken text exactly.
-            return results.map((r) => (r ? (polish([r], targetLang)[0] ?? r) : null));
+            // The injector renders polish(cached) with the reader's corrections
+            // applied — return the same final form so pre-generated audio keys
+            // match the spoken text exactly.
+            const rules = getCorrectionRules(vs.proofreadRules);
+            return results.map((r) =>
+              r ? applyRulesToText(polish([r], targetLang)[0] ?? r, rules) : null,
+            );
           } catch (err) {
             console.warn('[TTS] prefetch translation failed', err);
             return null;

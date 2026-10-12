@@ -30,11 +30,123 @@ const DEFAULT_VOICE = 'da05ae30d8c0428eb47498df524e448c'; // "Claire"
 // small enough to stop someone pushing whole books through one request.
 const MAX_CHARS = 5000;
 
-const json = (status, obj) =>
+const json = (status, obj, extraHeaders = {}) =>
   new Response(JSON.stringify(obj), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...extraHeaders },
   });
+
+// --- Traduction naturelle (IA de Cloudflare, Workers AI) -------------------
+// POST /v1/translate { text, source, target } -> { translation }
+//
+// Les traducteurs classiques (Google, DeepL...) rendent souvent les expressions
+// mot a mot ("it's raining cats and dogs" -> "il pleut des chats et des
+// chiens"). Un modele de langage, avec la consigne ci-dessous, donne
+// l'equivalent naturel ("il pleut des cordes").
+//
+// Cout : gratuit dans la limite de 10 000 "neurones" par jour du forfait
+// gratuit (Mistral Small 3.1 : 31 876 neurones par million de jetons lus,
+// 50 488 par million ecrits — page de tarifs Cloudflare, lue le 12/10/2026).
+// Au-dela, Workers AI refuse (aucune facturation sur le forfait gratuit) ; le
+// relais repond alors 429 et l'app repasse sur son traducteur classique.
+const TRANSLATE_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
+// Un paragraphe ; au-dela, c'est que quelqu'un pompe.
+const MAX_TRANSLATE_CHARS = 6000;
+const LANG_NAMES = {
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  nl: 'Dutch',
+  ru: 'Russian',
+  ja: 'Japanese',
+  zh: 'Chinese',
+  ko: 'Korean',
+  ar: 'Arabic',
+};
+const langName = (code) => {
+  const short = String(code || '').toLowerCase().split(/[-_]/)[0];
+  if (!short || short === 'auto') return '';
+  return LANG_NAMES[short] || short;
+};
+// La version web de l'app appelle depuis un navigateur ; l'app Android passe
+// par le module reseau natif et n'en a pas besoin.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Relay-Token',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+// "a passage from a book... never continue": essai du 12/10/2026, le titre de
+// deux mots "The Call" est revenu en un long texte invente ("L'Appel. Il y a des
+// jours ou je me reveille...") — un texte court se lit comme une consigne
+// d'ecriture. La consigne, le plafond de jetons et le controle de longueur
+// ci-dessous ferment cette porte.
+const systemPrompt = (source, target) =>
+  `You are a literary translator. The user's message is a passage from a book, possibly ` +
+  `just a title or a few words: translate exactly that ${source ? `from ${source} ` : ''}` +
+  `into ${target}, and never continue, expand or explain it. Render the meaning, tone and ` +
+  `register, never word for word: replace every idiom, phrasal verb and figure of speech ` +
+  `with the natural ${target} equivalent a native writer would use. If the source has an ` +
+  `obvious typo or a missing word, translate what was clearly meant. Keep names and numbers, ` +
+  `and keep the sentences in their order without merging or dropping any. Follow ${target} ` +
+  `typography (for French: « » quotation marks and a space before ; : ! ?). Reply with the ` +
+  `translation only: no notes or explanations.`;
+// Une traduction n'est jamais beaucoup plus longue que l'original (francais :
+// environ 1,2 fois l'anglais). Au-dela, c'est que le modele a brode.
+const looksExpanded = (source, translation) => translation.length > source.length * 2.5 + 40;
+
+async function handleTranslate(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (request.method !== 'POST') return json(404, { error: 'not found' }, CORS);
+  if (!env.RELAY_TOKEN || request.headers.get('X-Relay-Token') !== env.RELAY_TOKEN) {
+    return json(403, { error: 'forbidden' }, CORS);
+  }
+  if (env.TRANSLATE_LIMITER) {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await env.TRANSLATE_LIMITER.limit({ key: ip });
+    if (!success) return json(429, { error: 'rate limited' }, CORS);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { error: 'invalid json' }, CORS);
+  }
+  const text = typeof body?.text === 'string' ? body.text.trim() : '';
+  const target = langName(body?.target);
+  if (!text || !target) return json(400, { error: 'text and target required' }, CORS);
+  if (text.length > MAX_TRANSLATE_CHARS) {
+    return json(413, { error: `text over ${MAX_TRANSLATE_CHARS} chars` }, CORS);
+  }
+  try {
+    const out = await env.AI.run(TRANSLATE_MODEL, {
+      messages: [
+        { role: 'system', content: systemPrompt(langName(body?.source), target) },
+        { role: 'user', content: text },
+      ],
+      // Assez pour la traduction (environ 0,35 jeton par caractere source),
+      // pas pour broder : le plafond par defaut (256) couperait les longs
+      // paragraphes, un plafond large laissait un titre devenir une page.
+      max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
+      temperature: 0.2,
+    });
+    const translation = typeof out?.response === 'string' ? out.response.trim() : '';
+    if (!translation) return json(502, { error: 'empty translation' }, CORS);
+    // 502 : l'app passe ce paragraphe a Google plutot que d'afficher (et faire
+    // lire a voix haute) un texte invente.
+    if (looksExpanded(text, translation)) return json(502, { error: 'translation too long' }, CORS);
+    return json(200, { translation, usage: out.usage ?? null }, CORS);
+  } catch (err) {
+    const message = String(err?.message || err);
+    // 4006 : allocation gratuite du jour epuisee.
+    if (/4006|neuron|allocation/i.test(message)) {
+      return json(429, { error: 'daily free allocation exhausted' }, CORS);
+    }
+    return json(502, { error: message.slice(0, 200) }, CORS);
+  }
+}
 
 export default {
   async fetch(request, env) {
@@ -43,6 +155,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return json(200, { status: 'ok', model: FREE_MODEL, keyConfigured: !!env.FISH_KEY });
     }
+    if (url.pathname === '/v1/translate') return handleTranslate(request, env);
     const upstreamUrl = FISH_ROUTES.get(url.pathname);
     if (request.method !== 'POST' || !upstreamUrl) {
       return json(404, { error: 'not found' });

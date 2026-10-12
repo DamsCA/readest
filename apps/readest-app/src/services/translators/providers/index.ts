@@ -1,4 +1,5 @@
 import { TranslationProvider } from '../types';
+import { aiProvider } from './ai';
 import { deeplProvider } from './deepl';
 import { azureProvider } from './azure';
 import { googleProvider } from './google';
@@ -16,12 +17,17 @@ function createTranslator<T extends string>(
   return implementation as TranslationProvider & { name: T };
 }
 
+const aiTranslator = createTranslator('ai', aiProvider);
 const deeplTranslator = createTranslator('deepl', deeplProvider);
 const azureTranslator = createTranslator('azure', azureProvider);
 const googleTranslator = createTranslator('google', googleProvider);
 const yandexTranslator = createTranslator('yandex', yandexProvider);
 
+// First available wins whenever the configured provider is unusable (e.g. the
+// DeepL default without a Readest account): the AI translator renders idioms
+// naturally instead of word for word, and is only listed when the relay exists.
 const availableTranslators = [
+  aiTranslator,
   deeplTranslator,
   azureTranslator,
   googleTranslator,
@@ -55,6 +61,21 @@ export const isTranslatorAvailable = (
   if (translator.quotaExceeded) return false;
   if (translator.authRequired && !hasToken) return false;
   return true;
+};
+
+/**
+ * The provider actually used for `provider`: itself when available, otherwise
+ * the first available one — the rule `useTranslator` applies to the reader's
+ * own translations. Code translating outside that hook (the TTS chapter
+ * prefetch) must resolve the same way, or it caches under another provider
+ * and, with the DeepL default and no Readest account, cannot translate at all.
+ */
+export const resolveTranslator = (
+  provider: string,
+  hasToken: boolean,
+): TranslationProvider | undefined => {
+  const available = availableTranslators.filter((t) => isTranslatorAvailable(t, hasToken));
+  return available.find((t) => t.name === provider) ?? available[0];
 };
 
 /**

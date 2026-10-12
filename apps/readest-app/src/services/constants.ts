@@ -200,7 +200,9 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   isNotebookPinned: false,
   notebookActiveTab: 'notes',
   autohideCursor: true,
-  translationProvider: 'deepl',
+  // AI = natural translation through the relay (see translators/providers/ai.ts);
+  // builds without the relay fall back to the first available provider.
+  translationProvider: 'ai',
   translateTargetLang: 'EN',
   wordLensAutoDownload: true,
 
@@ -378,7 +380,7 @@ export const DEFAULT_TTS_CONFIG: TTSConfig = {
 
 export const DEFAULT_TRANSLATOR_CONFIG: TranslatorConfig = {
   translationEnabled: false,
-  translationProvider: 'deepl',
+  translationProvider: 'ai',
   translateTargetLang: '',
   showTranslateSource: true,
   ttsReadAloudText: 'both',
