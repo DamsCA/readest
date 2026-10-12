@@ -263,6 +263,16 @@ const plausible = (para, find, replace) => {
   );
 };
 
+// L'app insere le texte tel quel : "don&#8217;t", "’" ou une balise
+// s'afficheraient en clair dans le livre (et partout, la regle valant pour le
+// livre entier). Le garde-fou plausible() les laissait passer.
+const hasCode = (s) => /&(?:#\d+|#x[0-9a-f]+|[a-z]+);|\\u[0-9a-f]{4}|<\/?[a-z]/i.test(s);
+// Apostrophe ou guillemets droits contre typographiques : un choix d'edition.
+const typographyOnly = (find, replace) => {
+  const plain = (s) => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+  return plain(find) === plain(replace);
+};
+
 const parseCorrections = (raw, paragraphs, onlyInsertions = false) => {
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
@@ -281,6 +291,7 @@ const parseCorrections = (raw, paragraphs, onlyInsertions = false) => {
     const replace = typeof c?.replace === 'string' ? c.replace : '';
     const para = Number.isInteger(p) ? paragraphs[p] : undefined;
     if (!para || !find || find === replace) continue;
+    if (hasCode(replace) || typographyOnly(find, replace)) continue;
     // Citation exacte et unique dans son paragraphe, sinon on ne sait pas ou
     // l'appliquer (et c'est souvent que le modele a reformule).
     const at = para.indexOf(find);

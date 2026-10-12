@@ -65,12 +65,18 @@ describe('detectParagraph', () => {
     ]);
   });
 
-  it('splits words run together, swaps transposed letters, strips stray marks', () => {
-    expect(fixesOf('Why wasthe tide out when teh sun rose over the wo■rd?')).toEqual([
+  it('splits a small word glued to its neighbour and strips stray marks', () => {
+    expect(fixesOf('Why wasthe tide out over the wo■rd? It was lifeyou wanted.')).toEqual([
       { find: 'wasthe', replace: 'was the' },
-      { find: 'teh', replace: 'the' },
       { find: 'wo■rd', replace: 'word' },
+      { find: 'lifeyou', replace: 'life you' },
     ]);
+  });
+
+  it('leaves swapped letters to the AI, which reads the sentence ("teh" may be "the" or "tea")', () => {
+    const found = detectParagraph('He poured a cup of teh for her.', words, names);
+    expect(found.fixes).toEqual([]);
+    expect(found.hints.find((h) => h.startsWith('"teh"'))).toMatch(/maybe/);
   });
 
   it("puts a misread name right from the book's own spelling", () => {
@@ -96,16 +102,48 @@ describe('detectParagraph', () => {
 
   it('points doubtful spots out to the AI instead of deciding', () => {
     const found = detectParagraph(
-      'She had had enough, and a strange blorvik made her hapy.',
+      'She had had enough of the blorvik becuase of its hapy song.',
       words,
       names,
     );
     expect(found.fixes).toEqual([]);
     expect(found.hints).toContain('"had had": doubled word');
     expect(found.hints).toContain('"blorvik" is not an English word');
-    expect(found.hints.find((h) => h.startsWith('"hapy"'))).toMatch(/maybe happy/);
-    // A lowercase non-word nobody fixes falls back to its likeliest word.
-    expect(found.fallbacks).toEqual([{ find: 'hapy', replace: 'happy' }]);
+    expect(found.hints.find((h) => h.startsWith('"hapy"'))).toMatch(/maybe/);
+    // A non-word nobody fixes falls back to a word only when one common word
+    // is the obvious reading ("hapy" could be "happy" or "hay").
+    expect(found.fallbacks).toEqual([{ find: 'becuase', replace: 'because' }]);
+  });
+
+  // Each one a wrong proposal the first version made on a real book.
+  it('never touches real words the list lacks, names, brands, addresses or abbreviations', () => {
+    for (const text of [
+      'We feel it vibrationally, and the suppressions are noncash and boundaryless.',
+      'He kneeled by the wingmen near the endnotes of the cowtown chapter.',
+      'Columbia lost to Israel. Walt Disney went broke. Anne smiled at Annie.',
+      'Bear Stearns and Lehman Bros failed, said Phillip Davis, a CHRIS VOSS fan.',
+      'Pros and cons, etc. See the 2nd ed. of the book, vs. the first.',
+      'It is a way of pre-paving the road, co-op style, with ad-libbing.',
+      'Visit www.abraham-hicks.com or write to tr@example.com for an eBook or iPhone.',
+      'The All-That-Is Is here, and it is is not a slip here either.',
+      'We set it up for l0:00 o’clock, and Darby5 wrote the note.',
+      'That was some “stinkin’ thinkin’” on a coupla’ boards.',
+      'ot so very long ago, the story began.',
+    ]) {
+      const found = detectParagraph(text, words, names);
+      expect({ text, fixes: found.fixes, fallbacks: found.fallbacks }).toEqual({
+        text,
+        fixes: [],
+        fallbacks: [],
+      });
+    }
+  });
+
+  it('still fixes a scanning confusion where a sentence starts, and a misread name', () => {
+    expect(fixesOf('Tlie wind rose. Tbomas looked at the sea while Martha waited.')).toEqual([
+      { find: 'Tlie', replace: 'The' },
+      { find: 'Tbomas', replace: 'Thomas' },
+    ]);
   });
 });
 

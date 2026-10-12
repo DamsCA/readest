@@ -7,11 +7,15 @@ import type { PendingCorrection } from '@/services/ai/proofread';
 // suspicious spot) and fallbacks (the likeliest word for a non-word nobody else
 // fixed).
 //
-// Measured 12 Oct 2026 on pages with injected conversion errors of 15 kinds:
-// the AI alone found 29 of 54 (tuning pages) and 23 of 36 (fresh pages); with
-// these checks and the AI's second pass for missing words, 53 of 54 and 34 of
-// 36, with at most one false alert. A Python prototype was measured; this is
-// its port.
+// Measured 12 Oct 2026. On pages with injected conversion errors of 15 kinds
+// the AI alone found 29 of 54 (tuning pages) and 23 of 36 (fresh pages); the
+// first version of these checks plus the AI's two passes found 53 and 34. On
+// four real books (~9,100 paragraphs) that version proposed 466 changes, nearly
+// all wrong ("Columbia" -> "Colombia", "etc" -> "etch"): a word missing from a
+// list is rarely a typo. The rules are now precision first: the same books get
+// 7 proposals, all real conversion errors ("lifeyou", "andthe",
+// "civilization.The"); alone they still fix 42 of 54 and 28 of 36 injected
+// errors and point the AI at most of the rest.
 
 /** Word -> SCOWL level (10 = most common, 70 = rare). */
 export type WordLevels = Map<string, number>;
@@ -57,6 +61,8 @@ export const loadEnglishWords = (): Promise<WordLevels> => {
 };
 
 const STRAY = '■¬~�•|';
+// Scanning confusions. "b"/"h" only within lowercase words ("tbe"): on a
+// capitalised word it turned names into words ("Bart" -> "Hart").
 const OCR_SUBS: [string, string][] = [
   ['rn', 'm'],
   ['vv', 'w'],
@@ -67,21 +73,76 @@ const OCR_SUBS: [string, string][] = [
   ['5', 's'],
   ['ii', 'u'],
   ['ni', 'm'],
-  ['I', 'l'],
-  ['l', 'I'],
-  ['1', 'I'],
 ];
+const OCR_SUBS_LOWER: [string, string][] = [...OCR_SUBS, ['b', 'h']];
 // A doubled one of these is always a slip ("the the"); other doubles can be
-// meant ("had had", "that that") and are left to the AI.
+// meant ("had had", "it was was", "gave her her coat") and are left to the AI.
 const SAFE_DOUBLES = new Set(
-  'the a an to of and in on for with was is it he she they her his at by as from but'.split(' '),
+  'the a an to of and in on for with it he she they his at by as from but'.split(' '),
 );
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 const SUFFIXES = ["'s", "'", "n't", "'ll", "'re", "'ve", "'d", "'m"];
-// Titles the word list leaves out.
+// Titles and abbreviations the word list leaves out.
 const ABBREVIATIONS = new Set(
-  'mr mrs ms dr st jr sr mt ft capt col gen lt sgt rev prof messrs mme mlle esq'.split(' '),
+  (
+    'mr mrs ms dr st jr sr mt ft capt col gen lt sgt rev prof messrs mme mlle esq ' +
+    'etc vs eg ie ed eds vol pp fig ch cf al op cit ibid approx dept govt inc ltd corp ' +
+    'cm mm km kg lb lbs oz'
+  ).split(' '),
 );
+// Small words a conversion glues to a neighbour ("andthe", "beenmy", "lifeyou").
+// Two glued halves are split only when one of them is such a word: two content
+// words glued are usually a real compound the list lacks ("cowtown").
+const FUNCTION_WORDS = new Set(
+  (
+    'the an and or but nor of to in on at by for with from as into onto upon than then that ' +
+    'this these those there here where when what which who whom whose why how is am are was ' +
+    'were been has have had do does did will would shall should can could may might must not ' +
+    'no all any some each every more most much many other such only just also very too if me ' +
+    'my we us our you your he him his she her it its they them their'
+  ).split(' '),
+);
+// Prefixes that make a real word of a known one ("noncash", "reinitiate").
+const PREFIXES = (
+  'non un re pre counter over under out anti semi multi inter super self mis dis sub co de ' +
+  'en em trans post mid micro mega ultra hyper be fore mini neo pseudo quasi tele'
+).split(' ');
+// Endings that make a real word of a known one ("suppressions", "kneeled"),
+// with what the stem may have lost.
+const ENDINGS: [string, string[]][] = [
+  ['s', ['']],
+  ['es', ['']],
+  ['ies', ['y']],
+  ['ied', ['y']],
+  ['ed', ['', 'e']],
+  ['d', ['']],
+  ['ing', ['', 'e']],
+  ['er', ['', 'e']],
+  ['ers', ['', 'e']],
+  ['est', ['', 'e']],
+  ['ly', ['', 'le']],
+  ['ily', ['y']],
+  ['ally', ['', 'al']],
+  ['ness', ['']],
+  ['less', ['']],
+  ['ful', ['']],
+  ['ment', ['']],
+  ['able', ['', 'e']],
+  ['ability', ['', 'e', 'able']],
+  ['ism', ['']],
+  ['ist', ['']],
+  ['ity', ['', 'e']],
+  ['ize', ['', 'e']],
+  ['ise', ['', 'e']],
+  ['ship', ['']],
+  ['hood', ['']],
+  ['wise', ['']],
+  ['ward', ['']],
+  ['wards', ['']],
+  ['ish', ['', 'e']],
+  ['ive', ['', 'e']],
+  ['y', ['', 'e']],
+];
 // Below this share of known lowercase words the page is not English: the
 // checks would flag every word.
 const MIN_ENGLISH_SHARE = 0.8;
@@ -89,25 +150,32 @@ const MIN_ENGLISH_SHARE = 0.8;
 const WORD_CHAR = '\\p{L}\\p{N}_';
 const TOKEN = /[\p{L}\p{M}\p{N}’'■¬~�•|]+/gu;
 const NAME = /(?<=[a-z,;] )(\p{Lu}\p{Ll}{2,})(?![\p{L}\p{N}_])/gu;
-// "room ," (a spaced ellipsis ". . ." is a style, not a slip)
-const SPACE_BEFORE_PUNCT = /(\p{L}+) ([,.;:!?])(?! ?\.)/gu;
-// "end.The"
+// "room ," (not a spaced ellipsis ". . .", a style; not "info .com", a broken
+// address; ; : ! ? spaced the French way are a style too)
+const SPACE_BEFORE_PUNCT = /(\p{L}+) ([,.])(?! ?\.)(?![\p{L}\p{N}])/gu;
+// "end.The" (not initials: "J.R.R.Tolkien")
 const MISSING_SPACE = new RegExp(
-  `(?<![${WORD_CHAR}])(\\p{L}+)\\.(\\p{Lu}\\p{Ll}+)(?![${WORD_CHAR}])`,
+  `(?<![${WORD_CHAR}.])(\\p{L}{2,})\\.(\\p{Lu}\\p{Ll}+)(?![${WORD_CHAR}])`,
   'gu',
 );
 // "some- thing", a line-end hyphen left in the text
 const SPLIT_HYPHEN = new RegExp(`(?<![${WORD_CHAR}])(\\p{L}+)- (\\p{Ll}+)(?![${WORD_CHAR}])`, 'gu');
-const DOUBLED = new RegExp(`(?<![${WORD_CHAR}])([${WORD_CHAR}]+) \\1(?![${WORD_CHAR}])`, 'giu');
-const OCR_SUSPECT = /rn|vv|cl|li|[01]/;
+// Not inside a hyphenated name or after an apostrophe ("All-That-Is Is").
+const DOUBLED = new RegExp(
+  `(?<![${WORD_CHAR}\\-'’])([${WORD_CHAR}]+) \\1(?![${WORD_CHAR}\\-'’])`,
+  'giu',
+);
+const OCR_SUSPECT = /rn|vv|cl|li|ii|[015]/;
 const NUMBER_LIKE = /^\d+(?:st|nd|rd|th|s|['’]s)?$/i;
+const ROMAN = /^[ivxlcdm]+$/i;
+// "Darby5": a footnote number glued to its word.
+const FOOTNOTE = /^\p{L}{3,}\d{1,3}$/u;
+const LINK = /@|:\/\/|www\.|\.(?:com|org|net|edu|gov|info|biz|io|uk|fr|de)\b|\/\w/i;
 
 const isAlpha = (s: string) => /^\p{L}+$/u.test(s);
 const isLower = (s: string) => s === s.toLowerCase() && s !== s.toUpperCase();
 const isUpper = (s: string) => s === s.toUpperCase() && s !== s.toLowerCase();
 const startsUpper = (s: string) => isUpper(s.slice(0, 1));
-const keepCase = (src: string, dst: string) =>
-  startsUpper(src) ? dst.slice(0, 1).toUpperCase() + dst.slice(1) : dst;
 const strip = (s: string, chars: string) => {
   let a = 0;
   let b = s.length;
@@ -128,6 +196,47 @@ export const isKnownWord = (word: string, words: WordLevels): boolean => {
 };
 
 /**
+ * A real word the list lacks, made of known parts: an inflection or derivation
+ * ("suppressions", "kneeled", "noncash", "vibrationally") or a compound of two
+ * content words ("cowtown", "endnotes"). Halves that are small function words
+ * are left out: those are words a conversion glued together ("andthe").
+ */
+export const isDerivedWord = (word: string, words: WordLevels, depth = 0): boolean => {
+  const w = word.toLowerCase();
+  const knownPart = (part: string) =>
+    words.has(part) || (depth === 0 && isDerivedWord(part, words, 1));
+  for (const prefix of PREFIXES) {
+    const rest = w.slice(prefix.length);
+    if (w.startsWith(prefix) && rest.length >= 4 && !FUNCTION_WORDS.has(rest) && knownPart(rest)) {
+      return true;
+    }
+  }
+  for (const [ending, restores] of ENDINGS) {
+    if (!w.endsWith(ending)) continue;
+    const stem = w.slice(0, -ending.length);
+    if (stem.length < 3) continue;
+    // A short stem ending consonant-vowel-consonant doubles its consonant
+    // before a vowel ("wit" -> "witting"): "witing" is a typo, not a word.
+    const doubles =
+      /^[aeiouy]/.test(ending) &&
+      stem.length <= 4 &&
+      /[^aeiou][aeiou][b-df-hj-np-tv-z]$/.test(stem);
+    if (restores.some((r) => !(r === '' && doubles) && knownPart(stem + r))) return true;
+    // "running", "stopped": a doubled final consonant.
+    if (/([b-df-hj-np-tv-z])\1$/.test(stem) && words.has(stem.slice(0, -1))) return true;
+  }
+  for (let i = 3; i <= w.length - 3; i++) {
+    const a = w.slice(0, i);
+    const b = w.slice(i);
+    if (FUNCTION_WORDS.has(a) || FUNCTION_WORDS.has(b)) continue;
+    // Two long words glued are a conversion slip more often than a compound.
+    if (a.length >= 8 && b.length >= 8) continue;
+    if (words.has(a) && words.has(b)) return true;
+  }
+  return false;
+};
+
+/**
  * Capitalised words seen mid-sentence at least twice that no dictionary knows:
  * the book's characters and places.
  */
@@ -142,26 +251,26 @@ export const collectNames = (texts: string[], words: WordLevels, minCount = 2): 
   return new Set([...seen].filter(([, n]) => n >= minCount).map(([name]) => name));
 };
 
-const dropOne = (s: string) => Array.from(s, (_, i) => s.slice(0, i) + s.slice(i + 1));
-
-/** The book's names one edit (or one scanning confusion) away from a token. */
-const nearNames = (token: string, names: Set<string>): string[] => {
+/** Every spelling one scanning confusion away from `token`. */
+const ocrVariants = (token: string, subs: [string, string][]): string[] => {
   const out = new Set<string>();
-  const low = token.toLowerCase();
-  for (const name of names) {
-    const n = name.toLowerCase();
-    if (Math.abs(n.length - low.length) > 2) continue;
-    for (const [src, dst] of OCR_SUBS) {
-      if (low.includes(src) && low.replace(src, dst) === n) out.add(name);
+  for (const [src, dst] of subs) {
+    for (let k = token.indexOf(src); k >= 0; k = token.indexOf(src, k + 1)) {
+      out.add(token.slice(0, k) + dst + token.slice(k + src.length));
     }
-    if (n.length === low.length && [...n].filter((ch, i) => ch !== low[i]).length === 1) {
-      out.add(name);
-    }
-    if (n.length === low.length + 1 && dropOne(n).includes(low)) out.add(name);
-    if (n.length + 1 === low.length && dropOne(low).includes(n)) out.add(name);
   }
-  return [...out].sort();
+  return [...out];
 };
+
+/**
+ * The book's names a scanning confusion away from a token ("Tbomas" ->
+ * "Thomas"). Only confusions: one letter apart is just another name
+ * ("Anne"/"Annie", "Davis"/"David" in the same index).
+ */
+const ocrNearNames = (token: string, names: Set<string>): string[] =>
+  [...names].filter((name) =>
+    ocrVariants(token, [...OCR_SUBS, ['b', 'h']]).some((v) => v === name),
+  );
 
 /**
  * Words one edit from `w`, likeliest first: two letters swapped, then a letter
@@ -203,7 +312,8 @@ export const detectParagraph = (
   const fallbacks: PendingCorrection[] = [];
   const spans: [number, number][] = [];
   const known = (w: string) => isKnownWord(w, words);
-  const level = (w: string) => words.get(w) ?? 99;
+  // The list spells contractions with a straight apostrophe ("you're").
+  const level = (w: string) => words.get(w.toLowerCase().replace(/’/g, "'")) ?? 99;
   const hint = (h: string) => {
     if (!hints.includes(h)) hints.push(h);
   };
@@ -215,10 +325,19 @@ export const detectParagraph = (
     fixes.push({ find, replace });
   };
 
+  // The whitespace-delimited run around a match: a web or e-mail address is
+  // never proofread.
+  const inLink = (a: number, b: number) => {
+    while (a > 0 && !/\s/.test(paragraph[a - 1]!)) a--;
+    while (b < paragraph.length && !/\s/.test(paragraph[b]!)) b++;
+    return LINK.test(paragraph.slice(a, b));
+  };
+
   for (const m of paragraph.matchAll(SPACE_BEFORE_PUNCT)) {
-    fix(m[0], m[1]! + m[2]!, m.index!);
+    if (!inLink(m.index!, m.index! + m[0].length)) fix(m[0], m[1]! + m[2]!, m.index!);
   }
   for (const m of paragraph.matchAll(MISSING_SPACE)) {
+    if (inLink(m.index!, m.index! + m[0].length)) continue;
     if (known(m[1]!) && known(m[2]!)) fix(m[0], `${m[1]}. ${m[2]}`, m.index!);
   }
   for (const m of paragraph.matchAll(SPLIT_HYPHEN)) {
@@ -231,97 +350,117 @@ export const detectParagraph = (
     else hint(`"${m[0]}": doubled word`);
   }
 
+  // Every rule below was paid for by a wrong proposal on a real book (Never
+  // Split the Difference, Think and Grow Rich, Ask and It Is Given, See You at
+  // the Top): "Columbia" -> "Colombia", "Walt" -> "WaIt", "etc" -> "etch",
+  // "pre-paving" -> "per-paving", "vibrationally" -> "vibration ally".
   for (const m of paragraph.matchAll(TOKEN)) {
     const tok = m[0];
-    let j = m.index! - 1;
-    while (j >= 0 && /\s/.test(paragraph[j]!)) j--;
-    const atStart = j < 0 || '.!?“‘"('.includes(paragraph[j]!);
+    const start = m.index!;
+    const end = start + tok.length;
     const core = strip(tok, `${STRAY}'’`);
     if (!core) continue;
-    const at = m.index! + tok.indexOf(core);
+    const at = start + tok.indexOf(core);
+    // Part of a hyphenated word ("pre-paving", "co-op") or of an address.
+    if (paragraph[start - 1] === '-' || paragraph[end] === '-') continue;
+    if (inLink(start, end)) continue;
     if ([...tok].some((ch) => STRAY.includes(ch))) {
       const cleaned = withoutStray(tok);
       if (known(strip(cleaned, "'’"))) {
-        fix(tok, cleaned, m.index!);
+        fix(tok, cleaned, start);
         continue;
       }
     }
-    if (known(core) || NUMBER_LIKE.test(core)) continue;
+    if (known(core) || NUMBER_LIKE.test(core) || ROMAN.test(core)) continue;
     // Foreign words: the English list says nothing useful about them.
     if (/[^\x00-\x7F]/.test(withoutStray(core).replace(/’/g, "'"))) continue;
-    const bare = core.replace(/['’]s$/, '');
-    if (names.has(core) || names.has(bare)) continue;
-    if (startsUpper(core) && !atStart && isAlpha(bare) && !OCR_SUSPECT.test(bare)) continue; // a name
-    if (isUpper(core) && core.length <= 4) continue; // an acronym
-
-    // Scanning confusions: a single substitution that gives a word.
-    const cands = new Set<string>();
-    for (const [src, dst] of OCR_SUBS) {
-      for (let k = core.indexOf(src); k >= 0; k = core.indexOf(src, k + 1)) {
-        const cand = core.slice(0, k) + dst + core.slice(k + src.length);
-        if (known(cand)) cands.add(cand);
-      }
-    }
-    if (cands.size === 1) {
-      fix(core, keepCase(core, [...cands][0]!), at);
+    // Capitals only (headings, acronyms, names), a brand ("eBay", "iPhone"),
+    // a footnote number, a time ("l0:00" is a 10, not "lo"), an abbreviation
+    // ("etc.", "ed."), a drop cap's remainder ("ot so very").
+    if (!/\p{Ll}/u.test(core) || /\p{Ll}\p{Lu}/u.test(core)) continue;
+    const letters = core.replace(/\d+$/, '');
+    if (FOOTNOTE.test(core) && (known(letters) || startsUpper(letters))) continue;
+    if (
+      /\d/.test(core) &&
+      (/^[:.,]\d/.test(paragraph.slice(end)) || /\d[:.,]$/.test(paragraph.slice(0, start)))
+    ) {
       continue;
     }
-    // Words run together: a single cut into two common words.
+    if (paragraph[end] === '.' && core.length <= 3 && !OCR_SUSPECT.test(core)) continue;
+    if (start === 0 && isLower(core.slice(0, 1))) continue;
     const low = core.toLowerCase();
+    if (isDerivedWord(low, words)) continue;
+    // "stinkin’": a dropped g.
+    if (/['’]$/.test(tok) && low.endsWith('in') && words.has(`${low}g`)) continue;
+
+    if (startsUpper(core)) {
+      // A name, almost always: only a scanning confusion is put right, toward
+      // the book's own spelling, or toward a common word where a sentence
+      // starts ("Tlie" -> "The"; mid-sentence, "Bear Stearns" is no "Steams").
+      const bare = core.replace(/['’]s$/, '');
+      if (names.has(bare) || (!OCR_SUSPECT.test(bare.toLowerCase()) && !/b/.test(bare))) continue;
+      let j = start - 1;
+      while (j >= 0 && /\s/.test(paragraph[j]!)) j--;
+      const atStart = j < 0 || '.!?“‘"('.includes(paragraph[j]!);
+      const toWords = atStart
+        ? ocrVariants(bare, OCR_SUBS).filter((v) => level(v.toLowerCase()) <= 35)
+        : [];
+      const toNames = ocrNearNames(bare, names);
+      const targets = [...new Set([...toWords, ...toNames])];
+      if (targets.length === 1) fix(bare, targets[0]!, at);
+      continue;
+    }
+
+    // Scanning confusions: a single substitution that gives a common word.
+    const cands = ocrVariants(low, OCR_SUBS_LOWER).filter((v) => level(v) <= 50);
+    if (cands.length === 1) {
+      fix(core, cands[0]!, at);
+      continue;
+    }
+    // Words run together: a single cut into two common words, one of them a
+    // small function word ("andthe", "lifeyou").
     const splits: [string, string][] = [];
-    for (let i = 1; i < low.length; i++) {
+    for (let i = 2; i <= low.length - 2; i++) {
       const a = low.slice(0, i);
       const b = low.slice(i);
-      if (!known(a) || !known(b)) continue;
-      if ((a.length > 1 || 'ai'.includes(a)) && (b.length > 1 || 'ai'.includes(b))) {
-        splits.push([a, b]);
-      }
+      if (known(a) && known(b)) splits.push([a, b]);
     }
     const common = splits.filter(([a, b]) => level(a) <= 35 && level(b) <= 35);
-    if (isAlpha(core) && isLower(core) && common.length === 1) {
-      fix(core, common[0]!.join(' '), at);
+    const glued = common.filter(
+      ([a, b]) => FUNCTION_WORDS.has(b) || (FUNCTION_WORDS.has(a) && !PREFIXES.includes(a)),
+    );
+    if (isAlpha(core) && common.length === 1 && glued.length === 1) {
+      fix(core, glued[0]!.join(' '), at);
       continue;
     }
-    if (isAlpha(core)) {
-      const swaps = new Set<string>();
-      for (let i = 0; i < low.length - 1; i++) {
-        const c = low.slice(0, i) + low[i + 1] + low[i] + low.slice(i + 2);
-        if (c !== low && words.has(c)) swaps.add(c);
-      }
-      if (swaps.size === 1) {
-        fix(core, keepCase(core, [...swaps][0]!), at);
-        continue;
-      }
-    }
-    const sugg = isAlpha(core) ? suggestions(low, words) : [];
-    const close = startsUpper(core) ? nearNames(core, names) : [];
-    if (close.length === 1) {
-      fix(core, close[0]!, at);
-      continue;
-    }
+    const sugg = isAlpha(core) ? suggestions(low, words, 6) : [];
     let text = `"${core}" is not an English word`;
-    if (startsUpper(core)) {
-      text += close.length ? ` (maybe ${close.join(' or ')})` : ' (maybe a name)';
-    } else if (cands.size) {
-      text += ` (OCR: maybe ${[...cands].sort().join(' or ')})`;
+    if (cands.length) {
+      text += ` (OCR: maybe ${cands.sort().join(' or ')})`;
     } else if (splits.length) {
       text += ` (maybe ${splits
         .slice(0, 3)
         .map((s) => s.join(' '))
         .join(' or ')})`;
     } else if (sugg.length) {
-      text += ` (maybe ${sugg.map((s) => keepCase(core, s)).join(', ')})`;
+      text += ` (maybe ${sugg.slice(0, 3).join(', ')})`;
     }
     hint(text);
-    // A lowercase non-word that neither the AI nor a sure fix handles is
-    // proposed with its likeliest replacement.
-    if (isLower(core) && (sugg.length || splits.length)) {
-      const best = common.length
-        ? common[0]!.join(' ')
-        : sugg.length
-          ? sugg[0]!
-          : splits[0]!.join(' ');
-      if (!fallbacks.some((f) => f.find === core)) fallbacks.push({ find: core, replace: best });
+    // A non-word nobody else fixed is proposed only when one common word is
+    // the obvious reading ("hapy" -> "happy"): a list cannot read the sentence.
+    // Same first and last letters: a word the list lacks differs at its edges
+    // ("ebook" -> "book", "esthetic" -> "aesthetic", "coupla" -> "couple").
+    const [best, second] = [...sugg].sort((x, y) => level(x) - level(y));
+    if (
+      core.length >= 4 &&
+      best &&
+      best[0] === low[0] &&
+      best.at(-1) === low.at(-1) &&
+      level(best) <= 20 &&
+      (!second || level(second) >= 50) &&
+      !fallbacks.some((f) => f.find === core)
+    ) {
+      fallbacks.push({ find: core, replace: best });
     }
   }
   return { fixes, hints, fallbacks };
