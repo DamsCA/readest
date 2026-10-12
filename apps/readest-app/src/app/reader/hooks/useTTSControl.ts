@@ -377,7 +377,14 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       if (hlContents.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) return;
 
       const wordRange = anchor(doc);
-      const visibleRange = getProgress(bookKey)?.range as Range | undefined;
+      // The view's own last relocation, set synchronously on every page turn.
+      // The store's progress is committed on the next animation frame, which
+      // never comes while the screen is off: there, every spoken word looked
+      // "ahead" of the stale page and re-issued the same page turn, about three
+      // times a second (measured in a non-rendering browser, Oct 2026).
+      const visibleRange = (view.lastLocation?.range ?? getProgress(bookKey)?.range) as
+        | Range
+        | undefined;
       if (!wordRange || !visibleRange) return;
 
       try {
