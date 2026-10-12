@@ -1,6 +1,11 @@
 import { stubTranslation as _ } from '@/utils/misc';
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import { isTauriAppPlatform } from '@/services/environment';
+import {
+  getRelayUrl,
+  isAIPaused,
+  postToRelay,
+  relayError,
+  resetAIPause,
+} from '@/services/ai/relay';
 import { TranslationProvider } from '../types';
 import { googleProvider } from './google';
 
@@ -17,11 +22,6 @@ import { googleProvider } from './google';
 // Never leaves a paragraph untranslated: whatever the AI could not translate
 // (daily allocation used up, relay unreachable, a refusal) goes to Google.
 
-const getRelayUrl = () => (process.env['NEXT_PUBLIC_FISH_RELAY_URL'] || '').replace(/\/+$/, '');
-// Sent as X-Relay-Token. It ships inside the public APK: it only screens out
-// scanners; the relay's per-IP limit is what protects the account.
-const getRelayToken = () => process.env['NEXT_PUBLIC_FISH_RELAY_TOKEN'] || '';
-
 // The reader translates up to 5 paragraphs at once; a chapter prefetch can hand
 // over many more in one call.
 const CONCURRENCY = 4;
@@ -32,41 +32,18 @@ const TIMEOUT_MS = 30_000;
 const MIN_WORDS_FOR_AI = 4;
 const wordCount = (text: string) => text.trim().split(/\s+/).length;
 
-// Workers AI resets its free allocation at 00:00 UTC. Once the relay reports
-// it used up, skip the AI until then instead of paying a failed round trip per
-// paragraph before falling back.
-let pausedUntil = 0;
-const nextUtcMidnight = (now: number) => {
-  const d = new Date(now);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
-};
-
 const translateOne = async (text: string, sourceLang: string, targetLang: string) => {
-  if (Date.now() < pausedUntil) throw new Error('AI translation paused until 00:00 UTC');
-  const fetchFn = isTauriAppPlatform() ? tauriFetch : window.fetch;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetchFn(`${getRelayUrl()}/v1/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Relay-Token': getRelayToken() },
-      body: JSON.stringify({ text, source: sourceLang, target: targetLang }),
-      signal: ctrl.signal,
-    });
-    if (!response.ok) {
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (response.status === 429 && /allocation/i.test(data?.error || '')) {
-        pausedUntil = nextUtcMidnight(Date.now());
-      }
-      throw new Error(`AI translation failed (${response.status}): ${data?.error || ''}`);
-    }
-    const data = (await response.json()) as { translation?: unknown };
-    const translation = typeof data.translation === 'string' ? data.translation.trim() : '';
-    if (!translation) throw new Error('AI translation came back empty');
-    return translation;
-  } finally {
-    clearTimeout(timer);
-  }
+  if (isAIPaused()) throw new Error('AI translation paused until 00:00 UTC');
+  const response = await postToRelay(
+    '/v1/translate',
+    { text, source: sourceLang, target: targetLang },
+    TIMEOUT_MS,
+  );
+  if (!response.ok) throw await relayError(response, 'AI translation');
+  const data = (await response.json()) as { translation?: unknown };
+  const translation = typeof data.translation === 'string' ? data.translation.trim() : '';
+  if (!translation) throw new Error('AI translation came back empty');
+  return translation;
 };
 
 // The same paragraph is often asked for twice at once (the viewport observer
@@ -131,6 +108,4 @@ export const aiProvider: TranslationProvider = {
 };
 
 /** Test hook: forget a paused allocation. */
-export const resetAITranslationPause = () => {
-  pausedUntil = 0;
-};
+export const resetAITranslationPause = resetAIPause;

@@ -76,6 +76,7 @@ import { eventDispatcher } from '@/utils/event';
 import { isFontType } from '@/utils/font';
 import { getScrollGapAttr } from '@/utils/webtoon';
 import { ParagraphControl } from './paragraph';
+import AIProofreadBar from './AIProofreadBar';
 import Spinner from '@/components/Spinner';
 import KOSyncConflictResolver from './KOSyncResolver';
 import ImageViewer from './ImageViewer';
@@ -941,6 +942,7 @@ const FoliateViewer: React.FC<{
       />
       <BrightnessOverlay visible={overlayVisible} level={overlayLevel} />
       <ParagraphControl bookKey={bookKey} viewRef={viewRef} gridInsets={gridInsets} />
+      <AIProofreadBar bookKey={bookKey} viewRef={viewRef} gridInsets={gridInsets} />
       {((!docLoaded.current && loading) || viewState?.loading) && (
         <div className='absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center'>
           <Spinner loading={true} />

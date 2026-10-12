@@ -183,6 +183,51 @@ function applyReplacementSingle(
   }
 }
 
+/** Library-wide rules plus this book's, in the order the transformer merges them. */
+export const getCorrectionRules = (bookRules: ProofreadRule[] | undefined): ProofreadRule[] => [
+  ...(useSettingsStore.getState().settings?.globalViewSettings?.proofreadRules ?? []),
+  ...(bookRules ?? []),
+];
+
+/**
+ * Whether a plain, case-sensitive rule with this pattern would match `text`,
+ * exactly as the transformer matches it (word boundaries included). Lets a
+ * correction be checked before it is saved as a rule.
+ */
+export const ruleMatches = (text: string, pattern: string): boolean => {
+  const rule = { pattern, isRegex: false, caseSensitive: true } as ProofreadRule;
+  const { source, flags } = normalizePattern(pattern, false, true);
+  let regex: RegExp;
+  try {
+    regex = new RegExp(source, flags);
+  } catch {
+    return false;
+  }
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match[0].length === 0) {
+      regex.lastIndex++;
+      continue;
+    }
+    if (isValidMatch(text, match, rule)) return true;
+  }
+  return false;
+};
+
+/**
+ * Applies rules to live text nodes the way the transformer applies them to the
+ * section HTML, so a correction kept while reading shows at once without
+ * rebuilding the view (which would cut the voice off mid-sentence).
+ */
+export const applyRulesToTextNodes = (textNodes: Text[], rules: ProofreadRule[]): void => {
+  for (const rule of rules) {
+    applyReplacementMulti(textNodes, {
+      ...rule,
+      normalizedPattern: normalizePattern(rule.pattern, rule.isRegex, rule.caseSensitive !== false),
+    });
+  }
+};
+
 /**
  * Applies the book and library correction rules to one plain string: the
  * translation injected next to each paragraph. The transformer below only sees
@@ -192,12 +237,6 @@ function applyReplacementSingle(
  * Selection-scope rules are anchored to a position in the source, and TTS-only
  * rules never change displayed text, so neither applies here.
  */
-/** Library-wide rules plus this book's, in the order the transformer merges them. */
-export const getCorrectionRules = (bookRules: ProofreadRule[] | undefined): ProofreadRule[] => [
-  ...(useSettingsStore.getState().settings?.globalViewSettings?.proofreadRules ?? []),
-  ...(bookRules ?? []),
-];
-
 export const applyRulesToText = (text: string, rules: ProofreadRule[] | undefined): string => {
   if (!text || !rules?.length) return text;
   const active = rules

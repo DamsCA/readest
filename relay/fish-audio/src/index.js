@@ -148,6 +148,136 @@ async function handleTranslate(request, env) {
   }
 }
 
+// --- Relecture IA d'une page (/v1/proofread) -------------------------------
+// POST { paragraphs: string[] } -> { corrections: [{ p, find, replace }] }
+//
+// Repere les erreurs de conversion d'un EPUB (fautes de frappe, mots doubles ou
+// manquants, confusions de numerisation, cesures restees) sans toucher au
+// style. Chaque correction doit citer EXACTEMENT un passage unique de son
+// paragraphe : les autres sont ecartees ici, l'app n'applique donc que des
+// citations verifiees. Meme modele et meme allocation gratuite que la
+// traduction.
+const MAX_PROOFREAD_PARAGRAPHS = 40;
+const MAX_PROOFREAD_CHARS = 9000;
+const proofreadPrompt =
+  'You proofread one page of an ebook converted from print. Its text may contain conversion ' +
+  'errors: typos, doubled words, missing words, OCR confusions (rn/m, vv/w, l/1, 0/O), leftover ' +
+  'hyphenation ("some- thing"), stray spaces or characters, wrongly joined or split words, ' +
+  "garbled fragments. The user message is a JSON array of the page's paragraphs. Reply with " +
+  'only a JSON object {"corrections":[{"p":<paragraph index>,"find":"<exact text copied from ' +
+  'that paragraph>","replace":"<corrected text>"}]}. Fix only clear errors. A real word used ' +
+  'correctly in any variety of English is never an error: keep style, wording, British or ' +
+  'American spellings, dialect, slang, archaic forms, names, numbers and deliberate ' +
+  'punctuation (for example "whilst", "colour", "grey", "ain\'t", "Mr." stay as they are). ' +
+  'The way a character or narrator speaks is never an error either: keep nonstandard grammar ' +
+  'such as "could of", double negatives or dropped letters. Only fix what a conversion broke. ' +
+  'Make "find" the shortest exact excerpt that contains the error and occurs once in its ' +
+  'paragraph (add a neighbouring word if needed). If nothing needs fixing, reply ' +
+  '{"corrections":[]}.';
+// Modeles essayes pour la relecture (12/10/2026) ; le premier sert par defaut.
+const PROOFREAD_MODELS = [
+  TRANSLATE_MODEL,
+  '@cf/qwen/qwen3-30b-a3b-fp8',
+  '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
+];
+
+// Garde-fous sur ce que le modele propose (essais du 12/10/2026) : sur une page
+// correcte il a une fois "ajoute" une virgule deja presente ("not here" ->
+// "not here," devant ", not in front" = deux virgules). Une correction qui ne
+// change que ponctuation ou espaces ne peut donc que RETIRER (espace parasite,
+// cesure "some- thing"), et aucune ne doit creer de ponctuation doublee.
+const lettersOf = (s) => s.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+const isDeletionOf = (shorter, longer) => {
+  let i = 0;
+  for (const ch of longer) if (ch === shorter[i]) i++;
+  return i === shorter.length;
+};
+const doubledPunctuation = (s) => (s.match(/([,;:!?])\1|\s[,;:!?.]/g) || []).length;
+const plausible = (para, find, replace) => {
+  if (lettersOf(find) === lettersOf(replace) && !isDeletionOf(replace, find)) return false;
+  const fixed = para.replace(find, replace);
+  return doubledPunctuation(fixed) <= doubledPunctuation(para);
+};
+
+const parseCorrections = (raw, paragraphs) => {
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return [];
+  let data;
+  try {
+    data = JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  const list = Array.isArray(data?.corrections) ? data.corrections : [];
+  const out = [];
+  for (const c of list) {
+    const p = Number(c?.p);
+    const find = typeof c?.find === 'string' ? c.find : '';
+    const replace = typeof c?.replace === 'string' ? c.replace : '';
+    const para = Number.isInteger(p) ? paragraphs[p] : undefined;
+    if (!para || !find || find === replace) continue;
+    // Citation exacte et unique dans son paragraphe, sinon on ne sait pas ou
+    // l'appliquer (et c'est souvent que le modele a reformule).
+    const at = para.indexOf(find);
+    if (at < 0 || para.indexOf(find, at + 1) >= 0) continue;
+    if (find.length > 200 || Math.abs(replace.length - find.length) > 60) continue;
+    if (!plausible(para, find, replace)) continue;
+    out.push({ p, find, replace });
+    if (out.length >= 20) break;
+  }
+  return out;
+};
+
+async function handleProofread(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (request.method !== 'POST') return json(404, { error: 'not found' }, CORS);
+  if (!env.RELAY_TOKEN || request.headers.get('X-Relay-Token') !== env.RELAY_TOKEN) {
+    return json(403, { error: 'forbidden' }, CORS);
+  }
+  if (env.TRANSLATE_LIMITER) {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await env.TRANSLATE_LIMITER.limit({ key: ip });
+    if (!success) return json(429, { error: 'rate limited' }, CORS);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { error: 'invalid json' }, CORS);
+  }
+  const paragraphs = Array.isArray(body?.paragraphs)
+    ? body.paragraphs.map((p) => (typeof p === 'string' ? p : ''))
+    : [];
+  const total = paragraphs.reduce((n, p) => n + p.length, 0);
+  if (!paragraphs.some((p) => p.trim())) return json(400, { error: 'paragraphs required' }, CORS);
+  if (paragraphs.length > MAX_PROOFREAD_PARAGRAPHS || total > MAX_PROOFREAD_CHARS) {
+    return json(413, { error: 'page too long' }, CORS);
+  }
+  const model = PROOFREAD_MODELS.includes(body?.model) ? body.model : PROOFREAD_MODELS[0];
+  try {
+    const out = await env.AI.run(model, {
+      messages: [
+        { role: 'system', content: proofreadPrompt },
+        { role: 'user', content: JSON.stringify(paragraphs) },
+      ],
+      max_tokens: 1024,
+      // 0 : la meme page doit donner les memes propositions a chaque passage.
+      temperature: 0,
+    });
+    // Certains modeles rendent deja un objet quand leur reponse est du JSON.
+    const raw =
+      typeof out?.response === 'string' ? out.response : JSON.stringify(out?.response ?? '');
+    return json(200, { corrections: parseCorrections(raw, paragraphs), usage: out.usage ?? null }, CORS);
+  } catch (err) {
+    const message = String(err?.message || err);
+    if (/4006|neuron|allocation/i.test(message)) {
+      return json(429, { error: 'daily free allocation exhausted' }, CORS);
+    }
+    return json(502, { error: message.slice(0, 200) }, CORS);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -156,6 +286,7 @@ export default {
       return json(200, { status: 'ok', model: FREE_MODEL, keyConfigured: !!env.FISH_KEY });
     }
     if (url.pathname === '/v1/translate') return handleTranslate(request, env);
+    if (url.pathname === '/v1/proofread') return handleProofread(request, env);
     const upstreamUrl = FISH_ROUTES.get(url.pathname);
     if (request.method !== 'POST' || !upstreamUrl) {
       return json(404, { error: 'not found' });
