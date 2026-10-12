@@ -3,12 +3,14 @@ import { getRelayUrl, isAIPaused, postToRelay, relayError } from './relay';
 // AI proofreading of the page being read (relay route /v1/proofread, Workers
 // AI, Mistral Small 3.1): it spots what converting a printed book to EPUB broke
 // — typos, doubled or missing words, OCR confusions, leftover hyphenation —
-// and proposes find/replace pairs; the reader keeps or ignores them.
+// and proposes find/replace pairs; the reader keeps or ignores them. The relay
+// reads each page twice in parallel (every error, guided by the app's hints;
+// then missing words only) and merges the answers.
 //
-// Measured 12 Oct 2026: a trap page (~560 chars) came back with its 6 real
-// errors ("the the", "rnorning", "vvind", "some- thing", "al1", "room ,") and
-// one debatable change ("could of"); a clean page (~770 chars) with none,
-// twice; ~20 neurons per page either way, 3-4 s.
+// Measured 12 Oct 2026 with the local checks (utils/proofreadDetector.ts): 53
+// of 54 injected errors found on tuning pages, 34 of 36 on fresh ones, one bad
+// proposal (a missing word put back in the wrong place); ~43 neurons and 3-4 s
+// per page.
 
 export interface AICorrection {
   /** Index of the paragraph in the request. */
@@ -19,10 +21,10 @@ export interface AICorrection {
 
 // The free allocation (10,000 neurons a day) is shared with the AI
 // translation: proofreading stops at this many per UTC day and leaves the rest
-// to it (about 150-200 pages at ~20-25 neurons each).
-export const PROOFREAD_DAILY_NEURONS = 4000;
+// to it (about 140 pages at ~43 neurons each).
+export const PROOFREAD_DAILY_NEURONS = 6000;
 // Used when the relay does not report usage, so the budget still moves.
-const FALLBACK_NEURONS_PER_PAGE = 25;
+const FALLBACK_NEURONS_PER_PAGE = 45;
 const TIMEOUT_MS = 30_000;
 
 const NEURONS_KEY_PREFIX = 'ai-proofread-neurons:';
@@ -54,8 +56,12 @@ const addNeurons = (neurons: number, now = Date.now()) => {
 export const canProofread = () =>
   !!getRelayUrl() && !isAIPaused() && neuronsUsedToday() < PROOFREAD_DAILY_NEURONS;
 
-export const requestProofread = async (paragraphs: string[]): Promise<AICorrection[]> => {
-  const response = await postToRelay('/v1/proofread', { paragraphs }, TIMEOUT_MS);
+/** `hints` are the local checks' suspicious spots, each examined by the AI. */
+export const requestProofread = async (
+  paragraphs: string[],
+  hints: string[] = [],
+): Promise<AICorrection[]> => {
+  const response = await postToRelay('/v1/proofread', { paragraphs, hints }, TIMEOUT_MS);
   if (!response.ok) throw await relayError(response, 'AI proofreading');
   const data = (await response.json()) as {
     corrections?: unknown;

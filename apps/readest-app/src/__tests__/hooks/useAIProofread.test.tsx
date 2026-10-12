@@ -16,11 +16,23 @@ const addRule = vi.fn(async () => ({}));
 vi.mock('@/store/proofreadStore', () => ({
   useProofreadStore: (select: (s: { addRule: typeof addRule }) => unknown) => select({ addRule }),
 }));
+const loadWords = vi.fn();
+vi.mock('@/utils/proofreadDetector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/proofreadDetector')>()),
+  loadEnglishWords: () => loadWords(),
+}));
 
-import { useAIProofread } from '@/app/reader/hooks/useAIProofread';
+import { proposalKey, useAIProofread } from '@/app/reader/hooks/useAIProofread';
+import { loadParagraphStates } from '@/services/ai/proofread';
 import { resetAIPause } from '@/services/ai/relay';
 import { paragraphText } from '@/utils/aiProofreadDom';
+import { parseWordList } from '@/utils/proofreadDetector';
 import type { FoliateView } from '@/types/view';
+
+// Just the words of the pages below.
+const WORDS = parseWordList(
+  `#10\n${'tom picked up the phone but his hands were shaking morning was cold and wind blew hard'.replace(/ /g, '\n')}`,
+);
 
 const memoryStorage = (): Storage => {
   const data = new Map<string, string>();
@@ -42,11 +54,13 @@ const answer = (body: object) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-const setUpPage = () => {
-  document.body.innerHTML = `
+const setUpPage = (
+  html = `
     <p id="a">Tom picked up the
       the phone, but his hands were shaking.</p>
-    <p id="b">The morning was cold and the vvind blew hard.</p>`;
+    <p id="b">The morning was cold and the vvind blew hard.</p>`,
+) => {
+  document.body.innerHTML = html;
   const range = document.createRange();
   range.selectNodeContents(document.body);
   return {
@@ -68,6 +82,9 @@ describe('useAIProofread', () => {
     addRule.mockClear();
     resetAIPause();
     location = 'page-1';
+    // The AI on its own unless a test brings the word list.
+    loadWords.mockReset();
+    loadWords.mockRejectedValue(new Error('no word list'));
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -170,5 +187,81 @@ describe('useAIProofread', () => {
     await act(() => vi.advanceTimersByTimeAsync(3000));
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.current.proposals).toEqual([]);
+  });
+
+  const LOCAL_PAGE = `
+    <p id="a">Tom picked up phone, but his hands were shaking.</p>
+    <p id="b">The rnorning was cold and the blorvik blew hard.</p>`;
+
+  it('adds the local checks: sure fixes proposed, unknown words pointed out to the AI', async () => {
+    loadWords.mockResolvedValue(WORDS);
+    const viewRef = setUpPage(LOCAL_PAGE);
+    mockFetch.mockResolvedValueOnce(
+      answer({
+        corrections: [{ p: 0, find: 'up phone', replace: 'up the phone' }],
+        usage: { neurons: 40 },
+      }),
+    );
+    const { result } = renderHook(() => useAIProofread(BOOK, viewRef));
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+
+    const body = JSON.parse(String((mockFetch.mock.calls[0]![1] as RequestInit).body));
+    expect(body.hints).toEqual(['"blorvik" is not an English word']);
+    expect(result.current.proposals.map(({ find, replace }) => ({ find, replace }))).toEqual([
+      { find: 'up phone', replace: 'up the phone' },
+      { find: 'rnorning', replace: 'morning' },
+    ]);
+  });
+
+  it('still proposes the sure fixes without the AI, and has the AI read the page later', async () => {
+    loadWords.mockResolvedValue(WORDS);
+    const viewRef = setUpPage(LOCAL_PAGE);
+    const today = `ai-proofread-neurons:${new Date().toISOString().slice(0, 10)}`;
+    localStorage.setItem(today, '999999');
+    const { result, rerender } = renderHook(() => useAIProofread(BOOK, viewRef));
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result.current.proposals.map((p) => p.find)).toEqual(['rnorning']);
+    // Not recorded as checked: the AI has not read it yet.
+    expect(loadParagraphStates('book1')).toEqual({});
+
+    localStorage.removeItem(today);
+    mockFetch.mockResolvedValueOnce(answer({ corrections: [], usage: { neurons: 40 } }));
+    location = 'page-2';
+    rerender();
+    location = 'page-1';
+    rerender();
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.current.proposals.map((p) => p.find)).toEqual(['rnorning']);
+  });
+
+  it('keeps all but the corrections the reader left out', async () => {
+    const viewRef = setUpPage();
+    mockFetch.mockResolvedValueOnce(
+      answer({
+        corrections: [
+          { p: 0, find: 'the the phone', replace: 'the phone' },
+          { p: 1, find: 'vvind', replace: 'wind' },
+        ],
+        usage: { neurons: 20 },
+      }),
+    );
+    const { result } = renderHook(() => useAIProofread(BOOK, viewRef));
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+
+    const [first] = result.current.proposals;
+    await act(() => result.current.keep(new Set([proposalKey(first!)])));
+
+    expect(paragraphText(document.getElementById('a')!)).toBe(
+      'Tom picked up the the phone, but his hands were shaking.',
+    );
+    expect(paragraphText(document.getElementById('b')!)).toBe(
+      'The morning was cold and the wind blew hard.',
+    );
+    expect(addRule).toHaveBeenCalledTimes(1);
+    // Both are settled: the one left out is not proposed again.
+    expect(Object.values(loadParagraphStates('book1'))).not.toContainEqual(expect.any(Array));
   });
 });

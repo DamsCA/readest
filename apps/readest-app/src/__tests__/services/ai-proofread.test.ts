@@ -61,13 +61,17 @@ describe('AI proofreading client', () => {
       }),
     );
 
-    const out = await requestProofread(['He picked up the the phone.', 'Fine text here.']);
+    const out = await requestProofread(
+      ['He picked up the the phone.', 'Fine text here.'],
+      ['"tpyo" is not an English word'],
+    );
 
     expect(out).toEqual([{ p: 0, find: 'the the', replace: 'the' }]);
     const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('https://relay.test/v1/proofread');
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({
       paragraphs: ['He picked up the the phone.', 'Fine text here.'],
+      hints: ['"tpyo" is not an English word'],
     });
     expect(neuronsUsedToday()).toBeCloseTo(19.9, 5);
   });

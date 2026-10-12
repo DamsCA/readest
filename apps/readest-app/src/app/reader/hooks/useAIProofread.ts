@@ -4,6 +4,7 @@ import { useBookProgress } from '@/store/readerProgressStore';
 import { useProofreadStore } from '@/store/proofreadStore';
 import { FoliateView } from '@/types/view';
 import {
+  AICorrection,
   PendingCorrection,
   canProofread,
   isProofreadOff,
@@ -18,7 +19,15 @@ import {
   hashParagraph,
   locateInNodes,
   paragraphText,
+  sourceTextNodes,
 } from '@/utils/aiProofreadDom';
+import {
+  WordLevels,
+  checkPage,
+  collectNames,
+  combineCorrections,
+  loadEnglishWords,
+} from '@/utils/proofreadDetector';
 
 // Proofread a page once the reader has stayed on it this long: pages skimmed
 // past (or turned by the voice in quick succession) are not paid for.
@@ -29,6 +38,29 @@ export interface ProofreadProposal extends PendingCorrection {
   hash: string;
   el: HTMLElement;
 }
+
+export const proposalKey = (p: ProofreadProposal) => `${p.hash}\u0000${p.find}\u0000${p.replace}`;
+
+// The book's characters and places, from the loaded sections' own text: a name
+// is not a typo, and a misread name is put right from its correct spelling.
+const namesByDoc = new WeakMap<Document, Set<string>>();
+const bookNames = (view: FoliateView, words: WordLevels): Set<string> => {
+  const names = new Set<string>();
+  for (const { doc } of view.renderer.getContents()) {
+    if (!doc?.body) continue;
+    let found = namesByDoc.get(doc);
+    if (!found) {
+      const text = sourceTextNodes(doc.body)
+        .map((n) => n.data)
+        .join(' ')
+        .replace(/\s+/g, ' ');
+      found = collectNames([text], words);
+      namesByDoc.set(doc, found);
+    }
+    found.forEach((name) => names.add(name));
+  }
+  return names;
+};
 
 /**
  * Automatic AI proofreading of the page being read. Proposes corrections for
@@ -70,28 +102,46 @@ export function useAIProofread(bookKey: string, viewRef: RefObject<FoliateView |
         return state === undefined;
       });
 
-      if (fresh.length && !inFlightRef.current && canProofread()) {
+      if (fresh.length && !inFlightRef.current) {
         inFlightRef.current = true;
         try {
-          const corrections = await requestProofread(fresh.map((p) => p.text));
-          const byParagraph = new Map<number, PendingCorrection[]>();
-          for (const c of corrections) {
-            const para = fresh[c.p];
-            // Only what can be placed in the book's own text is ever proposed.
-            const find = para ? locateInNodes(para.nodes, c.find) : null;
-            if (!find || find === c.replace) continue;
-            byParagraph.set(c.p, [...(byParagraph.get(c.p) ?? []), { find, replace: c.replace }]);
+          const texts = fresh.map((p) => p.text);
+          // Local checks first: sure fixes, and every unknown word or mechanical
+          // slip pointed out to the AI, which alone missed nearly half of them.
+          const words = await loadEnglishWords().catch((err) => {
+            console.warn('English word list unavailable:', err);
+            return null;
+          });
+          const view = viewRef.current;
+          const local = words && view ? checkPage(texts, words, bookNames(view, words)) : [];
+          let ai: AICorrection[] | null = null;
+          if (canProofread()) {
+            try {
+              ai = await requestProofread(
+                texts,
+                local.flatMap((l) => l.hints),
+              );
+            } catch (err) {
+              console.warn('AI proofreading failed:', err);
+            }
           }
+          const combined = combineCorrections(texts, local, ai ?? []);
           // Re-read: another page may have saved its own results meanwhile.
           const latest = loadParagraphStates(bookHash);
           fresh.forEach((para, i) => {
-            const list = byParagraph.get(i);
-            latest[para.hash] = list ?? 'clean';
-            if (list) found.push(...list.map((c) => ({ ...c, hash: para.hash, el: para.el })));
+            const list: PendingCorrection[] = [];
+            for (const c of combined[i] ?? []) {
+              // Only what can be placed in the book's own text is ever proposed.
+              const find = locateInNodes(para.nodes, c.find);
+              if (!find || find === c.replace || list.some((l) => l.find === find)) continue;
+              list.push({ find, replace: c.replace });
+            }
+            // Without the AI's answer the paragraph stays unchecked: it is read
+            // again once the AI is back (daily allocation, network).
+            if (ai) latest[para.hash] = list.length ? list : 'clean';
+            found.push(...list.map((c) => ({ ...c, hash: para.hash, el: para.el })));
           });
-          saveParagraphStates(bookHash, latest);
-        } catch (err) {
-          console.warn('AI proofreading failed:', err);
+          if (ai) saveParagraphStates(bookHash, latest);
         } finally {
           inFlightRef.current = false;
         }
@@ -116,31 +166,36 @@ export function useAIProofread(bookKey: string, viewRef: RefObject<FoliateView |
     [bookHash],
   );
 
-  const keep = useCallback(async () => {
-    const handled = proposals;
-    setProposals([]);
-    const unique = [...new Map(handled.map((p) => [`${p.find}\u0000${p.replace}`, p])).values()];
-    const docs = (viewRef.current?.renderer.getContents() ?? [])
-      .map((c) => c.doc)
-      .filter((d): d is Document => !!d);
-    // Visible at once; the rules make it last (every later render applies them).
-    applyCorrectionsToDocs(docs, unique);
-    settle(handled);
-    for (const c of unique) {
-      try {
-        await addRule(envConfig, bookKey, {
-          scope: 'book',
-          pattern: c.find,
-          replacement: c.replace,
-          isRegex: false,
-          caseSensitive: true,
-          wholeWord: false,
-        });
-      } catch (err) {
-        console.warn('Could not save AI correction:', err);
+  /** Keeps the proposals but those the reader left out (by `proposalKey`). */
+  const keep = useCallback(
+    async (leftOut: ReadonlySet<string> = new Set()) => {
+      const handled = proposals;
+      setProposals([]);
+      const kept = handled.filter((p) => !leftOut.has(proposalKey(p)));
+      const unique = [...new Map(kept.map((p) => [`${p.find}\u0000${p.replace}`, p])).values()];
+      const docs = (viewRef.current?.renderer.getContents() ?? [])
+        .map((c) => c.doc)
+        .filter((d): d is Document => !!d);
+      // Visible at once; the rules make it last (every later render applies them).
+      applyCorrectionsToDocs(docs, unique);
+      settle(handled);
+      for (const c of unique) {
+        try {
+          await addRule(envConfig, bookKey, {
+            scope: 'book',
+            pattern: c.find,
+            replacement: c.replace,
+            isRegex: false,
+            caseSensitive: true,
+            wholeWord: false,
+          });
+        } catch (err) {
+          console.warn('Could not save AI correction:', err);
+        }
       }
-    }
-  }, [proposals, viewRef, settle, addRule, envConfig, bookKey]);
+    },
+    [proposals, viewRef, settle, addRule, envConfig, bookKey],
+  );
 
   const ignore = useCallback(() => {
     settle(proposals);

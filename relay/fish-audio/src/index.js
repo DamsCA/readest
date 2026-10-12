@@ -67,7 +67,9 @@ const LANG_NAMES = {
   ar: 'Arabic',
 };
 const langName = (code) => {
-  const short = String(code || '').toLowerCase().split(/[-_]/)[0];
+  const short = String(code || '')
+    .toLowerCase()
+    .split(/[-_]/)[0];
   if (!short || short === 'auto') return '';
   return LANG_NAMES[short] || short;
 };
@@ -171,14 +173,35 @@ const proofreadPrompt =
   'punctuation (for example "whilst", "colour", "grey", "ain\'t", "Mr." stay as they are). ' +
   'The way a character or narrator speaks is never an error either: keep nonstandard grammar ' +
   'such as "could of", double negatives or dropped letters. Only fix what a conversion broke. ' +
+  'Also catch a real word that a conversion swapped for another and that does not fit its ' +
+  'sentence (e.g. "a small, tried smile" for "tired", "came form the sea" for "from"). ' +
   'Make "find" the shortest exact excerpt that contains the error and occurs once in its ' +
-  'paragraph (add a neighbouring word if needed). If nothing needs fixing, reply ' +
+  'paragraph (add a neighbouring word if needed). Read every sentence word by word for a ' +
+  'missing small word (article, preposition, auxiliary verb): for a gap, quote the words on ' +
+  'both sides in "find" and give them with the missing word inserted in "replace" (e.g. ' +
+  '"find":"opened envelope","replace":"opened the envelope"). If nothing needs fixing, reply ' +
   '{"corrections":[]}.';
+// Passe dediee aux mots manquants (task "missing") : melee aux autres fautes,
+// l'IA en ratait 3 sur 4 sur le banc d'essai ; seule a chercher, elle lit
+// chaque phrase pour ce seul defaut.
+const missingWordsPrompt =
+  'You check one page of an ebook converted from print for MISSING WORDS only: a small word ' +
+  '(article, preposition, auxiliary or linking verb, pronoun) that the conversion dropped, ' +
+  'leaving a sentence ungrammatical. Read each sentence word by word. The user message is a ' +
+  "JSON array of the page's paragraphs. Reply with only a JSON object " +
+  '{"corrections":[{"p":<paragraph index>,"find":"<the words on both sides of the gap, copied ' +
+  'exactly>","replace":"<the same words with the missing word inserted>"}]}, for example ' +
+  '{"p":0,"find":"opened envelope","replace":"opened the envelope"}. Report only sentences ' +
+  "that are clearly broken; style, dialect and characters' speech are never errors. If no " +
+  'word is missing, reply {"corrections":[]}.';
+const PROOFREAD_PROMPTS = { all: proofreadPrompt, missing: missingWordsPrompt };
 // Modeles essayes pour la relecture (12/10/2026) ; le premier sert par defaut.
 const PROOFREAD_MODELS = [
   TRANSLATE_MODEL,
   '@cf/qwen/qwen3-30b-a3b-fp8',
   '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/openai/gpt-oss-120b',
 ];
 
 // Garde-fous sur ce que le modele propose (essais du 12/10/2026) : sur une page
@@ -186,6 +209,25 @@ const PROOFREAD_MODELS = [
 // "not here," devant ", not in front" = deux virgules). Une correction qui ne
 // change que ponctuation ou espaces ne peut donc que RETIRER (espace parasite,
 // cesure "some- thing"), et aucune ne doit creer de ponctuation doublee.
+// Passe "mots manquants" : une correction n'y insere qu'UN mot. Sinon c'est du
+// style ("Most were" -> "Most of them were", vu sur le banc d'essai).
+const wordsOf = (s) => s.split(/\s+/).filter(Boolean);
+const insertsOneWord = (find, replace) => {
+  const a = wordsOf(find);
+  const b = wordsOf(replace);
+  if (b.length !== a.length + 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  const added = b[i];
+  const doubles = (w) => w !== undefined && w.toLowerCase() === added.toLowerCase();
+  // "of paper" -> "of of paper" n'insere qu'un mot... en doublant son voisin.
+  if (doubles(b[i - 1]) || doubles(b[i + 1])) return false;
+  // "was the small" -> "was a the small" : deux determinants d'affilee.
+  const DETERMINERS = /^(a|an|the|this|that|these|those|my|his|her|its|our|your|their)$/i;
+  if (DETERMINERS.test(added) && DETERMINERS.test(b[i + 1] ?? '')) return false;
+  return /^[\p{L}']+$/u.test(added) && a.slice(i).every((w, k) => w === b[i + 1 + k]);
+};
+
 const lettersOf = (s) => s.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
 const isDeletionOf = (shorter, longer) => {
   let i = 0;
@@ -193,13 +235,35 @@ const isDeletionOf = (shorter, longer) => {
   return i === shorter.length;
 };
 const doubledPunctuation = (s) => (s.match(/([,;:!?])\1|\s[,;:!?.]/g) || []).length;
+const doubledWords = (s) => (s.match(/(?<!\p{L})(\p{L}+)\s+\1(?!\p{L})/giu) || []).length;
+const onlySpacesAdded = (find, replace) =>
+  replace.replace(/\s+/g, '') === find.replace(/\s+/g, '') && replace.length > find.length;
 const plausible = (para, find, replace) => {
-  if (lettersOf(find) === lettersOf(replace) && !isDeletionOf(replace, find)) return false;
+  if (
+    lettersOf(find) === lettersOf(replace) &&
+    !isDeletionOf(replace, find) &&
+    !onlySpacesAdded(find, replace)
+  ) {
+    return false;
+  }
+  // Ajouter des mots, c'est inserer UN mot manquant ou couper deux mots colles ;
+  // le reste est du style ("God rest him" -> "God rest his soul", vu au banc).
+  if (
+    wordsOf(replace).length > wordsOf(find).length &&
+    !insertsOneWord(find, replace) &&
+    !onlySpacesAdded(find, replace)
+  ) {
+    return false;
+  }
   const fixed = para.replace(find, replace);
-  return doubledPunctuation(fixed) <= doubledPunctuation(para);
+  // Ni ponctuation doublee, ni mot double ("of of paper", vu sur le banc d'essai).
+  return (
+    doubledPunctuation(fixed) <= doubledPunctuation(para) &&
+    doubledWords(fixed) <= doubledWords(para)
+  );
 };
 
-const parseCorrections = (raw, paragraphs) => {
+const parseCorrections = (raw, paragraphs, onlyInsertions = false) => {
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
   if (start < 0 || end <= start) return [];
@@ -223,6 +287,7 @@ const parseCorrections = (raw, paragraphs) => {
     if (at < 0 || para.indexOf(find, at + 1) >= 0) continue;
     if (find.length > 200 || Math.abs(replace.length - find.length) > 60) continue;
     if (!plausible(para, find, replace)) continue;
+    if (onlyInsertions && !insertsOneWord(find, replace)) continue;
     out.push({ p, find, replace });
     if (out.length >= 20) break;
   }
@@ -255,11 +320,27 @@ async function handleProofread(request, env) {
     return json(413, { error: 'page too long' }, CORS);
   }
   const model = PROOFREAD_MODELS.includes(body?.model) ? body.model : PROOFREAD_MODELS[0];
-  try {
+  // 'full' (l'app) = passe generale avec indices + passe dediee aux mots
+  // manquants, en parallele, fusionnees ; 'all' et 'missing' servent aux essais.
+  const task = ['all', 'missing'].includes(body?.task) ? body.task : 'full';
+  // Indices de l'app (dictionnaire + detecteurs) : chaque mot inconnu ou
+  // anomalie mecanique de la page, a examiner un par un. Lu "a l'oeil", le
+  // modele seul ratait pres de la moitie des fautes du banc d'essai (29/54).
+  const hints = Array.isArray(body?.hints)
+    ? body.hints.filter((h) => typeof h === 'string' && h.trim()).slice(0, 60)
+    : [];
+  const userContent =
+    JSON.stringify(paragraphs) +
+    (hints.length
+      ? '\n\nA spell checker flagged these spots. Examine every one and fix it, unless it is ' +
+        'a name or a correct rare word:\n' +
+        hints.map((h) => `- ${h.slice(0, 200)}`).join('\n')
+      : '');
+  const pass = async (kind) => {
     const out = await env.AI.run(model, {
       messages: [
-        { role: 'system', content: proofreadPrompt },
-        { role: 'user', content: JSON.stringify(paragraphs) },
+        { role: 'system', content: PROOFREAD_PROMPTS[kind] },
+        { role: 'user', content: kind === 'all' ? userContent : JSON.stringify(paragraphs) },
       ],
       max_tokens: 1024,
       // 0 : la meme page doit donner les memes propositions a chaque passage.
@@ -268,7 +349,24 @@ async function handleProofread(request, env) {
     // Certains modeles rendent deja un objet quand leur reponse est du JSON.
     const raw =
       typeof out?.response === 'string' ? out.response : JSON.stringify(out?.response ?? '');
-    return json(200, { corrections: parseCorrections(raw, paragraphs), usage: out.usage ?? null }, CORS);
+    return { corrections: parseCorrections(raw, paragraphs, kind === 'missing'), usage: out.usage };
+  };
+  try {
+    const kinds = task === 'full' ? ['all', 'missing'] : [task];
+    const results = await Promise.all(kinds.map(pass));
+    // Fusion : la passe generale d'abord ; une correction qui touche un endroit
+    // deja corrige est ecartee (deux insertions au meme endroit doublaient un mot).
+    const corrections = [];
+    const taken = [];
+    for (const c of results.flatMap((r) => r.corrections)) {
+      const at = paragraphs[c.p].indexOf(c.find);
+      const span = [c.p, at, at + c.find.length];
+      if (taken.some(([p, a, b]) => p === span[0] && span[1] < b && a < span[2])) continue;
+      taken.push(span);
+      corrections.push(c);
+    }
+    const neurons = results.reduce((n, r) => n + (Number(r.usage?.neurons) || 0), 0);
+    return json(200, { corrections, usage: { neurons } }, CORS);
   } catch (err) {
     const message = String(err?.message || err);
     if (/4006|neuron|allocation/i.test(message)) {
