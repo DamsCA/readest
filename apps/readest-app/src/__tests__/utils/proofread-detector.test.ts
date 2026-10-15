@@ -58,6 +58,26 @@ describe('detectParagraph', () => {
     ]);
   });
 
+  // Missed on the bench, 15 Oct 2026: a contraction had no frequency, and a
+  // rare word ("wite", "cony") made a typo pass as its derivation.
+  it('reads a contraction as its stem and a typo as no derivation', () => {
+    expect(fixesOf('‘Y0u’re late again,’ said Mrs Hartley.')).toEqual([
+      { find: 'Y0u’re', replace: 'You’re' },
+    ]);
+    expect(fixesOf('the Energy that conies from your Inner Being')).toEqual([
+      { find: 'conies', replace: 'comes' },
+    ]);
+    const { hints } = detectParagraph(
+      'She felt that he was witing for her to speak.',
+      words,
+      names,
+    );
+    expect(hints.join(' ')).toContain('"witing"');
+    expect(
+      detectParagraph('The siting of the new school was debated.', words, names).hints,
+    ).toEqual([]);
+  });
+
   it('fixes mechanical slips: spacing, line-end hyphens, doubled small words', () => {
     expect(fixesOf('He sat in the room , waiting for the end.The door opened.')).toEqual([
       { find: 'room ,', replace: 'room,' },

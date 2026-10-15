@@ -219,12 +219,15 @@ export const isDerivedWord = (word: string, words: WordLevels, depth = 0): boole
     const stem = w.slice(0, -ending.length);
     if (stem.length < 3) continue;
     // A short stem ending consonant-vowel-consonant doubles its consonant
-    // before a vowel ("wit" -> "witting"): "witing" is a typo, not a word.
+    // before a vowel ("wit" -> "witting"): "witing" is a typo, not a word. With
+    // an "e" restored the stem must be a common word ("siting" from "site"):
+    // the list's rarest words made "witing" pass as "wite" + "ing".
     const doubles =
       /^[aeiouy]/.test(ending) &&
       stem.length <= 4 &&
       /[^aeiou][aeiou][b-df-hj-np-tv-z]$/.test(stem);
-    if (restores.some((r) => !(r === '' && doubles) && knownPart(stem + r))) return true;
+    const restored = (r: string) => !doubles || (r !== '' && (words.get(stem + r) ?? 99) <= 50);
+    if (restores.some((r) => restored(r) && knownPart(stem + r))) return true;
     // "running", "stopped": a doubled final consonant.
     if (/([b-df-hj-np-tv-z])\1$/.test(stem) && words.has(stem.slice(0, -1))) return true;
   }
@@ -275,6 +278,19 @@ const ocrNearNames = (token: string, names: Set<string>): string[] =>
     ocrVariants(token, [...OCR_SUBS, ['b', 'h']]).some((v) => v === name),
   );
 
+/** How common a word is (10: most), a contraction as its stem ("you're" as "you"). */
+const wordLevel = (word: string, words: WordLevels): number => {
+  const w = word.toLowerCase().replace(/’/g, "'");
+  const direct = words.get(w);
+  if (direct !== undefined) return direct;
+  for (const suffix of SUFFIXES) {
+    if (suffix === "'" || !w.endsWith(suffix)) continue;
+    const stem = words.get(w.slice(0, -suffix.length));
+    if (stem !== undefined) return stem;
+  }
+  return 99;
+};
+
 /**
  * Words one edit from `w`, likeliest first: two letters swapped, then a letter
  * lost, then the rest; among equals, the most common word.
@@ -315,8 +331,7 @@ export const detectParagraph = (
   const fallbacks: PendingCorrection[] = [];
   const spans: [number, number][] = [];
   const known = (w: string) => isKnownWord(w, words);
-  // The list spells contractions with a straight apostrophe ("you're").
-  const level = (w: string) => words.get(w.toLowerCase().replace(/’/g, "'")) ?? 99;
+  const level = (w: string) => wordLevel(w, words);
   const hint = (h: string) => {
     if (!hints.includes(h)) hints.push(h);
   };
@@ -374,6 +389,8 @@ export const detectParagraph = (
         continue;
       }
     }
+    // A real word is never questioned, even one scanning confusion from a
+    // commoner one: on his books "clay" (a sculptor's) was no "day" (15 Oct 2026).
     if (known(core) || NUMBER_LIKE.test(core) || ROMAN.test(core)) continue;
     // Foreign words: the English list says nothing useful about them.
     if (/[^\x00-\x7F]/.test(withoutStray(core).replace(/’/g, "'"))) continue;
@@ -400,6 +417,9 @@ export const detectParagraph = (
       // A name, almost always: only a scanning confusion is put right, toward
       // the book's own spelling, or toward a common word where a sentence
       // starts ("Tlie" -> "The"; mid-sentence, "Bear Stearns" is no "Steams").
+      // A letter lost or swapped in a name ("Thoas" for "Thomas") is left alone:
+      // on his books nearly every such pair was two real names or a plural
+      // ("Anne"/"Annie", "Fred"/"Freud", "Fridays"/"Friday"; 15 Oct 2026).
       const bare = core.replace(/['’]s$/, '');
       if (names.has(bare) || (!OCR_SUSPECT.test(bare.toLowerCase()) && !/b/.test(bare))) continue;
       let j = start - 1;
