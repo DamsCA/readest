@@ -19,8 +19,15 @@ vi.mock('@/hooks/useTranslation', () => ({
 import AIProofreadBar from '@/app/reader/components/AIProofreadBar';
 import { proposalKey } from '@/app/reader/hooks/useAIProofread';
 
-const el = document.createElement('p');
-const proposal = (find: string, replace: string): ProofreadProposal => ({
+const paragraph = (text: string) => {
+  const el = document.createElement('p');
+  el.textContent = text;
+  return el;
+};
+const PAGE = paragraph(
+  'It was a cold rnorning in March. He hung his his coat on the peg by the door and sat down.',
+);
+const proposal = (find: string, replace: string, el = PAGE): ProofreadProposal => ({
   find,
   replace,
   hash: 'h1',
@@ -36,6 +43,8 @@ const renderBar = () =>
     />,
   );
 
+const boxFor = (text: string) => screen.getByText(text).closest('[role="checkbox"]')!;
+
 describe('AIProofreadBar', () => {
   beforeEach(() => {
     keep.mockReset();
@@ -43,33 +52,68 @@ describe('AIProofreadBar', () => {
   });
   afterEach(() => cleanup());
 
-  it('keeps everything but the corrections tapped out', () => {
-    proposals = [proposal('rnorning', 'morning'), proposal('the peg by', 'the peg on by')];
+  // Reported 15 Oct 2026: only the struck original was shown, cut short, so a
+  // correction could not be judged. Each one now shows what it removes, what it
+  // adds and the words around it.
+  it('shows each change in full, in its sentence', () => {
+    proposals = [proposal('cold rnorning in', 'cold morning in')];
     renderBar();
 
-    fireEvent.click(screen.getByText('the peg on by'));
+    expect(screen.getByText('rnorning').tagName).toBe('DEL');
+    expect(screen.getByText('morning').tagName).toBe('INS');
+    expect(screen.getByText(/It was a/)).toBeTruthy();
+    expect(screen.getByText(/March\. He hung his/)).toBeTruthy();
+    expect(screen.getByText('Spelling')).toBeTruthy();
+  });
+
+  it('names the kind of change', () => {
+    proposals = [
+      proposal('the peg by', 'the peg on by'),
+      proposal('his his coat', 'his coat'),
+      proposal('cold rnorning in', 'cold morning in'),
+    ];
+    renderBar();
+    expect(screen.getByText('Missing word')).toBeTruthy();
+    expect(screen.getByText('Extra word')).toBeTruthy();
+    expect(screen.getByText('Spelling')).toBeTruthy();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+  });
+
+  it('keeps every ticked correction, none left out by default', () => {
+    proposals = [proposal('cold rnorning in', 'cold morning in'), proposal('peg by', 'peg on by')];
+    renderBar();
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect(box.getAttribute('aria-checked')).toBe('true');
+    }
     fireEvent.click(screen.getByText('Keep'));
+    expect(keep).toHaveBeenCalledWith(new Set());
+  });
+
+  it('leaves out the corrections unticked', () => {
+    proposals = [proposal('cold rnorning in', 'cold morning in'), proposal('peg by', 'peg on by')];
+    renderBar();
+
+    fireEvent.click(boxFor('on'));
+    expect(boxFor('on').getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByText('Keep (1)'));
 
     expect(keep).toHaveBeenCalledWith(new Set([proposalKey(proposals[1]!)]));
   });
 
-  it('cannot keep once every correction is left out', () => {
-    proposals = [proposal('rnorning', 'morning')];
+  it('cannot keep once every correction is unticked', () => {
+    proposals = [proposal('cold rnorning in', 'cold morning in')];
     renderBar();
-    fireEvent.click(screen.getByText('morning'));
-    expect(screen.getByText('Keep').closest('button')!.disabled).toBe(true);
-    // Tapped again: back in.
-    fireEvent.click(screen.getByText('morning'));
+    fireEvent.click(boxFor('morning'));
+    expect(screen.getByText('Keep (0)').closest('button')!.disabled).toBe(true);
+    // Ticked again: back in.
+    fireEvent.click(boxFor('morning'));
     expect(screen.getByText('Keep').closest('button')!.disabled).toBe(false);
   });
 
-  it('lists three corrections, the rest on demand', () => {
-    proposals = ['a1', 'b1', 'c1', 'd1', 'e1'].map((w) => proposal(w, `${w}x`));
+  it('lists every correction, however many', () => {
+    proposals = ['a1', 'b1', 'c1', 'd1', 'e1'].map((w) => proposal(w, `${w}x`, paragraph(w)));
     renderBar();
-    expect(screen.queryByText('d1x')).toBeNull();
-
-    fireEvent.click(screen.getByText('+2 more'));
-    expect(screen.getByText('d1x')).toBeTruthy();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
     expect(screen.getByText('e1x')).toBeTruthy();
   });
 });

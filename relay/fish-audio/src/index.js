@@ -266,12 +266,44 @@ const doubledPunctuation = (s) => (s.match(/([,;:!?])\1|\s[,;:!?.]/g) || []).len
 const doubledWords = (s) => (s.match(/(?<!\p{L})(\p{L}+)\s+\1(?!\p{L})/giu) || []).length;
 const onlySpacesAdded = (find, replace) =>
   replace.replace(/\s+/g, '') === find.replace(/\s+/g, '') && replace.length > find.length;
+// Trois propositions inutiles vues le 15/10 sur une page de Damien : changer
+// seulement l'ordre des mots ("who clearly were not" -> "who were clearly not"),
+// c'est du style ; ajouter un mot qui suit deja ("were not" -> "were not
+// bringing" devant ", for the most part, bringing them"), c'est prendre une
+// incise pour un trou ; et "that" ("you found that satisfaction") est
+// facultatif en anglais.
+const plainWord = (w) => w.toLowerCase().replace(/[^\p{L}']/gu, '');
+const reordersOnly = (find, replace) => {
+  const a = wordsOf(find).map(plainWord);
+  const b = wordsOf(replace).map(plainWord);
+  return a.join(' ') !== b.join(' ') && [...a].sort().join(' ') === [...b].sort().join(' ');
+};
+const addedWord = (find, replace) => {
+  const a = wordsOf(find);
+  const b = wordsOf(replace);
+  if (b.length !== a.length + 1) return '';
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  // "that.What" -> "that. What" coupe deux mots colles, n'ajoute rien.
+  if (!a.slice(i).every((w, k) => w === b[i + 1 + k])) return '';
+  return plainWord(b[i] ?? '');
+};
+const addsWordAlreadyNext = (para, find, replace) => {
+  const added = addedWord(find, replace);
+  if (added.length < 4) return false;
+  const after = para.slice(para.indexOf(find) + find.length);
+  return wordsOf(after).slice(0, 8).map(plainWord).includes(added);
+};
 const plausible = (para, find, replace) => {
   if (
     lettersOf(find) === lettersOf(replace) &&
     !isDeletionOf(replace, find) &&
     !onlySpacesAdded(find, replace)
   ) {
+    return false;
+  }
+  if (reordersOnly(find, replace)) return false;
+  if (addedWord(find, replace) === 'that' || addsWordAlreadyNext(para, find, replace)) {
     return false;
   }
   // Ajouter des mots, c'est inserer UN mot manquant ou couper deux mots colles ;
