@@ -31,11 +31,24 @@ const FISH_AUDIO_CACHE_MAX = 128;
 
 // Default reading voice: "Claire" — soft / deep / intimate / breathy / gentle.
 // Chosen by the user as a warm, sensual, hypnotic French narration voice.
+// English is read by a native English voice: Claire's French accent is a bad
+// model for someone learning how English words sound (asked 15 Oct 2026). The
+// most used female narration voices of the public Fish Audio library; the
+// first one is the default for English, the TTS panel picks another.
 const FISH_AUDIO_VOICES: TTSVoice[] = [
   {
     id: 'da05ae30d8c0428eb47498df524e448c',
     name: 'Claire (Fish Audio)',
     lang: 'fr-FR',
+  },
+  { id: '933563129e564b19a115bedd57b7406a', name: 'Sarah (Fish Audio)', lang: 'en-US' },
+  { id: 'b347db033a6549378b48d00acb0d06cd', name: 'Selene (Fish Audio)', lang: 'en-US' },
+  { id: 'e3cd384158934cc9a01029cd7d278634', name: 'Laura (Fish Audio)', lang: 'en-US' },
+  { id: 'f6a19fe5ab494e1fa51bb1476d583a44', name: 'Abby (Fish Audio)', lang: 'en-US' },
+  {
+    id: '8906b5268cae414fb9b8d3da6e84413d',
+    name: 'Measured Storyteller (Fish Audio)',
+    lang: 'en-US',
   },
 ];
 const FISH_AUDIO_DEFAULT_VOICE_ID = FISH_AUDIO_VOICES[0]!.id;
@@ -46,8 +59,7 @@ const getApiKey = () => process.env['NEXT_PUBLIC_FISHAUDIO_API_KEY'] || '';
 // The fork is public, so a key compiled into the APK would be published; the
 // relay keeps it off the device, forces the free model and rate-limits per IP.
 // When set, it takes precedence over a baked-in key.
-const getFishRelayUrl = () =>
-  (process.env['NEXT_PUBLIC_FISH_RELAY_URL'] || '').replace(/\/+$/, '');
+const getFishRelayUrl = () => (process.env['NEXT_PUBLIC_FISH_RELAY_URL'] || '').replace(/\/+$/, '');
 // Sent as X-Relay-Token. It ships inside the public APK, so it only screens out
 // scanners — the relay's own limits are what actually protect the account.
 const getFishRelayToken = () => process.env['NEXT_PUBLIC_FISH_RELAY_TOKEN'] || '';
@@ -771,10 +783,14 @@ export class FishAudioTTSClient implements TTSClient {
     return url;
   }
 
-  getVoiceIdFromLang = (_lang: string): string => {
-    const preferredVoiceId = TTSUtils.getPreferredVoice(this.name, _lang);
+  getVoiceIdFromLang = (lang: string): string => {
+    const preferredVoiceId = TTSUtils.getPreferredVoice(this.name, lang);
     const preferredVoice = this.#voices.find((v) => v.id === preferredVoiceId);
     if (preferredVoice) return preferredVoice.id;
+    // A native voice for the language being read: in a translated book the
+    // English is read in English, the French by Claire.
+    const native = lang ? this.#voices.find((v) => isSameLang(v.lang, lang)) : undefined;
+    if (native) return native.id;
     return this.#currentVoiceId || FISH_AUDIO_DEFAULT_VOICE_ID;
   };
 
@@ -1156,17 +1172,19 @@ export class FishAudioTTSClient implements TTSClient {
   async getVoices(lang: string): Promise<TTSVoicesGroup[]> {
     const locale = lang === 'en' ? getUserLocale(lang) || lang : lang;
     const voices = await this.getAllVoices();
-    // Fish Audio currently exposes a single curated French voice (Claire). Keep
-    // it available for every book language so it can always be selected as the
-    // narration voice; the requested locale's matches still sort first.
-    const sameLang = voices.filter((v) => isSameLang(v.lang, lang));
-    const filteredVoices = sameLang.length > 0 ? sameLang : voices;
+    // Every voice stays available for every book language (Claire may still be
+    // wanted for English); the requested language's voices come first.
+    const sameLang = voices
+      .filter((v) => isSameLang(v.lang, lang))
+      .sort(TTSUtils.sortVoicesPreferLocaleFunc(locale));
+    const others = voices.filter((v) => !isSameLang(v.lang, lang));
+    const ordered = [...sameLang, ...others];
 
     const voicesGroup: TTSVoicesGroup = {
       id: 'fish-audio',
       name: 'Fish Audio',
-      voices: filteredVoices.sort(TTSUtils.sortVoicesPreferLocaleFunc(locale)),
-      disabled: !this.initialized || filteredVoices.length === 0,
+      voices: ordered,
+      disabled: !this.initialized || ordered.length === 0,
     };
 
     return [voicesGroup];
