@@ -5,6 +5,7 @@ import {
   getTranslator,
   getTranslators,
   isTranslatorAvailable,
+  resolveTranslator,
   TranslatorName,
 } from '@/services/translators';
 import { getFromCache, storeInCache, UseTranslatorOptions } from '@/services/translators';
@@ -23,8 +24,12 @@ export function useTranslator({
   const _ = useTranslation();
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState(provider);
-  const [translator, setTransltor] = useState(() => getTranslator(provider));
+  // Resolved from the first render: a provider that is not offered (DeepL next
+  // to the AI translator) must not get the first paragraphs.
+  const [selectedProvider, setSelectedProvider] = useState(
+    () => (resolveTranslator(provider, !!token)?.name ?? provider) as TranslatorName,
+  );
+  const [translator, setTransltor] = useState(() => getTranslator(selectedProvider));
   const [translators] = useState(() => getTranslators());
 
   useEffect(() => {
@@ -150,7 +155,11 @@ export function useTranslator({
             ),
             type: 'error',
           });
-          setSelectedProvider('azure');
+          // The next paragraphs go to the first provider still available. This
+          // used to be Azure, whose token endpoint answers 404 (15 Oct 2026):
+          // every paragraph after the quota then stayed untranslated.
+          const fallback = getTranslators().find((t) => isTranslatorAvailable(t, !!token));
+          if (fallback) setSelectedProvider(fallback.name as TranslatorName);
         }
         setLoading(false);
         throw err instanceof Error ? err : new Error(String(err));

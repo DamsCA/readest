@@ -37,12 +37,20 @@ const availableTranslators = [
 
 export type TranslatorName = (typeof availableTranslators)[number]['name'];
 
+// With the relay, the AI translator does what DeepL cannot do here: through
+// Readest's server a free account gets 10,240 characters of DeepL a day, a few
+// pages, after which the list said "DeepL (Quota Exceeded)" and the paragraphs
+// stayed in English (reported 15 Oct 2026). Builds without the relay keep it.
+const listedTranslators = availableTranslators.filter(
+  (t) => !(t.name === 'deepl' && !aiTranslator.disabled),
+);
+
 export const getTranslator = (name: TranslatorName): TranslationProvider | undefined => {
-  return availableTranslators.find((translator) => translator.name === name);
+  return listedTranslators.find((translator) => translator.name === name);
 };
 
 export const getTranslators = (): TranslationProvider[] => {
-  return availableTranslators;
+  return listedTranslators;
 };
 
 /**
@@ -74,7 +82,7 @@ export const resolveTranslator = (
   provider: string,
   hasToken: boolean,
 ): TranslationProvider | undefined => {
-  const available = availableTranslators.filter((t) => isTranslatorAvailable(t, hasToken));
+  const available = listedTranslators.filter((t) => isTranslatorAvailable(t, hasToken));
   return available.find((t) => t.name === provider) ?? available[0];
 };
 

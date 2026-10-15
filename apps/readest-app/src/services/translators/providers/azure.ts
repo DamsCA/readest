@@ -49,6 +49,10 @@ const getAuthToken = async (): Promise<string> => {
 export const azureProvider: TranslationProvider = {
   name: 'azure',
   label: _('Azure Translator'),
+  // Microsoft's token endpoint (edge.microsoft.com/translate/auth) answers 404
+  // (checked 15 Oct 2026), so every Azure translation fails. Re-enable by
+  // deleting this line once it hands out tokens again.
+  disabled: true,
   translate: async (text: string[], sourceLang: string, targetLang: string): Promise<string[]> => {
     if (!text.length) return [];
 
