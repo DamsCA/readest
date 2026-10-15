@@ -52,17 +52,31 @@ describe('contextAround', () => {
     expect(contextAround(text, 'cold rnorning', 2)).toEqual({
       before: 'was a',
       after: 'in March.',
+      cutBefore: true,
+      cutAfter: true,
     });
   });
 
-  it('stops at the edges of the paragraph', () => {
+  // "…beast.…" was shown where the paragraph ended (seen on the phone, 15 Oct 2026).
+  it('says where the paragraph does not go on', () => {
     expect(contextAround(text, 'It was', 5)).toEqual({
       before: '',
       after: 'a cold rnorning in March.',
+      cutBefore: false,
+      cutAfter: true,
+    });
+    expect(contextAround(text, 'on the', 5)).toMatchObject({
+      after: 'peg.',
+      cutAfter: false,
     });
   });
 
   it('gives nothing when the excerpt is not in the paragraph', () => {
-    expect(contextAround(text, 'not there')).toEqual({ before: '', after: '' });
+    expect(contextAround(text, 'not there')).toEqual({
+      before: '',
+      after: '',
+      cutBefore: false,
+      cutAfter: false,
+    });
   });
 });

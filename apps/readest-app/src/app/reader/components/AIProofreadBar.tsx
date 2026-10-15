@@ -10,12 +10,20 @@ import { ProofreadProposal, proposalKey, useAIProofread } from '../hooks/useAIPr
 /** One proposal as the reader judges it: what kind of change, in its sentence. */
 const Change: React.FC<{ proposal: ProofreadProposal; label: string }> = ({ proposal, label }) => {
   const parts = wordDiff(proposal.find, proposal.replace);
-  const { before, after } = contextAround(paragraphText(proposal.el), proposal.find);
+  const { before, after, cutBefore, cutAfter } = contextAround(
+    paragraphText(proposal.el),
+    proposal.find,
+  );
   return (
     <span className='min-w-0 flex-1'>
       <span className='block text-xs opacity-60'>{label}</span>
       <span className='block break-words leading-snug'>
-        {before && <span className='opacity-60'>…{before} </span>}
+        {before && (
+          <span className='opacity-60'>
+            {cutBefore && '…'}
+            {before}{' '}
+          </span>
+        )}
         {parts.map((part, i) => (
           <React.Fragment key={i}>
             {i > 0 && ' '}
@@ -28,7 +36,13 @@ const Change: React.FC<{ proposal: ProofreadProposal; label: string }> = ({ prop
             )}
           </React.Fragment>
         ))}
-        {after && <span className='opacity-60'> {after}…</span>}
+        {after && (
+          <span className='opacity-60'>
+            {' '}
+            {after}
+            {cutAfter && '…'}
+          </span>
+        )}
       </span>
     </span>
   );

@@ -98,14 +98,16 @@ export const getTranslatorDisplayLabel = (
   hasToken: boolean,
   _: (key: string) => string,
 ): string => {
+  // In the reader's language: the list showed "AI (natural)" in English.
+  const label = _(translator.label);
   if (translator.disabled) {
-    return `${translator.label}`;
+    return label;
   }
   if (translator.authRequired && !hasToken) {
-    return `${translator.label} (${_('Login Required')})`;
+    return `${label} (${_('Login Required')})`;
   }
   if (translator.quotaExceeded) {
-    return `${translator.label} (${_('Quota Exceeded')})`;
+    return `${label} (${_('Quota Exceeded')})`;
   }
-  return translator.label;
+  return label;
 };

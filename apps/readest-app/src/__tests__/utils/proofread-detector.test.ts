@@ -41,6 +41,10 @@ describe('isKnownWord', () => {
     for (const w of ['colour', 'color', 'whilst', 'grey', 'don’t', "dogs'", 'naïve', 'ﬁnd', 'Mr']) {
       expect(isKnownWord(w, words), w).toBe(true);
     }
+    // Their stem is no word ("ca" + "n't"): flagged on a real book, 15 Oct 2026.
+    for (const w of ['can’t', "won't", 'Can’t', 'o’clock']) {
+      expect(isKnownWord(w, words), w).toBe(true);
+    }
     expect(isKnownWord('rnorning', words)).toBe(false);
   });
 });

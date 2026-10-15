@@ -62,23 +62,29 @@ export const correctionKind = (before: string, after: string): CorrectionKind =>
   return 'changed';
 };
 
-/** A few words of the paragraph on each side of an excerpt, to read it in its sentence. */
+/**
+ * A few words of the paragraph on each side of an excerpt, to read it in its
+ * sentence; `cutBefore` / `cutAfter` say whether the paragraph goes on.
+ */
 export const contextAround = (
   paragraph: string,
   excerpt: string,
   words = 5,
-): { before: string; after: string } => {
+): { before: string; after: string; cutBefore: boolean; cutAfter: boolean } => {
   const text = paragraph.replace(/\s+/g, ' ');
   const find = excerpt.replace(/\s+/g, ' ').trim();
   const at = find ? text.indexOf(find) : -1;
-  if (at < 0) return { before: '', after: '' };
-  const before = text.slice(0, at).trim().split(' ').filter(Boolean).slice(-words).join(' ');
-  const after = text
+  if (at < 0) return { before: '', after: '', cutBefore: false, cutAfter: false };
+  const head = text.slice(0, at).trim().split(' ').filter(Boolean);
+  const tail = text
     .slice(at + find.length)
     .trim()
     .split(' ')
-    .filter(Boolean)
-    .slice(0, words)
-    .join(' ');
-  return { before, after };
+    .filter(Boolean);
+  return {
+    before: head.slice(-words).join(' '),
+    after: tail.slice(0, words).join(' '),
+    cutBefore: head.length > words,
+    cutAfter: tail.length > words,
+  };
 };

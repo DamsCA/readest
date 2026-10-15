@@ -82,12 +82,15 @@ const SAFE_DOUBLES = new Set(
 );
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 const SUFFIXES = ["'s", "'", "n't", "'ll", "'re", "'ve", "'d", "'m"];
-// Titles and abbreviations the word list leaves out.
+// Titles, abbreviations and contractions the word list leaves out.
 const ABBREVIATIONS = new Set(
   (
     'mr mrs ms dr st jr sr mt ft capt col gen lt sgt rev prof messrs mme mlle esq ' +
     'etc vs eg ie ed eds vol pp fig ch cf al op cit ibid approx dept govt inc ltd corp ' +
-    'cm mm km kg lb lbs oz'
+    'cm mm km kg lb lbs oz ' +
+    // Contractions whose stem is no word ("ca" + "n't"): "can’t" was flagged on
+    // a real book (See You at the Top, 15 Oct 2026), costing an AI call per page.
+    "can't won't shan't ain't ma'am o'clock y'all"
   ).split(' '),
 );
 // Small words a conversion glues to a neighbour ("andthe", "beenmy", "lifeyou").

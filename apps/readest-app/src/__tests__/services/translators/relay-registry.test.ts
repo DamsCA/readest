@@ -16,6 +16,7 @@ vi.mock('@/utils/supabase', () => ({
 }));
 
 import {
+  getTranslatorDisplayLabel,
   getTranslators,
   isTranslatorAvailable,
   resolveTranslator,
@@ -46,5 +47,13 @@ describe('translators with the relay', () => {
 
   it('still lets Google be chosen', () => {
     expect(resolveTranslator('google', false)?.name).toBe('google');
+  });
+
+  it("names each translator in the reader's language", () => {
+    const fr: Record<string, string> = { 'AI (natural)': 'IA (traduction naturelle)' };
+    const ai = getTranslators().find((t) => t.name === 'ai')!;
+    expect(getTranslatorDisplayLabel(ai, false, (s) => fr[s] ?? s)).toBe(
+      'IA (traduction naturelle)',
+    );
   });
 });
