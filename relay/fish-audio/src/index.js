@@ -26,6 +26,21 @@ const FISH_ROUTES = new Map([
 ]);
 const FREE_MODEL = 's2.1-pro-free';
 const DEFAULT_VOICE = 'da05ae30d8c0428eb47498df524e448c'; // "Claire"
+// Volume. Sans prosodie, Fish rend chaque voix a son niveau d'origine : mesure
+// le 15/10 (ffmpeg ebur128), de -14 LUFS (Storyteller) a -28 (Sarah, Abby),
+// Claire a -17,5 : le francais couvrait l'anglais. Avec une prosodie, Fish
+// normalise la sonie (~-22,5 LUFS) puis applique le gain, cretes limitees a
+// -0,4 dBFS. Gain par voix mesure sur 8 phrases chacune (15/10) pour viser
+// -18,5 LUFS : avec +4 dB uniforme, elles allaient de -18,5 a -19,2.
+const VOICE_GAIN_DB = {
+  da05ae30d8c0428eb47498df524e448c: 4.3, // Claire
+  '933563129e564b19a115bedd57b7406a': 4.5, // Sarah
+  b347db033a6549378b48d00acb0d06cd: 4.7, // Selene
+  e3cd384158934cc9a01029cd7d278634: 4.6, // Laura
+  f6a19fe5ab494e1fa51bb1476d583a44: 4.0, // Abby
+  '8906b5268cae414fb9b8d3da6e84413d': 4.0, // Measured Storyteller
+};
+const prosodyFor = (voice) => ({ volume: VOICE_GAIN_DB[voice] ?? 4.4, normalize_loudness: true });
 // Large enough that no real sentence is ever refused (a refusal would skip it),
 // small enough to stop someone pushing whole books through one request.
 const MAX_CHARS = 5000;
@@ -223,6 +238,51 @@ const missingWordsPrompt =
   "that are clearly broken; style, dialect and characters' speech are never errors. If no " +
   'word is missing, reply {"corrections":[]}.';
 const PROOFREAD_PROMPTS = { all: proofreadPrompt, missing: missingWordsPrompt };
+// Controle (task "verify", essais) : une seule correction, la phrase avant et
+// apres ; le modele dit seulement si l'original est fautif. La passe "mots
+// manquants" proposait surtout du style sur de vrais livres (15/10).
+const verifyPrompt =
+  'You check ONE proposed edit to a published, professionally edited book. Published text is ' +
+  'almost always right: style, rhythm, idioms, dialect, inverted questions, elliptical or ' +
+  'unusual sentences, rare words and names are deliberate. Reply with exactly one word: YES if ' +
+  'the original sentence is plainly broken without the edit (a word missing, doubled or ' +
+  'misspelled), NO otherwise.';
+const sentenceAround = (para, at, length) => {
+  let a = at;
+  while (a > 0 && !/[.!?]\s/.test(para.slice(a - 2, a))) a--;
+  let b = at + length;
+  while (b < para.length && !/[.!?]/.test(para[b - 1] ?? '')) b++;
+  return [a, Math.min(para.length, b)];
+};
+async function verifyCorrections(env, model, paragraphs, candidates, maxTokens = 4) {
+  let neurons = 0;
+  const verdicts = await Promise.all(
+    candidates.map(async (c) => {
+      const para = paragraphs[c.p];
+      const at = typeof para === 'string' ? para.indexOf(c.find) : -1;
+      if (at < 0) return false;
+      const [a, b] = sentenceAround(para, at, c.find.length);
+      const original = para.slice(a, b).trim();
+      const edited = (para.slice(a, at) + c.replace + para.slice(at + c.find.length, b)).trim();
+      // Qwen3 thinks before answering unless told not to (a tenth of the cost).
+      const noThink = /qwen3/.test(model) ? ' /no_think' : '';
+      const out = await env.AI.run(model, {
+        messages: [
+          { role: 'system', content: verifyPrompt },
+          { role: 'user', content: `Original: ${original}\nEdited: ${edited}${noThink}` },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0,
+      });
+      neurons += Number(out?.usage?.neurons) || 0;
+      // A reasoning model thinks first: its verdict is the last YES or NO.
+      const text = typeof out?.response === 'string' ? out.response : JSON.stringify(out ?? '');
+      const answers = text.match(/\b(YES|NO)\b/gi) ?? [];
+      return /^yes$/i.test(answers[answers.length - 1] ?? '');
+    }),
+  );
+  return { verdicts, neurons };
+}
 // Modeles essayes pour la relecture (12/10/2026) ; le premier sert par defaut.
 const PROOFREAD_MODELS = [
   TRANSLATE_MODEL,
@@ -393,6 +453,24 @@ async function handleProofread(request, env) {
     return json(413, { error: 'page too long' }, CORS);
   }
   const model = PROOFREAD_MODELS.includes(body?.model) ? body.model : PROOFREAD_MODELS[0];
+  if (body?.task === 'verify') {
+    const candidates = (Array.isArray(body.candidates) ? body.candidates : [])
+      .filter((c) => Number.isInteger(c?.p) && typeof c?.find === 'string' && typeof c?.replace === 'string')
+      .slice(0, 20);
+    try {
+      const maxTokens = Math.min(1024, Math.max(4, Number(body.maxTokens) || 4));
+      const { verdicts, neurons } = await verifyCorrections(
+        env,
+        model,
+        paragraphs,
+        candidates,
+        maxTokens,
+      );
+      return json(200, { verdicts, usage: { neurons } }, CORS);
+    } catch (err) {
+      return json(502, { error: String(err?.message || err).slice(0, 200) }, CORS);
+    }
+  }
   // 'full' (l'app) = passe generale bornee aux indices de l'app (voir plus bas) ;
   // 'all' (relecture libre) et 'missing' (mots manquants) servent aux essais.
   const task = ['all', 'missing'].includes(body?.task) ? body.task : 'full';
@@ -409,11 +487,15 @@ async function handleProofread(request, env) {
         'a name or a correct rare word:\n' +
         hints.map((h) => `- ${h.slice(0, 200)}`).join('\n')
       : '');
-  const pass = async (kind) => {
-    const out = await env.AI.run(model, {
+  const pass = async (kind, passModel = model) => {
+    const noThink = /qwen3/.test(passModel) ? ' /no_think' : '';
+    const out = await env.AI.run(passModel, {
       messages: [
         { role: 'system', content: PROOFREAD_PROMPTS[kind] },
-        { role: 'user', content: kind === 'all' ? userContent : JSON.stringify(paragraphs) },
+        {
+          role: 'user',
+          content: (kind === 'all' ? userContent : JSON.stringify(paragraphs)) + noThink,
+        },
       ],
       max_tokens: 1024,
       // 0 : la meme page doit donner les memes propositions a chaque passage.
@@ -424,30 +506,56 @@ async function handleProofread(request, env) {
       typeof out?.response === 'string' ? out.response : JSON.stringify(out?.response ?? '');
     return { corrections: parseCorrections(raw, paragraphs, kind === 'missing'), usage: out.usage };
   };
-  // L'IA ne corrige plus que ce que l'app a signale. Sur 32 pages de ses vrais
-  // livres (15/10), la relecture libre (passe generale + mots manquants) a fait
-  // 52 propositions dont UNE vraie faute ("may not pleasing") : le reste etait
-  // du style ou faux ("whom" -> "who", "mailbox" -> "mail box", virgules, un
-  // numero de page "13" -> "1992"). Le detecteur de l'app, lui, avait trouve 7
-  // vraies fautes sur 7 dans ces livres (12/10). Sans indice : aucun appel.
+  // Passe generale : l'IA ne corrige que ce que l'app a signale. Sur 32 pages
+  // de ses vrais livres (15/10), la relecture libre a fait 52 propositions dont
+  // UNE vraie faute ("may not pleasing") : le reste etait du style ou faux
+  // ("whom" -> "who", "mailbox" -> "mail box", virgules, "13" -> "1992").
   // "can’t", "won’t" : des mots que la liste de l'app (claire.50) ignore.
   const CONTRACTION = /^(can|won|shan|ain)['’]t$|^(o['’]clock|ma['’]am|y['’]all)$/i;
   const flagged = hints
     .map((h) => /"([^"]+)"/.exec(h)?.[1])
     .filter((t) => t && !CONTRACTION.test(t));
-  if (task === 'full' && !flagged.length) {
-    return json(200, { corrections: [], usage: { neurons: 0 } }, CORS);
-  }
-  const onFlagged = (c) =>
-    task !== 'full' || flagged.some((t) => c.find.includes(t) || t.includes(c.find));
+  const onFlagged = (c) => flagged.some((t) => c.find.includes(t) || t.includes(c.find));
+  const flaggedPass = async () => {
+    const found = await pass('all');
+    return { ...found, corrections: found.corrections.filter(onFlagged) };
+  };
+  // Mots manquants : Mistral cherche, puis deux autres modeles jugent chaque
+  // proposition et elle n'est gardee que s'ils disent OUI tous les deux. Mesure
+  // du 15/10 : sur 80 vraies pages, 26 propositions, 2 gardees (« may not
+  // pleasing », « allow little anger » : vraies fautes) et 0 fausse ; sur le
+  // banc, les 3 mots manquants trouves gardes. Chacun seul se trompait (Llama
+  // 70B et Qwen3 acceptaient chacun une fausse, pas la meme).
+  const JUDGES = [
+    ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', 4],
+    ['@cf/qwen/qwen3-30b-a3b-fp8', 16],
+  ];
+  const checkedMissing = async () => {
+    const found = await pass('missing');
+    if (!found.corrections.length) return found;
+    const votes = await Promise.all(
+      JUDGES.map(([judge, tokens]) =>
+        verifyCorrections(env, judge, paragraphs, found.corrections, tokens),
+      ),
+    );
+    return {
+      corrections: found.corrections.filter((_, i) => votes.every((v) => v.verdicts[i])),
+      usage: {
+        neurons: (Number(found.usage?.neurons) || 0) + votes.reduce((n, v) => n + v.neurons, 0),
+      },
+    };
+  };
   try {
-    const kinds = task === 'full' ? ['all'] : [task];
-    const results = await Promise.all(kinds.map(pass));
+    const runs =
+      task === 'full'
+        ? [...(flagged.length ? [flaggedPass()] : []), checkedMissing()]
+        : [pass(task)];
+    const results = await Promise.all(runs);
     // Fusion : la passe generale d'abord ; une correction qui touche un endroit
     // deja corrige est ecartee (deux insertions au meme endroit doublaient un mot).
     const corrections = [];
     const taken = [];
-    for (const c of results.flatMap((r) => r.corrections).filter(onFlagged)) {
+    for (const c of results.flatMap((r) => r.corrections)) {
       const at = paragraphs[c.p].indexOf(c.find);
       const span = [c.p, at, at + c.find.length];
       if (taken.some(([p, a, b]) => p === span[0] && span[1] < b && a < span[2])) continue;
@@ -502,6 +610,8 @@ export default {
     if (!text) return json(400, { error: 'empty text' });
     if (text.length > MAX_CHARS) return json(413, { error: `text over ${MAX_CHARS} chars` });
 
+    const voice =
+      typeof body.reference_id === 'string' && body.reference_id ? body.reference_id : DEFAULT_VOICE;
     const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: {
@@ -511,12 +621,10 @@ export default {
       },
       body: JSON.stringify({
         text,
-        reference_id:
-          typeof body.reference_id === 'string' && body.reference_id
-            ? body.reference_id
-            : DEFAULT_VOICE,
+        reference_id: voice,
         format: 'mp3',
         mp3_bitrate: 128,
+        prosody: prosodyFor(voice),
       }),
     });
 
