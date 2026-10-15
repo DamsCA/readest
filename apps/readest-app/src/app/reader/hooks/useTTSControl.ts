@@ -14,6 +14,7 @@ import {
 } from '@/services/transformers/proofread';
 import { useTranslation } from '@/hooks/useTranslation';
 import { TTSController, TTSMark, TTSHighlightOptions, TTSVoicesGroup } from '@/services/tts';
+import { TTSUtils } from '@/services/tts/TTSUtils';
 import {
   resolveTranslator,
   getFromCache,
@@ -953,7 +954,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   // Rate/voice/timeout/bar controls
   // rate range: 0.5 - 3, 1.0 is normal speed
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleSetRate = useCallback(
+  const restartWithRate = useCallback(
     throttle(async (rate: number) => {
       const ttsController = ttsControllerRef.current;
       if (ttsController) {
@@ -968,6 +969,20 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     }, 3000),
     [],
   );
+  // An engine that changes the speed of the sentence being read (Fish) gets it
+  // at once; the others restart the sentence, at most every 3 s.
+  const handleSetRate = useCallback(
+    (rate: number) => {
+      if (ttsControllerRef.current?.setRateLive(rate)) return;
+      restartWithRate(rate);
+    },
+    [restartWithRate],
+  );
+
+  const handleSetLangVolume = useCallback((lang: string, volume: number) => {
+    if (ttsControllerRef.current) ttsControllerRef.current.setLangVolume(lang, volume);
+    else TTSUtils.setLangVolume(lang, volume);
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSetVoice = useCallback(
@@ -1092,6 +1107,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     handleForward,
     handlePause,
     handleSetRate,
+    handleSetLangVolume,
     handleSetVoice,
     handleGetVoices,
     handleGetVoiceIdForLang,

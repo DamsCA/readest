@@ -38,3 +38,21 @@ export const byLanguage = (voices: TTSVoice[]): [string, TTSVoice[]][] => {
   }
   return [...sections.entries()];
 };
+
+export interface EngineVoices {
+  engine: string;
+  voices: TTSVoice[];
+}
+
+/**
+ * The voices that can read `lang`, engine by engine in the order the engines
+ * are listed (Fish first), leaving out engines and voices that cannot speak now.
+ */
+export const voicesForLang = (groups: TTSVoicesGroup[], lang: string): EngineVoices[] =>
+  groups
+    .filter((g) => !g.disabled)
+    .map((g) => ({
+      engine: g.name,
+      voices: g.voices.filter((v) => !v.disabled && baseLang(v.lang) === lang),
+    }))
+    .filter((e) => e.voices.length > 0);

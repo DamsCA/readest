@@ -35,6 +35,31 @@ export class TTSUtils {
     return preferences[`${engine}-${lang}`] || null;
   }
 
+  // The reader's volume for each language's voice, 0..1: in a translated book
+  // one voice may be wanted louder than the other.
+  private static readonly LANG_VOLUME_PREFIX = 'volume-';
+
+  // Read before every sentence: storage that cannot be read plays at full
+  // volume rather than stopping the reading.
+  static getLangVolume(language: string): number {
+    try {
+      const key = `${this.LANG_VOLUME_PREFIX}${this.normalizeLanguage(language)}`;
+      const volume = Number(this.getPreferences()[key] ?? 1);
+      return Number.isFinite(volume) && volume >= 0 && volume <= 1 ? volume : 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  static setLangVolume(language: string, volume: number): void {
+    if (!language || !Number.isFinite(volume)) return;
+    const preferences = this.getPreferences();
+    preferences[`${this.LANG_VOLUME_PREFIX}${this.normalizeLanguage(language)}`] = String(
+      Math.max(0, Math.min(1, volume)),
+    );
+    localStorage.setItem(this.LOCAL_STORAGE_KEY, JSON.stringify(preferences));
+  }
+
   private static getPreferences(): Record<string, string> {
     const storedPreferences = localStorage.getItem(this.LOCAL_STORAGE_KEY);
     return storedPreferences ? JSON.parse(storedPreferences) : {};

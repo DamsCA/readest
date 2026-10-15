@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { TTSVoicesGroup } from '@/services/tts/types';
-import { baseLang, byLanguage, languageLabel, mergeVoiceGroups } from '@/utils/voiceMenu';
+import {
+  baseLang,
+  byLanguage,
+  languageLabel,
+  mergeVoiceGroups,
+  voicesForLang,
+} from '@/utils/voiceMenu';
 
 const sarah = { id: 'sarah', name: 'Sarah', lang: 'en-US' };
 const selene = { id: 'selene', name: 'Selene', lang: 'en-US' };
@@ -37,6 +43,20 @@ describe('voice menu', () => {
     const group: TTSVoicesGroup = { id: 'edge-tts', name: 'Edge TTS', voices: [aria] };
     mergeVoiceGroups([group, { ...group, voices: [denise] }]);
     expect(group.voices).toEqual([aria]);
+  });
+
+  it('offers for a language the voices that can read it now, engine by engine', () => {
+    const groups: TTSVoicesGroup[] = [
+      { id: 'kokoro', name: 'Kokoro', voices: [{ ...sarah, id: 'k-sarah' }], disabled: true },
+      { id: 'fish-audio', name: 'Fish Audio', voices: [sarah, selene, claire] },
+      { id: 'edge-tts', name: 'Edge TTS', voices: [aria, { ...denise, disabled: true }] },
+    ];
+    expect(voicesForLang(groups, 'en')).toEqual([
+      { engine: 'Fish Audio', voices: [sarah, selene] },
+      { engine: 'Edge TTS', voices: [aria] },
+    ]);
+    expect(voicesForLang(groups, 'fr')).toEqual([{ engine: 'Fish Audio', voices: [claire] }]);
+    expect(voicesForLang(groups, 'de')).toEqual([]);
   });
 
   it('names each language in its own words', () => {

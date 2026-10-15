@@ -4,19 +4,12 @@ import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useTTSControl } from '@/app/reader/hooks/useTTSControl';
-import { getPopupPosition, Position } from '@/utils/sel';
 import { Insets } from '@/types/misc';
-import { Overlay } from '@/components/Overlay';
-import Popup from '@/components/Popup';
+import Dialog from '@/components/Dialog';
 import TTSPanel from './TTSPanel';
 import TTSIcon from './TTSIcon';
 import TTSBar from './TTSBar';
-
-const POPUP_WIDTH = 282;
-const POPUP_HEIGHT = 160;
-const POPUP_PADDING = 10;
 
 interface TTSControlProps {
   bookKey: string;
@@ -32,8 +25,6 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
   const viewSettings = getViewSettings(bookKey);
 
   const [showPanel, setShowPanel] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<Position>();
-  const [trianglePosition, setTrianglePosition] = useState<Position>();
 
   const iconRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,11 +33,6 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
 
   const [shouldMountBackButton, setShouldMountBackButton] = useState(false);
   const [isBackButtonVisible, setIsBackButtonVisible] = useState(false);
-
-  const popupPadding = useResponsiveSize(POPUP_PADDING);
-  const maxWidth = window.innerWidth - 2 * popupPadding;
-  const popupWidth = Math.min(maxWidth, useResponsiveSize(POPUP_WIDTH));
-  const popupHeight = useResponsiveSize(POPUP_HEIGHT);
 
   const tts = useTTSControl({
     bookKey,
@@ -71,21 +57,6 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
       return;
     }
   }, [tts.showBackToCurrentTTSLocation]);
-
-  useEffect(() => {
-    if (!iconRef.current || !showPanel) return;
-    const parentElement = iconRef.current.parentElement;
-    if (!parentElement) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      updatePanelPosition();
-    });
-    resizeObserver.observe(parentElement);
-    return () => {
-      resizeObserver.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPanel]);
 
   useEffect(() => {
     if (hoveredBookKey) {
@@ -121,33 +92,7 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
     }
   }, [tts.showTTSBar]);
 
-  const updatePanelPosition = () => {
-    if (iconRef.current) {
-      const rect = iconRef.current.getBoundingClientRect();
-      const parentRect =
-        iconRef.current.parentElement?.getBoundingClientRect() ||
-        document.documentElement.getBoundingClientRect();
-
-      const trianglePos = {
-        dir: 'up',
-        point: { x: rect.left + rect.width / 2 - parentRect.left, y: rect.top - 12 },
-      } as Position;
-
-      const popupPos = getPopupPosition(
-        trianglePos,
-        parentRect,
-        popupWidth,
-        popupHeight,
-        popupPadding,
-      );
-
-      setPanelPosition(popupPos);
-      setTrianglePosition(trianglePos);
-    }
-  };
-
   const togglePopup = () => {
-    updatePanelPosition();
     if (!showPanel && tts.isTTSActive) {
       tts.refreshTtsLang();
     }
@@ -183,7 +128,6 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
           </button>
         </div>
       )}
-      {showPanel && <Overlay onDismiss={handleDismissPopup} />}
       {(showPanel || (tts.showIndicator && showIndicatorWithinTimeout)) && (
         <div
           ref={iconRef}
@@ -206,33 +150,39 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
           />
         </div>
       )}
-      {showPanel && panelPosition && trianglePosition && tts.ttsClientsInited && (
-        <Popup
-          width={popupWidth}
-          height={popupHeight}
-          position={panelPosition}
-          trianglePosition={trianglePosition}
-          className='bg-base-200 flex shadow-lg'
-          onDismiss={handleDismissPopup}
-        >
+      {/* A sheet from the bottom on a phone, the page still showing above it. */}
+      <Dialog
+        id='tts-player'
+        isOpen={showPanel && tts.ttsClientsInited}
+        onClose={handleDismissPopup}
+        snapHeight={0.66}
+        title={_('Read Aloud')}
+        bgClassName='sm:!bg-black/20 !bg-black/20'
+        boxClassName='sm:!w-[480px] sm:!max-w-[480px] sm:!h-auto sm:max-h-[85vh]'
+        contentClassName='!px-4 sm:!px-6'
+      >
+        {showPanel && tts.ttsClientsInited && (
           <TTSPanel
             bookKey={bookKey}
             ttsLang={tts.ttsLang}
             isPlaying={tts.isPlaying}
             timeoutOption={tts.timeoutOption}
             timeoutTimestamp={tts.timeoutTimestamp}
+            chapterRemainingSec={tts.chapterRemainingSec}
+            bookRemainingSec={tts.bookRemainingSec}
             onTogglePlay={tts.handleTogglePlay}
             onBackward={tts.handleBackward}
             onForward={tts.handleForward}
             onSetRate={tts.handleSetRate}
+            onSetLangVolume={tts.handleSetLangVolume}
             onGetVoices={tts.handleGetVoices}
             onSetVoice={tts.handleSetVoice}
             onGetVoiceIdForLang={tts.handleGetVoiceIdForLang}
             onSelectTimeout={tts.handleSelectTimeout}
             onToogleTTSBar={tts.handleToggleTTSBar}
           />
-        </Popup>
-      )}
+        )}
+      </Dialog>
       {tts.showIndicator && tts.showTTSBar && tts.ttsClientsInited && (
         <TTSBar
           bookKey={bookKey}

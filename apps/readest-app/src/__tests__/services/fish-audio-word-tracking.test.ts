@@ -15,6 +15,7 @@ vi.mock('@/utils/misc', () => ({
 vi.mock('@/services/tts/TTSUtils', () => ({
   TTSUtils: {
     getPreferredVoice: vi.fn(() => null),
+    getLangVolume: vi.fn(() => 1),
     sortVoicesPreferLocaleFunc: vi.fn(() => () => 0),
   },
 }));

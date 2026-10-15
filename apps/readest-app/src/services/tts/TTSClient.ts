@@ -33,4 +33,8 @@ export interface TTSClient {
   // language, so a translated book has one voice per language.
   getVoiceIdFromLang?(lang: string): string | Promise<string>;
   getSpeakingLang(): string;
+  // A new rate applied to the sentence being read, without restarting it.
+  setRateLive?(rate: number): void;
+  // The reader's volume for one language's voice (0..1), applied at once.
+  setLangVolume?(lang: string, volume: number): void;
 }

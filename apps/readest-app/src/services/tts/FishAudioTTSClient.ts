@@ -158,8 +158,10 @@ const resolveClaireServerUrl = async (
 // v2 (Oct 2026): entries carry their word timings in WORDS_HEADER. A v1 entry
 // has none, and an untimed sentence silently falls back to turning the page
 // late — so the v1 store is dropped once instead of being mixed in.
-const PERSIST_CACHE_NAME = 'claire-tts-audio-v2';
-const LEGACY_PERSIST_CACHE_NAMES = ['claire-tts-audio-v1'];
+// v3 (15 Oct 2026): the relay evens out the voices' loudness; a v2 clip keeps
+// its voice's old level (Sarah 11 dB under Claire) and is dropped too.
+const PERSIST_CACHE_NAME = 'claire-tts-audio-v3';
+const LEGACY_PERSIST_CACHE_NAMES = ['claire-tts-audio-v1', 'claire-tts-audio-v2'];
 const WORDS_HEADER = 'X-Fish-Words';
 
 const hashText = (s: string): string => {
@@ -937,7 +939,7 @@ export class FishAudioTTSClient implements TTSClient {
               // Gap killer: start the primed next sentence inside the event
               // handler, before any generator/controller bookkeeping runs.
               if (!signal.aborted && primedUrl && standby.src === primedUrl) {
-                standby.volume = 1;
+                standby.volume = this.#volumeFor(marks[nextIdx]?.language ?? mark.language);
                 standby.playbackRate = this.#rate;
                 void standby.play().catch(() => {});
               }
@@ -947,7 +949,7 @@ export class FishAudioTTSClient implements TTSClient {
               console.warn('Fish Audio playback error:', e);
               finish({ code: 'error', message: 'Audio playback error' });
             };
-            audio.volume = 1;
+            audio.volume = this.#volumeFor(mark.language);
             if (audio.src !== url) {
               audio.src = url;
             }
@@ -1148,7 +1150,30 @@ export class FishAudioTTSClient implements TTSClient {
   }
 
   async setRate(rate: number) {
+    this.setRateLive(rate);
+  }
+
+  // playbackRate keeps the pitch, so the sentence being read can change speed
+  // at once: the speed control no longer restarts it at each step.
+  setRateLive(rate: number) {
     this.#rate = rate;
+    for (const a of [this.#audioA, this.#audioB]) {
+      if (a) a.playbackRate = rate;
+    }
+  }
+
+  // The voices are not equally loud (Claire covered the English voices,
+  // reported 15 Oct 2026): the relay evens them out, and the reader sets each
+  // language's volume on top.
+  #volumeFor(lang: string) {
+    return TTSUtils.getLangVolume(lang || this.#primaryLang);
+  }
+
+  setLangVolume(lang: string, volume: number) {
+    TTSUtils.setLangVolume(lang, volume);
+    if (this.#audioElement && isSameLang(this.#speakingLang || this.#primaryLang, lang)) {
+      this.#audioElement.volume = this.#volumeFor(lang);
+    }
   }
 
   async setPitch(_pitch: number) {

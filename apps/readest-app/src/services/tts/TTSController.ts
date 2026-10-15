@@ -1017,6 +1017,20 @@ export class TTSController extends EventTarget {
     await this.ttsClient.setRate(this.ttsRate);
   }
 
+  /** A new rate for the sentence being read, without restarting it, when the engine can. */
+  setRateLive(rate: number): boolean {
+    if (!this.ttsClient.setRateLive) return false;
+    this.ttsRate = rate;
+    this.ttsClient.setRateLive(rate);
+    return true;
+  }
+
+  /** The reader's volume for one language's voice (0..1). */
+  setLangVolume(lang: string, volume: number) {
+    TTSUtils.setLangVolume(lang, volume);
+    this.ttsClient.setLangVolume?.(lang, volume);
+  }
+
   async getVoices(lang: string) {
     const ttsKokoroVoices = await this.ttsKokoroClient.getVoices(lang);
     const ttsGoogleVoices = await this.ttsGoogleClient.getVoices(lang);

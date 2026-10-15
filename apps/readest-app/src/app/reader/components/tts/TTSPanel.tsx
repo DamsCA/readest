@@ -1,31 +1,44 @@
 import clsx from 'clsx';
-import { useState, ChangeEvent, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  MdPlayCircle,
-  MdPauseCircle,
-  MdFastRewind,
+  MdAdd,
+  MdCheck,
+  MdExpandLess,
+  MdExpandMore,
   MdFastForward,
-  MdAlarm,
+  MdFastRewind,
   MdOutlineCloudDownload,
-  MdShortText,
-  MdTextFields,
+  MdPause,
+  MdPlayArrow,
+  MdRemove,
+  MdSkipNext,
+  MdSkipPrevious,
+  MdVolumeDown,
+  MdVolumeUp,
 } from 'react-icons/md';
-import { TbChevronCompactDown, TbChevronCompactUp } from 'react-icons/tb';
-import { RiVoiceAiFill } from 'react-icons/ri';
-import { MdCheck } from 'react-icons/md';
 import { TTSVoicesGroup } from '@/services/tts';
+import { TTSUtils } from '@/services/tts/TTSUtils';
+import type { TTSHighlightGranularity } from '@/services/tts/types';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
-import { TranslationFunc, useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
-import { useDefaultIconSize, useResponsiveSize } from '@/hooks/useResponsiveSize';
-import { getLanguageName } from '@/utils/lang';
-import { getLocale } from '@/utils/misc';
-import { eventDispatcher } from '@/utils/event';
+import { useTranslation } from '@/hooks/useTranslation';
+import SegmentedControl from '@/components/SegmentedControl';
 import { saveViewSettings } from '@/helpers/settings';
-import { baseLang, byLanguage, languageLabel, mergeVoiceGroups } from '@/utils/voiceMenu';
-import type { TTSHighlightGranularity } from '@/services/tts/types';
+import { eventDispatcher } from '@/utils/event';
+import { getLocale } from '@/utils/misc';
+import { baseLang, languageLabel, mergeVoiceGroups, voicesForLang } from '@/utils/voiceMenu';
+import {
+  MAX_RATE,
+  MIN_RATE,
+  RATE_PRESETS,
+  TIMER_PRESETS,
+  clampRate,
+  formatDuration,
+  formatRate,
+  stepRate,
+} from '@/utils/ttsPlayer';
 
 type TTSPanelProps = {
   bookKey: string;
@@ -33,10 +46,13 @@ type TTSPanelProps = {
   isPlaying: boolean;
   timeoutOption: number;
   timeoutTimestamp: number;
+  chapterRemainingSec: number | null;
+  bookRemainingSec: number | null;
   onTogglePlay: () => void;
-  onBackward: () => void;
-  onForward: () => void;
+  onBackward: (byMark: boolean) => void;
+  onForward: (byMark: boolean) => void;
   onSetRate: (rate: number) => void;
+  onSetLangVolume: (lang: string, volume: number) => void;
   onGetVoices: (lang: string) => Promise<TTSVoicesGroup[]>;
   onSetVoice: (voice: string, lang: string) => void;
   onGetVoiceIdForLang: (lang: string) => Promise<string>;
@@ -44,88 +60,65 @@ type TTSPanelProps = {
   onToogleTTSBar: () => void;
 };
 
-const getTTSTimeoutOptions = (_: TranslationFunc) => {
-  return [
-    {
-      label: _('No Timeout'),
-      value: 0,
-    },
-    {
-      label: _('{{value}} minute', { value: 1 }),
-      value: 60,
-    },
-    {
-      label: _('{{value}} minutes', { value: 3 }),
-      value: 180,
-    },
-    {
-      label: _('{{value}} minutes', { value: 5 }),
-      value: 300,
-    },
-    {
-      label: _('{{value}} minutes', { value: 10 }),
-      value: 600,
-    },
-    {
-      label: _('{{value}} minutes', { value: 20 }),
-      value: 1200,
-    },
-    {
-      label: _('{{value}} minutes', { value: 30 }),
-      value: 1800,
-    },
-    {
-      label: _('{{value}} minutes', { value: 45 }),
-      value: 2700,
-    },
-    {
-      label: _('{{value}} hour', { value: 1 }),
-      value: 3600,
-    },
-    {
-      label: _('{{value}} hours', { value: 2 }),
-      value: 7200,
-    },
-    {
-      label: _('{{value}} hours', { value: 3 }),
-      value: 10800,
-    },
-    {
-      label: _('{{value}} hours', { value: 4 }),
-      value: 14400,
-    },
-    {
-      label: _('{{value}} hours', { value: 6 }),
-      value: 21600,
-    },
-    {
-      label: _('{{value}} hours', { value: 8 }),
-      value: 28800,
-    },
-  ];
+const Card: React.FC<{ title?: string; children: React.ReactNode; aside?: React.ReactNode }> = ({
+  title,
+  children,
+  aside,
+}) => (
+  <section className='bg-base-200 rounded-2xl p-4'>
+    {title && (
+      <div className='mb-3 flex items-center justify-between gap-2'>
+        <h3 className='text-sm font-semibold uppercase tracking-wide opacity-70'>{title}</h3>
+        {aside}
+      </div>
+    )}
+    {children}
+  </section>
+);
+
+const RoundButton: React.FC<{
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ label, onClick, children, className }) => (
+  <button
+    type='button'
+    title={label}
+    aria-label={label}
+    onClick={onClick}
+    className={clsx(
+      'flex items-center justify-center rounded-full transition-transform active:scale-95',
+      className ?? 'hover:bg-base-300 h-11 w-11',
+    )}
+  >
+    {children}
+  </button>
+);
+
+const countdown = (timestamp: number) => {
+  const left = Math.max(0, Math.floor((timestamp - Date.now()) / 1000));
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
 };
 
-const getCountdownTime = (timeout: number) => {
-  const now = Date.now();
-  if (timeout > now) {
-    const remainingTime = Math.floor((timeout - now) / 1000);
-    const minutes = Math.floor(remainingTime / 3600) * 60 + Math.floor((remainingTime % 3600) / 60);
-    const seconds = remainingTime % 60;
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  }
-  return '';
-};
-
+/**
+ * The read-aloud player, opened from the floating button: transport, speed to
+ * the hundredth, one voice and one volume per language, highlighting, sleep
+ * timer. It replaces the small popup inherited from Readest (asked 15 Oct 2026).
+ */
 const TTSPanel = ({
   bookKey,
   ttsLang,
   isPlaying,
   timeoutOption,
   timeoutTimestamp,
+  chapterRemainingSec,
+  bookRemainingSec,
   onTogglePlay,
   onBackward,
   onForward,
   onSetRate,
+  onSetLangVolume,
   onGetVoices,
   onSetVoice,
   onGetVoiceIdForLang,
@@ -138,379 +131,359 @@ const TTSPanel = ({
   const { getBookData } = useBookDataStore();
   const { settings, setSettings, saveSettings } = useSettingsStore();
   const viewSettings = getViewSettings(bookKey);
+  const locale = getLocale();
 
-  const [voiceGroups, setVoiceGroups] = useState<TTSVoicesGroup[]>([]);
-  const [rate, setRate] = useState(viewSettings?.ttsRate ?? 1.0);
-  // The voice each language is read with, by base language ('en', 'fr').
-  const [selectedByLang, setSelectedByLang] = useState<Record<string, string>>({});
-
-  // "Minutes d'avance": audio pre-downloaded ahead of the playhead by the banker
-  // (grows while paused, consumed while playing). Emitted by the Claire client.
-  const [bankedMinutes, setBankedMinutes] = useState(0);
-  useEffect(() => {
-    const onBanked = (event: CustomEvent) => {
-      const detail = event.detail as { bookKey?: string; minutes?: number };
-      if (detail?.bookKey && detail.bookKey !== bookKey) return;
-      setBankedMinutes(detail?.minutes ?? 0);
-    };
-    eventDispatcher.on('tts-banked-ahead', onBanked);
-    return () => eventDispatcher.off('tts-banked-ahead', onBanked);
-  }, [bookKey]);
-  const bankedLabel =
-    bankedMinutes >= 1
-      ? `~${Math.round(bankedMinutes)} min d'avance`
-      : bankedMinutes > 0
-        ? "<1 min d'avance"
-        : null;
-
-  const [timeoutCountdown, setTimeoutCountdown] = useState(() => {
-    return getCountdownTime(timeoutTimestamp);
+  // The languages read aloud, the book's first, then the translation's.
+  const [langs] = useState(() => {
+    const list = [getBookData(bookKey)?.book?.primaryLanguage, ttsLang];
+    if (viewSettings?.translationEnabled) {
+      list.splice(1, 0, viewSettings.translateTargetLang || getLocale());
+    }
+    return [...new Set(list.filter((l): l is string => !!l).map(baseLang))].filter(Boolean);
   });
 
-  const defaultIconSize = useDefaultIconSize();
-  const iconSize32 = useResponsiveSize(32);
-  const iconSize48 = useResponsiveSize(48);
-
-  const handleSetRate = (e: ChangeEvent<HTMLInputElement>) => {
-    let newRate = parseFloat(e.target.value);
-    newRate = Math.max(0.2, Math.min(3.0, newRate));
-    setRate(newRate);
-    onSetRate(newRate);
-    const viewSettings = getViewSettings(bookKey)!;
-    viewSettings.ttsRate = newRate;
-    settings.globalViewSettings.ttsRate = newRate;
-    setViewSettings(bookKey, viewSettings);
-    setSettings(settings);
-    saveSettings(envConfig, settings);
-  };
-
+  const [rate, setRate] = useState(clampRate(viewSettings?.ttsRate ?? 1));
+  const [voiceGroups, setVoiceGroups] = useState<TTSVoicesGroup[]>([]);
+  const [selectedByLang, setSelectedByLang] = useState<Record<string, string>>({});
+  const [volumes, setVolumes] = useState<Record<string, number>>(() =>
+    Object.fromEntries(langs.map((l) => [l, TTSUtils.getLangVolume(l)])),
+  );
+  const [openLang, setOpenLang] = useState<string | null>(null);
+  const [allEngines, setAllEngines] = useState<Record<string, boolean>>({});
   const [granularity, setGranularity] = useState<TTSHighlightGranularity>(
     viewSettings?.ttsHighlightGranularity ?? 'sentence',
   );
-  const toggleGranularity = () => {
-    // Word-level karaoke is SYNTHETIC (the model gives no real word timings), so
-    // it drifts/races on French. Sentence-level lights the whole spoken sentence
-    // — always in sync. One tap to switch.
-    const next: TTSHighlightGranularity = granularity === 'word' ? 'sentence' : 'word';
-    setGranularity(next);
-    void saveViewSettings(envConfig, bookKey, 'ttsHighlightGranularity', next);
-  };
+  const [bankedMinutes, setBankedMinutes] = useState(0);
+  const [timerLeft, setTimerLeft] = useState(() =>
+    timeoutTimestamp > Date.now() ? countdown(timeoutTimestamp) : '',
+  );
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSelectVoice = (voice: string, lang: string) => {
-    onSetVoice(voice, lang);
-    setSelectedByLang((prev) => ({ ...prev, [baseLang(lang)]: voice }));
-    const viewSettings = getViewSettings(bookKey)!;
-    viewSettings.ttsVoice = voice;
-    setViewSettings(bookKey, viewSettings);
-  };
-
-  const refreshSelection = async (groups: TTSVoicesGroup[]) => {
-    const langs = [...new Set(groups.flatMap((g) => g.voices.map((v) => baseLang(v.lang))))];
+  const refreshSelection = async () => {
     const chosen = await Promise.all(
       langs.map(async (lang) => [lang, await onGetVoiceIdForLang(lang)] as const),
     );
     setSelectedByLang(Object.fromEntries(chosen));
   };
 
-  // The languages read aloud: the one being spoken, the book's, and the
-  // translation's when the book is translated.
-  const readingLangs = () => {
-    const vs = getViewSettings(bookKey);
-    const langs = [ttsLang, getBookData(bookKey)?.book?.primaryLanguage];
-    if (vs?.translationEnabled) langs.push(vs.translateTargetLang || getLocale());
-    return [...new Set(langs.filter((l): l is string => !!l).map(baseLang))].filter(Boolean);
-  };
-
-  const updateTimeout = (timeout: number) => {
-    const now = Date.now();
-    if (timeout > 0 && timeout < now) {
-      onSelectTimeout(bookKey, 0);
-      setTimeoutCountdown('');
-    } else if (timeout > 0) {
-      setTimeoutCountdown(getCountdownTime(timeout));
-    }
-  };
-
   useEffect(() => {
-    setTimeout(() => {
-      updateTimeout(timeoutTimestamp);
-    }, 1000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeoutTimestamp, timeoutCountdown]);
-
-  useEffect(() => {
-    const fetchVoices = async () => {
-      const langs = readingLangs();
-      const lists = await Promise.all((langs.length ? langs : [ttsLang]).map(onGetVoices));
-      const voiceGroups = mergeVoiceGroups(lists.flat());
-      const voicesCount = voiceGroups.reduce((acc, group) => acc + group.voices.length, 0);
-      if (!voiceGroups || voicesCount === 0) {
-        console.warn('No voices found for TTSPanel');
-        setVoiceGroups([
-          {
-            id: 'no-voices',
-            name: _('Voices for {{lang}}', { lang: getLanguageName(ttsLang) }),
-            voices: [],
-          },
-        ]);
-      } else {
-        setVoiceGroups(voiceGroups);
-        await refreshSelection(voiceGroups);
-      }
-    };
-    fetchVoices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ttsLang]);
-
-  useEffect(() => {
+    void (async () => {
+      const lists = await Promise.all(langs.map(onGetVoices));
+      setVoiceGroups(mergeVoiceGroups(lists.flat()));
+      await refreshSelection();
+    })();
     const onVoiceChanged = (event: CustomEvent) => {
       const detail = event.detail as { bookKey?: string };
       if (detail?.bookKey && detail.bookKey !== bookKey) return;
-      void refreshSelection(voiceGroups);
+      void refreshSelection();
+    };
+    const onBanked = (event: CustomEvent) => {
+      const detail = event.detail as { bookKey?: string; minutes?: number };
+      if (detail?.bookKey && detail.bookKey !== bookKey) return;
+      setBankedMinutes(detail?.minutes ?? 0);
     };
     eventDispatcher.on('tts-voice-changed', onVoiceChanged);
-    return () => eventDispatcher.off('tts-voice-changed', onVoiceChanged);
+    eventDispatcher.on('tts-banked-ahead', onBanked);
+    return () => {
+      eventDispatcher.off('tts-voice-changed', onVoiceChanged);
+      eventDispatcher.off('tts-banked-ahead', onBanked);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookKey, voiceGroups]);
+  }, [bookKey]);
 
-  const severalLanguages = voiceGroups.some((g) => byLanguage(g.voices).length > 1);
+  useEffect(() => {
+    if (!timeoutTimestamp || timeoutTimestamp <= Date.now()) {
+      setTimerLeft('');
+      return;
+    }
+    const tick = () =>
+      setTimerLeft(timeoutTimestamp > Date.now() ? countdown(timeoutTimestamp) : '');
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [timeoutTimestamp]);
 
-  const timeoutOptions = getTTSTimeoutOptions(_);
+  const applyRate = (next: number) => {
+    const value = clampRate(next);
+    setRate(value);
+    onSetRate(value);
+    const vs = getViewSettings(bookKey);
+    if (vs) {
+      vs.ttsRate = value;
+      setViewSettings(bookKey, vs);
+    }
+    settings.globalViewSettings.ttsRate = value;
+    // A slider sends a value per pixel: store once it settles.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setSettings(settings);
+      void saveSettings(envConfig, settings);
+    }, 400);
+  };
+
+  const applyVolume = (lang: string, value: number) => {
+    setVolumes((prev) => ({ ...prev, [lang]: value }));
+    onSetLangVolume(lang, value);
+  };
+
+  const selectVoice = (lang: string, voiceId: string, voiceLang: string) => {
+    onSetVoice(voiceId, voiceLang);
+    setSelectedByLang((prev) => ({ ...prev, [lang]: voiceId }));
+    const vs = getViewSettings(bookKey);
+    if (vs) {
+      vs.ttsVoice = voiceId;
+      setViewSettings(bookKey, vs);
+    }
+    setOpenLang(null);
+  };
+
+  const changeGranularity = (next: TTSHighlightGranularity) => {
+    setGranularity(next);
+    void saveViewSettings(envConfig, bookKey, 'ttsHighlightGranularity', next);
+  };
+
+  const remaining = [
+    chapterRemainingSec !== null &&
+      _('Chapter: {{time}}', { time: formatDuration(chapterRemainingSec) }),
+    bookRemainingSec !== null && _('Book: {{time}}', { time: formatDuration(bookRemainingSec) }),
+  ].filter(Boolean);
 
   return (
-    <div className='flex w-full flex-col items-center justify-center gap-2 rounded-2xl px-4 pt-4 sm:gap-1'>
-      {bankedLabel && (
-        <div
-          className='text-base-content/60 flex items-center gap-1 text-xs'
-          title='Audio déjà téléchargé en avance (lecture hors-ligne possible)'
-        >
-          <MdOutlineCloudDownload size={14} />
-          <span>{bankedLabel}</span>
-        </div>
-      )}
-      <div className='flex w-full flex-col items-center gap-0.5'>
-        <input
-          className='range'
-          type='range'
-          min={0.0}
-          max={3.0}
-          step='0.1'
-          value={rate}
-          onChange={handleSetRate}
-        />
-        <div className='grid w-full grid-cols-7 text-xs'>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-          <span className='text-center'>|</span>
-        </div>
-        <div className='grid w-full grid-cols-7 text-xs'>
-          <span className='text-center'>{_('Slow')}</span>
-          <span className='text-center'></span>
-          <span className='text-center'>1.0</span>
-          <span className='text-center'>1.5</span>
-          <span className='text-center'>2.0</span>
-          <span className='text-center'></span>
-          <span className='text-center'>{_('Fast')}</span>
-        </div>
-      </div>
-      <div className='flex items-center justify-between space-x-2'>
-        <button
-          onClick={() => onBackward()}
-          className='rounded-full p-1 transition-transform duration-200 hover:scale-105'
-          title={_('Previous Paragraph')}
-          aria-label={_('Previous Paragraph')}
-        >
-          <MdFastRewind size={iconSize32} />
-        </button>
-        <button
-          onClick={onTogglePlay}
-          className='rounded-full p-1 transition-transform duration-200 hover:scale-105'
-          title={isPlaying ? _('Pause') : _('Play')}
-          aria-label={isPlaying ? _('Pause') : _('Play')}
-        >
-          {isPlaying ? (
-            <MdPauseCircle size={iconSize48} className='fill-primary' />
-          ) : (
-            <MdPlayCircle size={iconSize48} className='fill-primary' />
-          )}
-        </button>
-        <button
-          onClick={() => onForward()}
-          className='rounded-full p-1 transition-transform duration-200 hover:scale-105'
-          title={_('Next Paragraph')}
-          aria-label={_('Next Paragraph')}
-        >
-          <MdFastForward size={iconSize32} />
-        </button>
-        <button
-          onClick={toggleGranularity}
-          className='rounded-full p-1 opacity-70 transition-transform duration-200 hover:scale-105'
-          title={
-            granularity === 'word'
-              ? _('Highlight: word-by-word (tap for sentence)')
-              : _('Highlight: full sentence (tap for word-by-word)')
-          }
-          aria-label={_('Toggle highlight granularity')}
-        >
-          {granularity === 'word' ? (
-            <MdTextFields size={iconSize32} />
-          ) : (
-            <MdShortText size={iconSize32} />
-          )}
-        </button>
-        <div className='dropdown dropdown-top'>
-          <button
-            tabIndex={0}
-            className='flex flex-col items-center justify-center rounded-full p-1 transition-transform duration-200 hover:scale-105'
-            onClick={(e) => e.currentTarget.focus()}
-            title={_('Set Timeout')}
-            aria-label={_('Set Timeout')}
+    <div className='flex flex-col gap-4 pb-6'>
+      <section className='flex flex-col items-center gap-3 pt-1'>
+        <div className='flex items-center justify-center gap-1 sm:gap-3'>
+          <RoundButton label={_('Previous Paragraph')} onClick={() => onBackward(false)}>
+            <MdFastRewind size={26} />
+          </RoundButton>
+          <RoundButton label={_('Previous Sentence')} onClick={() => onBackward(true)}>
+            <MdSkipPrevious size={28} />
+          </RoundButton>
+          <RoundButton
+            label={isPlaying ? _('Pause') : _('Play')}
+            onClick={onTogglePlay}
+            className='bg-primary text-primary-content mx-2 h-16 w-16 shadow-md'
           >
-            <MdAlarm size={iconSize32} />
-            {timeoutCountdown && (
-              <span
-                className={clsx(
-                  'absolute bottom-0 left-1/2 w-12 translate-x-[-50%] translate-y-[80%] px-1',
-                  'bg-primary/80 text-base-100 rounded-full text-center text-xs',
-                )}
-              >
-                {timeoutCountdown}
+            {isPlaying ? <MdPause size={36} /> : <MdPlayArrow size={38} />}
+          </RoundButton>
+          <RoundButton label={_('Next Sentence')} onClick={() => onForward(true)}>
+            <MdSkipNext size={28} />
+          </RoundButton>
+          <RoundButton label={_('Next Paragraph')} onClick={() => onForward(false)}>
+            <MdFastForward size={26} />
+          </RoundButton>
+        </div>
+        {(remaining.length > 0 || bankedMinutes > 0) && (
+          <div className='text-base-content/60 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs'>
+            {remaining.map((r) => (
+              <span key={String(r)}>{r}</span>
+            ))}
+            {bankedMinutes > 0 && (
+              <span className='flex items-center gap-1'>
+                <MdOutlineCloudDownload size={14} />
+                {_('{{time}} downloaded ahead', { time: formatDuration(bankedMinutes * 60) })}
               </span>
             )}
-          </button>
-          <ul
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-            tabIndex={0}
-            className={clsx(
-              'dropdown-content bgcolor-base-200 no-triangle menu menu-vertical rounded-box absolute right-0 z-[1] shadow',
-              'mt-4 inline max-h-96 w-[200px] overflow-y-scroll',
-            )}
-          >
-            {timeoutOptions.map((option, index) => (
-              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-              <li
-                key={`${index}-${option.value}`}
-                onClick={() => onSelectTimeout(bookKey, option.value)}
-              >
-                <div className='flex items-center px-2'>
-                  <span
-                    style={{
-                      width: `${defaultIconSize}px`,
-                      height: `${defaultIconSize}px`,
-                    }}
-                  >
-                    {timeoutOption === option.value && <MdCheck className='text-base-content' />}
-                  </span>
-                  <span className={clsx('text-base sm:text-sm')}>{option.label}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+          </div>
+        )}
+      </section>
 
-        <div className='dropdown dropdown-top'>
-          <button
-            tabIndex={0}
-            className='rounded-full p-1 transition-transform duration-200 hover:scale-105'
-            onClick={(e) => e.currentTarget.focus()}
+      <Card
+        title={_('Speed')}
+        aside={
+          <span className='text-xl font-semibold tabular-nums'>{formatRate(rate, locale)}</span>
+        }
+      >
+        <div className='flex items-center gap-3'>
+          <RoundButton
+            label={_('Slower')}
+            onClick={() => applyRate(stepRate(rate, -1))}
+            className='bg-base-300 h-10 w-10 shrink-0'
           >
-            <RiVoiceAiFill size={iconSize32} />
-          </button>
-          <ul
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-            tabIndex={0}
-            className={clsx(
-              'dropdown-content bgcolor-base-200 no-triangle menu menu-vertical rounded-box absolute right-0 z-[1] shadow',
-              'mt-4 inline max-h-96 w-[250px] overflow-y-scroll',
-            )}
-            title={_('Select Voice')}
-            aria-label={_('Select Voice')}
+            <MdRemove size={22} />
+          </RoundButton>
+          <input
+            type='range'
+            className='range range-primary range-sm flex-1'
+            min={MIN_RATE}
+            max={MAX_RATE}
+            step={0.01}
+            value={rate}
+            aria-label={_('Speed')}
+            onChange={(e) => applyRate(Number(e.target.value))}
+          />
+          <RoundButton
+            label={_('Faster')}
+            onClick={() => applyRate(stepRate(rate, 1))}
+            className='bg-base-300 h-10 w-10 shrink-0'
           >
-            {severalLanguages && (
-              <div className='px-2 py-1 text-sm text-gray-400 sm:text-xs'>
-                {_('One voice per language')}
-              </div>
-            )}
-            {voiceGroups.map((voiceGroup, index) => {
-              const sections = byLanguage(voiceGroup.voices);
-              return (
-                <div key={voiceGroup.id} className=''>
-                  <div className='flex items-center gap-2 px-2 py-1'>
-                    <span
-                      style={{ width: `${defaultIconSize}px`, height: `${defaultIconSize}px` }}
-                    ></span>
-                    <span className='text-sm text-gray-400 sm:text-xs'>
-                      {_('{{engine}}: {{count}} voices', {
-                        engine: _(voiceGroup.name),
-                        count: voiceGroup.voices.length,
-                      })}
-                    </span>
-                  </div>
-                  {sections.map(([lang, voices]) => (
-                    <div
-                      key={`${voiceGroup.id}-${lang}`}
-                      role='group'
-                      aria-label={languageLabel(lang)}
-                    >
-                      {sections.length > 1 && (
-                        <div className='px-2 pt-1 text-sm font-semibold opacity-70 sm:text-xs'>
-                          {languageLabel(lang)}
-                        </div>
-                      )}
-                      {voices.map((voice, voiceIndex) => (
-                        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-                        <li
-                          key={`${index}-${voiceGroup.id}-${lang}-${voiceIndex}`}
-                          onClick={() => !voice.disabled && handleSelectVoice(voice.id, voice.lang)}
-                        >
-                          <div className='flex items-center px-2'>
-                            <span
-                              style={{
-                                width: `${defaultIconSize}px`,
-                                height: `${defaultIconSize}px`,
-                              }}
-                            >
-                              {selectedByLang[lang] === voice.id && (
-                                <MdCheck className='text-base-content' />
-                              )}
-                            </span>
-                            <span
-                              className={clsx(
-                                'max-w-[180px] overflow-hidden text-ellipsis text-base sm:text-sm',
-                                voice.disabled && 'text-gray-400',
-                              )}
-                            >
-                              {_(voice.name)}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </ul>
+            <MdAdd size={22} />
+          </RoundButton>
         </div>
-      </div>
-      <div className='flex h-4 items-center justify-center opacity-60 transition-transform duration-200 hover:scale-105 hover:opacity-100'>
-        <button
-          onClick={onToogleTTSBar}
-          className='p-0'
-          title={_('Toggle Sticky Bottom TTS Bar')}
-          aria-label={_('Toggle Sticky Bottom TTS Bar')}
-        >
-          {viewSettings?.showTTSBar ? (
-            <TbChevronCompactUp size={iconSize48} style={{ transform: 'scaleY(0.85)' }} />
-          ) : (
-            <TbChevronCompactDown size={iconSize48} style={{ transform: 'scaleY(0.85)' }} />
-          )}
-        </button>
-      </div>
+        <div className='mt-3 flex flex-wrap gap-2'>
+          {RATE_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type='button'
+              aria-pressed={preset === rate}
+              onClick={() => applyRate(preset)}
+              className={clsx(
+                'rounded-full px-3 py-1 text-sm tabular-nums transition-colors',
+                preset === rate ? 'bg-primary text-primary-content' : 'bg-base-300',
+              )}
+            >
+              {formatRate(preset, locale)}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={_('Voices')}>
+        <div className='flex flex-col'>
+          {langs.map((lang) => {
+            const engines = voicesForLang(voiceGroups, lang);
+            const selected = selectedByLang[lang];
+            const selectedName =
+              engines.flatMap((e) => e.voices).find((v) => v.id === selected)?.name ?? '';
+            const open = openLang === lang;
+            const shown = allEngines[lang] ? engines : engines.slice(0, 1);
+            const hidden = engines.slice(1).reduce((n, e) => n + e.voices.length, 0);
+            const volume = volumes[lang] ?? 1;
+            return (
+              <div
+                key={lang}
+                className='border-base-300 border-t py-3 first:border-t-0 first:pt-0 last:pb-0'
+              >
+                <button
+                  type='button'
+                  aria-expanded={open}
+                  onClick={() => setOpenLang(open ? null : lang)}
+                  className='flex w-full items-center justify-between gap-3 text-start'
+                >
+                  <span className='font-medium'>{languageLabel(lang)}</span>
+                  <span className='flex min-w-0 items-center gap-1 text-sm opacity-80'>
+                    <span className='truncate'>{selectedName}</span>
+                    {open ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
+                  </span>
+                </button>
+                {open && (
+                  <div
+                    role='radiogroup'
+                    aria-label={languageLabel(lang)}
+                    className='mt-2 flex flex-col'
+                  >
+                    {shown.map((engine) => (
+                      <React.Fragment key={engine.engine}>
+                        {allEngines[lang] && engines.length > 1 && (
+                          <div className='px-2 pt-2 text-xs opacity-60'>{engine.engine}</div>
+                        )}
+                        {engine.voices.map((voice) => (
+                          <button
+                            key={voice.id}
+                            type='button'
+                            role='radio'
+                            aria-checked={voice.id === selected}
+                            onClick={() => selectVoice(lang, voice.id, voice.lang)}
+                            className='hover:bg-base-300 flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-start'
+                          >
+                            <span className='truncate'>{voice.name}</span>
+                            {voice.id === selected && (
+                              <MdCheck size={20} className='text-primary shrink-0' />
+                            )}
+                          </button>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                    {hidden > 0 && !allEngines[lang] && (
+                      <button
+                        type='button'
+                        onClick={() => setAllEngines((prev) => ({ ...prev, [lang]: true }))}
+                        className='text-primary px-2 py-2 text-start text-sm'
+                      >
+                        {_('More voices ({{count}})', { count: hidden })}
+                      </button>
+                    )}
+                    {engines.length === 0 && (
+                      <div className='px-2 py-2 text-sm opacity-60'>
+                        {_('No voice for this language')}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className='mt-2 flex items-center gap-2'>
+                  <MdVolumeDown size={20} className='shrink-0 opacity-60' />
+                  <input
+                    type='range'
+                    className='range range-xs flex-1'
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={Math.round(volume * 100)}
+                    aria-label={_('Volume of {{lang}}', { lang: languageLabel(lang) })}
+                    onChange={(e) => applyVolume(lang, Number(e.target.value) / 100)}
+                  />
+                  <MdVolumeUp size={20} className='shrink-0 opacity-60' />
+                  <span className='w-11 text-end text-xs tabular-nums opacity-70'>
+                    {Math.round(volume * 100)} %
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card>
+        <div className='flex flex-col gap-4'>
+          <div className='flex items-center justify-between gap-3'>
+            <span>{_('Highlighting')}</span>
+            <SegmentedControl<TTSHighlightGranularity>
+              ariaLabel={_('Highlighting')}
+              options={[
+                { value: 'sentence', label: _('Sentence') },
+                { value: 'word', label: _('Word') },
+              ]}
+              value={granularity}
+              onChange={changeGranularity}
+            />
+          </div>
+          <div>
+            <div className='flex items-center justify-between gap-3'>
+              <span>{_('Sleep timer')}</span>
+              {timerLeft && (
+                <span className='text-xs tabular-nums opacity-70'>
+                  {_('Stops in {{time}}', { time: timerLeft })}
+                </span>
+              )}
+            </div>
+            <div className='mt-2 flex flex-wrap gap-2'>
+              {TIMER_PRESETS.map((seconds) => (
+                <button
+                  key={seconds}
+                  type='button'
+                  aria-pressed={seconds === timeoutOption}
+                  onClick={() => onSelectTimeout(bookKey, seconds)}
+                  className={clsx(
+                    'rounded-full px-3 py-1 text-sm transition-colors',
+                    seconds === timeoutOption ? 'bg-primary text-primary-content' : 'bg-base-300',
+                  )}
+                >
+                  {seconds ? formatDuration(seconds) : _('Off')}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className='flex cursor-pointer items-center justify-between gap-3'>
+            <span>{_('Player bar at the bottom')}</span>
+            <input
+              type='checkbox'
+              className='toggle toggle-sm'
+              checked={!!viewSettings?.showTTSBar}
+              onChange={onToogleTTSBar}
+            />
+          </label>
+        </div>
+      </Card>
     </div>
   );
 };
