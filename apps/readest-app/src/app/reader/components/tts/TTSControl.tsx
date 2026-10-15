@@ -227,7 +227,7 @@ const TTSControl: React.FC<TTSControlProps> = ({ bookKey, gridInsets }) => {
             onSetRate={tts.handleSetRate}
             onGetVoices={tts.handleGetVoices}
             onSetVoice={tts.handleSetVoice}
-            onGetVoiceId={tts.handleGetVoiceId}
+            onGetVoiceIdForLang={tts.handleGetVoiceIdForLang}
             onSelectTimeout={tts.handleSelectTimeout}
             onToogleTTSBar={tts.handleToggleTTSBar}
           />

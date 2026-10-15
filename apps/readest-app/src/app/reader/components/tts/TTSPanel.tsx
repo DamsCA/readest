@@ -16,12 +16,15 @@ import { MdCheck } from 'react-icons/md';
 import { TTSVoicesGroup } from '@/services/tts';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
+import { useBookDataStore } from '@/store/bookDataStore';
 import { TranslationFunc, useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useDefaultIconSize, useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { getLanguageName } from '@/utils/lang';
+import { getLocale } from '@/utils/misc';
 import { eventDispatcher } from '@/utils/event';
 import { saveViewSettings } from '@/helpers/settings';
+import { baseLang, byLanguage, languageLabel, mergeVoiceGroups } from '@/utils/voiceMenu';
 import type { TTSHighlightGranularity } from '@/services/tts/types';
 
 type TTSPanelProps = {
@@ -36,7 +39,7 @@ type TTSPanelProps = {
   onSetRate: (rate: number) => void;
   onGetVoices: (lang: string) => Promise<TTSVoicesGroup[]>;
   onSetVoice: (voice: string, lang: string) => void;
-  onGetVoiceId: () => string;
+  onGetVoiceIdForLang: (lang: string) => Promise<string>;
   onSelectTimeout: (bookKey: string, value: number) => void;
   onToogleTTSBar: () => void;
 };
@@ -125,19 +128,21 @@ const TTSPanel = ({
   onSetRate,
   onGetVoices,
   onSetVoice,
-  onGetVoiceId,
+  onGetVoiceIdForLang,
   onSelectTimeout,
   onToogleTTSBar,
 }: TTSPanelProps) => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
   const { getViewSettings, setViewSettings } = useReaderStore();
+  const { getBookData } = useBookDataStore();
   const { settings, setSettings, saveSettings } = useSettingsStore();
   const viewSettings = getViewSettings(bookKey);
 
   const [voiceGroups, setVoiceGroups] = useState<TTSVoicesGroup[]>([]);
   const [rate, setRate] = useState(viewSettings?.ttsRate ?? 1.0);
-  const [selectedVoice, setSelectedVoice] = useState(viewSettings?.ttsVoice ?? '');
+  // The voice each language is read with, by base language ('en', 'fr').
+  const [selectedByLang, setSelectedByLang] = useState<Record<string, string>>({});
 
   // "Minutes d'avance": audio pre-downloaded ahead of the playhead by the banker
   // (grows while paused, consumed while playing). Emitted by the Claire client.
@@ -193,10 +198,27 @@ const TTSPanel = ({
 
   const handleSelectVoice = (voice: string, lang: string) => {
     onSetVoice(voice, lang);
-    setSelectedVoice(voice);
+    setSelectedByLang((prev) => ({ ...prev, [baseLang(lang)]: voice }));
     const viewSettings = getViewSettings(bookKey)!;
     viewSettings.ttsVoice = voice;
     setViewSettings(bookKey, viewSettings);
+  };
+
+  const refreshSelection = async (groups: TTSVoicesGroup[]) => {
+    const langs = [...new Set(groups.flatMap((g) => g.voices.map((v) => baseLang(v.lang))))];
+    const chosen = await Promise.all(
+      langs.map(async (lang) => [lang, await onGetVoiceIdForLang(lang)] as const),
+    );
+    setSelectedByLang(Object.fromEntries(chosen));
+  };
+
+  // The languages read aloud: the one being spoken, the book's, and the
+  // translation's when the book is translated.
+  const readingLangs = () => {
+    const vs = getViewSettings(bookKey);
+    const langs = [ttsLang, getBookData(bookKey)?.book?.primaryLanguage];
+    if (vs?.translationEnabled) langs.push(vs.translateTargetLang || getLocale());
+    return [...new Set(langs.filter((l): l is string => !!l).map(baseLang))].filter(Boolean);
   };
 
   const updateTimeout = (timeout: number) => {
@@ -217,14 +239,10 @@ const TTSPanel = ({
   }, [timeoutTimestamp, timeoutCountdown]);
 
   useEffect(() => {
-    const voiceId = onGetVoiceId();
-    setSelectedVoice(voiceId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     const fetchVoices = async () => {
-      const voiceGroups = await onGetVoices(ttsLang);
+      const langs = readingLangs();
+      const lists = await Promise.all((langs.length ? langs : [ttsLang]).map(onGetVoices));
+      const voiceGroups = mergeVoiceGroups(lists.flat());
       const voicesCount = voiceGroups.reduce((acc, group) => acc + group.voices.length, 0);
       if (!voiceGroups || voicesCount === 0) {
         console.warn('No voices found for TTSPanel');
@@ -237,11 +255,25 @@ const TTSPanel = ({
         ]);
       } else {
         setVoiceGroups(voiceGroups);
+        await refreshSelection(voiceGroups);
       }
     };
     fetchVoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsLang]);
+
+  useEffect(() => {
+    const onVoiceChanged = (event: CustomEvent) => {
+      const detail = event.detail as { bookKey?: string };
+      if (detail?.bookKey && detail.bookKey !== bookKey) return;
+      void refreshSelection(voiceGroups);
+    };
+    eventDispatcher.on('tts-voice-changed', onVoiceChanged);
+    return () => eventDispatcher.off('tts-voice-changed', onVoiceChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookKey, voiceGroups]);
+
+  const severalLanguages = voiceGroups.some((g) => byLanguage(g.voices).length > 1);
 
   const timeoutOptions = getTTSTimeoutOptions(_);
 
@@ -398,7 +430,13 @@ const TTSPanel = ({
             title={_('Select Voice')}
             aria-label={_('Select Voice')}
           >
+            {severalLanguages && (
+              <div className='px-2 py-1 text-sm text-gray-400 sm:text-xs'>
+                {_('One voice per language')}
+              </div>
+            )}
             {voiceGroups.map((voiceGroup, index) => {
+              const sections = byLanguage(voiceGroup.voices);
               return (
                 <div key={voiceGroup.id} className=''>
                   <div className='flex items-center gap-2 px-2 py-1'>
@@ -412,31 +450,46 @@ const TTSPanel = ({
                       })}
                     </span>
                   </div>
-                  {voiceGroup.voices.map((voice, voiceIndex) => (
-                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-                    <li
-                      key={`${index}-${voiceGroup.id}-${voiceIndex}`}
-                      onClick={() => !voice.disabled && handleSelectVoice(voice.id, voice.lang)}
+                  {sections.map(([lang, voices]) => (
+                    <div
+                      key={`${voiceGroup.id}-${lang}`}
+                      role='group'
+                      aria-label={languageLabel(lang)}
                     >
-                      <div className='flex items-center px-2'>
-                        <span
-                          style={{
-                            width: `${defaultIconSize}px`,
-                            height: `${defaultIconSize}px`,
-                          }}
+                      {sections.length > 1 && (
+                        <div className='px-2 pt-1 text-sm font-semibold opacity-70 sm:text-xs'>
+                          {languageLabel(lang)}
+                        </div>
+                      )}
+                      {voices.map((voice, voiceIndex) => (
+                        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+                        <li
+                          key={`${index}-${voiceGroup.id}-${lang}-${voiceIndex}`}
+                          onClick={() => !voice.disabled && handleSelectVoice(voice.id, voice.lang)}
                         >
-                          {selectedVoice === voice.id && <MdCheck className='text-base-content' />}
-                        </span>
-                        <span
-                          className={clsx(
-                            'max-w-[180px] overflow-hidden text-ellipsis text-base sm:text-sm',
-                            voice.disabled && 'text-gray-400',
-                          )}
-                        >
-                          {_(voice.name)}
-                        </span>
-                      </div>
-                    </li>
+                          <div className='flex items-center px-2'>
+                            <span
+                              style={{
+                                width: `${defaultIconSize}px`,
+                                height: `${defaultIconSize}px`,
+                              }}
+                            >
+                              {selectedByLang[lang] === voice.id && (
+                                <MdCheck className='text-base-content' />
+                              )}
+                            </span>
+                            <span
+                              className={clsx(
+                                'max-w-[180px] overflow-hidden text-ellipsis text-base sm:text-sm',
+                                voice.disabled && 'text-gray-400',
+                              )}
+                            >
+                              {_(voice.name)}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </div>
                   ))}
                 </div>
               );

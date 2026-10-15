@@ -1092,6 +1092,12 @@ export class TTSController extends EventTarget {
     return this.ttsClient.getVoiceId();
   }
 
+  /** The voice the active engine reads `lang` with (see TTSClient.getVoiceIdFromLang). */
+  async getVoiceIdForLang(lang: string): Promise<string> {
+    if (!this.ttsClient.getVoiceIdFromLang) return this.ttsClient.getVoiceId();
+    return await this.ttsClient.getVoiceIdFromLang(lang);
+  }
+
   getSpeakingLang() {
     return this.ttsClient.getSpeakingLang();
   }

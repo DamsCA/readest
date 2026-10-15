@@ -981,6 +981,9 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
         } else {
           await ttsController.setVoice(voice, lang);
         }
+        // The voice menu shows one choice per language; a voice of another
+        // engine changes the others too, so it asks again.
+        eventDispatcher.dispatch('tts-voice-changed', { bookKey });
       }
     }, 3000),
     [],
@@ -994,10 +997,10 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     return [];
   };
 
-  const handleGetVoiceId = () => {
+  const handleGetVoiceIdForLang = async (lang: string): Promise<string> => {
     const ttsController = ttsControllerRef.current;
     if (ttsController) {
-      return ttsController.getVoiceId();
+      return ttsController.getVoiceIdForLang(lang);
     }
     return '';
   };
@@ -1091,7 +1094,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     handleSetRate,
     handleSetVoice,
     handleGetVoices,
-    handleGetVoiceId,
+    handleGetVoiceIdForLang,
     handleSelectTimeout,
     handleToggleTTSBar,
     handleBackToCurrentTTSLocation,

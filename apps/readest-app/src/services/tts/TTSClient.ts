@@ -28,5 +28,9 @@ export interface TTSClient {
   // controller can highlight word-by-word (and suppress the sentence highlight).
   supportsWordBoundaries(): boolean;
   getVoiceId(): string;
+  // The voice this client reads `lang` with: the one picked for that language,
+  // else its default for it. Each sentence is read with the voice of its own
+  // language, so a translated book has one voice per language.
+  getVoiceIdFromLang?(lang: string): string | Promise<string>;
   getSpeakingLang(): string;
 }
