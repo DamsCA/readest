@@ -350,7 +350,9 @@ const parseCorrections = (raw, paragraphs, onlyInsertions = false) => {
     const find = typeof c?.find === 'string' ? c.find : '';
     const replace = typeof c?.replace === 'string' ? c.replace : '';
     const para = Number.isInteger(p) ? paragraphs[p] : undefined;
-    if (!para || !find || find === replace) continue;
+    // Un espace ajoute en bord ("neurochemicals" -> "neurochemicals ", vu le
+    // 15/10) ne corrige rien.
+    if (!para || !find || find.trim() === replace.trim()) continue;
     if (hasCode(replace) || typographyOnly(find, replace)) continue;
     // Citation exacte et unique dans son paragraphe, sinon on ne sait pas ou
     // l'appliquer (et c'est souvent que le modele a reformule).
@@ -391,8 +393,8 @@ async function handleProofread(request, env) {
     return json(413, { error: 'page too long' }, CORS);
   }
   const model = PROOFREAD_MODELS.includes(body?.model) ? body.model : PROOFREAD_MODELS[0];
-  // 'full' (l'app) = passe generale avec indices + passe dediee aux mots
-  // manquants, en parallele, fusionnees ; 'all' et 'missing' servent aux essais.
+  // 'full' (l'app) = passe generale bornee aux indices de l'app (voir plus bas) ;
+  // 'all' (relecture libre) et 'missing' (mots manquants) servent aux essais.
   const task = ['all', 'missing'].includes(body?.task) ? body.task : 'full';
   // Indices de l'app (dictionnaire + detecteurs) : chaque mot inconnu ou
   // anomalie mecanique de la page, a examiner un par un. Lu "a l'oeil", le
@@ -422,14 +424,30 @@ async function handleProofread(request, env) {
       typeof out?.response === 'string' ? out.response : JSON.stringify(out?.response ?? '');
     return { corrections: parseCorrections(raw, paragraphs, kind === 'missing'), usage: out.usage };
   };
+  // L'IA ne corrige plus que ce que l'app a signale. Sur 32 pages de ses vrais
+  // livres (15/10), la relecture libre (passe generale + mots manquants) a fait
+  // 52 propositions dont UNE vraie faute ("may not pleasing") : le reste etait
+  // du style ou faux ("whom" -> "who", "mailbox" -> "mail box", virgules, un
+  // numero de page "13" -> "1992"). Le detecteur de l'app, lui, avait trouve 7
+  // vraies fautes sur 7 dans ces livres (12/10). Sans indice : aucun appel.
+  // "can’t", "won’t" : des mots que la liste de l'app (claire.50) ignore.
+  const CONTRACTION = /^(can|won|shan|ain)['’]t$|^(o['’]clock|ma['’]am|y['’]all)$/i;
+  const flagged = hints
+    .map((h) => /"([^"]+)"/.exec(h)?.[1])
+    .filter((t) => t && !CONTRACTION.test(t));
+  if (task === 'full' && !flagged.length) {
+    return json(200, { corrections: [], usage: { neurons: 0 } }, CORS);
+  }
+  const onFlagged = (c) =>
+    task !== 'full' || flagged.some((t) => c.find.includes(t) || t.includes(c.find));
   try {
-    const kinds = task === 'full' ? ['all', 'missing'] : [task];
+    const kinds = task === 'full' ? ['all'] : [task];
     const results = await Promise.all(kinds.map(pass));
     // Fusion : la passe generale d'abord ; une correction qui touche un endroit
     // deja corrige est ecartee (deux insertions au meme endroit doublaient un mot).
     const corrections = [];
     const taken = [];
-    for (const c of results.flatMap((r) => r.corrections)) {
+    for (const c of results.flatMap((r) => r.corrections).filter(onFlagged)) {
       const at = paragraphs[c.p].indexOf(c.find);
       const span = [c.p, at, at + c.find.length];
       if (taken.some(([p, a, b]) => p === span[0] && span[1] < b && a < span[2])) continue;
