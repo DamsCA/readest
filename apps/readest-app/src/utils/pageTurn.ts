@@ -66,11 +66,18 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
 /**
  * How far the turning page has rotated, in degrees, once it has risen `p`
- * (0: lying flat, 1: on edge at the spine). Its free edge then stands at
- * 1 - p of the width: a finger moved p of the way across keeps the edge
- * under it.
+ * (0: lying flat, 1: on edge at the spine). Seen straight on, its free edge
+ * then stands at 1 - p of the width: a finger moved p of the way across
+ * keeps the edge under it.
  */
 export const turnAngle = (p: number) => (Math.acos(1 - clamp01(p)) * 180) / Math.PI;
+
+// The rising page comes towards the reader, and perspective pushes its edge
+// out ahead of the finger. At 2.4 widths (claire.57), a third of the way into
+// a drag, the edge was still at the screen's right side (emulator, 16 Oct
+// 2026); halfway it led the finger by 0.28 of the width. At 4.5 widths it
+// leads by 0.12 halfway, and the page still visibly rises.
+const PERSPECTIVE_WIDTHS = 4.5;
 
 /** The turning page's keyframes from `q0` to `q1` of the turn (0: before, 1: done). */
 export const turningFrames = (
@@ -80,7 +87,7 @@ export const turningFrames = (
   q0: number,
   q1: number,
 ): Keyframe[] => {
-  const perspective = Math.round(Math.max(width, 320) * 2.4);
+  const perspective = Math.round(Math.max(width, 320) * PERSPECTIVE_WIDTHS);
   // A left-to-right book's pages rise from the right and turn to the left.
   const side = rtl ? 1 : -1;
   return Array.from({ length: STEPS + 1 }, (_, i) => {
