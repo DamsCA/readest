@@ -111,6 +111,23 @@ describe('AI proofreading client', () => {
     expect(isProofreadOff('book2')).toBe(false);
   });
 
+  // Seen 16 Oct 2026: the free proofreading's unanswered proposals ("was being
+  // acting") came back with their pages after the fix.
+  it('drops what an older proofreading left, but not what the reader decided', () => {
+    localStorage.setItem(
+      'ai-proofread:book1',
+      JSON.stringify({
+        h1: 'clean',
+        h2: [{ find: 'was acting', replace: 'was being acting' }],
+        h3: 'decided',
+      }),
+    );
+    expect(loadParagraphStates('book1')).toEqual({ h3: 'decided' });
+    // Read again by the present proofreading, it is kept from then on.
+    saveParagraphStates('book1', { h3: 'decided', h4: 'clean' });
+    expect(loadParagraphStates('book1')).toEqual({ h3: 'decided', h4: 'clean' });
+  });
+
   it('keeps only the most recent 3000 paragraph outcomes', () => {
     const many = Object.fromEntries(
       Array.from({ length: 3100 }, (_, i) => [`h${i}`, 'clean' as const]),

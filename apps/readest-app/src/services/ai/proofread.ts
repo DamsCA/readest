@@ -93,11 +93,26 @@ export type ParagraphState = 'clean' | 'decided' | PendingCorrection[];
 const MAX_REMEMBERED = 3000;
 const statesKey = (bookHash: string) => `ai-proofread:${bookHash}`;
 
+// The proofreading behind the stored states. The free proofreading of
+// claire.46-51 proposed mostly style (51 of 52 proposals on his books), and its
+// unanswered proposals came back with their pages after the fix (seen 16 Oct
+// 2026). States from an older proofreading lose those proposals and their
+// 'clean' marks, so the page is read again; what the reader decided stays.
+const PIPELINE = '3';
+const pipelineKey = (bookHash: string) => `ai-proofread-pipeline:${bookHash}`;
+
 export const loadParagraphStates = (bookHash: string): Record<string, ParagraphState> => {
   try {
     const raw = localStorage.getItem(statesKey(bookHash));
     const parsed: unknown = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, ParagraphState>) : {};
+    const states =
+      parsed && typeof parsed === 'object' ? (parsed as Record<string, ParagraphState>) : {};
+    if (!raw || localStorage.getItem(pipelineKey(bookHash)) === PIPELINE) return states;
+    const decided = Object.fromEntries(
+      Object.entries(states).filter(([, state]) => state === 'decided'),
+    );
+    saveParagraphStates(bookHash, decided);
+    return decided;
   } catch {
     return {};
   }
@@ -108,6 +123,7 @@ export const saveParagraphStates = (bookHash: string, states: Record<string, Par
   const kept = entries.length > MAX_REMEMBERED ? entries.slice(-MAX_REMEMBERED) : entries;
   try {
     localStorage.setItem(statesKey(bookHash), JSON.stringify(Object.fromEntries(kept)));
+    localStorage.setItem(pipelineKey(bookHash), PIPELINE);
   } catch {
     // Full storage: the worst case is re-checking a page.
   }
