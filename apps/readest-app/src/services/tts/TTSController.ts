@@ -20,6 +20,15 @@ import { GoogleTTSClient } from './GoogleTTSClient';
 import { KokoroTTSClient } from './KokoroTTSClient';
 import { TTSUtils } from './TTSUtils';
 import { TTSClient } from './TTSClient';
+import {
+  currentMarkName,
+  firstStep,
+  lastStep,
+  spokenMarks,
+  stepParagraph,
+  stepSentence,
+  TTSStep,
+} from './ttsNavigation';
 import { isSameLang, isValidLang } from '@/utils/lang';
 import {
   computeWordOffsets,
@@ -95,6 +104,15 @@ export class TTSController extends EventTarget {
   #emptyRetries: number = 0;
   #currentSpeakAbortController: AbortController | null = null;
   #currentSpeakPromise: Promise<void> | null = null;
+  // Quick taps on the transport. Each tap moves at once and the latest one
+  // speaks (#navSeq); while one is still stopping the voice, the state reads
+  // 'stopped', and a tap must not take that for a pause (#playingNavs and
+  // #speaksStarting count the voice being restarted). #speakSeq lets only the
+  // latest of several #speak calls stopping at the same time go on to speak.
+  #navSeq = 0;
+  #playingNavs = 0;
+  #speakSeq = 0;
+  #speaksStarting = 0;
 
   #ttsSectionIndex: number = -1;
   // Cross-chapter prefetch state. The abort controller is session-scoped
@@ -510,30 +528,14 @@ export class TTSController extends EventTarget {
     }
   }
 
-  async #handleNavigationWithoutSSML(
-    initSection: () => Promise<boolean>,
-    isPlaying: boolean,
-    toEnd = false,
-  ) {
+  async #handleNavigationWithoutSSML(initSection: () => Promise<boolean>, isPlaying: boolean) {
     if (!(await initSection())) {
       await this.stop();
-      // Guarded: backward() at the first paragraph legitimately lands here in a
-      // paused state and recovers on the next play tap.
+      // Guarded: a paused session at the book's end recovers on the next play tap.
       if (isPlaying) this.#end();
       return;
     }
-    let ssml = this.view.tts?.start();
-    if (toEnd) {
-      // Backward across a chapter boundary: seek to the LAST block of the
-      // freshly-initialized previous section (its last sentence), not its first.
-      // next() with no paused flag just returns the block's SSML and advances the
-      // iterator without speaking/highlighting, so walking it is side-effect free.
-      let next = this.view.tts?.next();
-      while (next) {
-        ssml = next;
-        next = this.view.tts?.next();
-      }
-    }
+    const ssml = this.view.tts?.start();
     if (isPlaying) {
       this.#speak(ssml);
     } else if (ssml) {
@@ -565,6 +567,10 @@ export class TTSController extends EventTarget {
     // If async gaps exist between next()/prev() calls, a concurrent #speak()
     // can dispatch marks against the wrong #ranges, causing incorrect highlights
     // and accidental page turns.
+    // next()/prev() also clear the cursor's mark: put it back, or a "next
+    // sentence" before the voice reports its sentence would start from the
+    // paragraph's beginning.
+    const mark = currentMarkName(tts);
     const rawSsmls: string[] = [];
     for (let i = 0; i < count; i++) {
       const ssml = tts.next();
@@ -574,6 +580,7 @@ export class TTSController extends EventTarget {
     for (let i = 0; i < rawSsmls.length; i++) {
       tts.prev();
     }
+    if (mark) this.#placeMark(mark);
     // Fewer than `count` paragraphs left in this section: the chapter boundary
     // is near. Prepare the next chapter now (translation warm + audio bank) so
     // the flip is seamless. Fire-and-forget; internally deduped per section.
@@ -632,7 +639,16 @@ export class TTSController extends EventTarget {
   }
 
   async #speak(ssml: string | undefined | Promise<string>, oneTime = false) {
-    await this.stop();
+    const token = ++this.#speakSeq;
+    this.#speaksStarting++;
+    try {
+      await this.stop();
+    } finally {
+      this.#speaksStarting--;
+    }
+    // Called again while this call was stopping the voice (quick taps): two
+    // sessions would then play over each other. The later call speaks.
+    if (token !== this.#speakSeq) return;
     // Capture our own controller locally. The finally below must abort/clear
     // THIS one, not the instance field — which a newer #speak may already have
     // replaced. Otherwise an interrupted speak's late finally would abort the
@@ -689,7 +705,7 @@ export class TTSController extends EventTarget {
             if (this.ttsTargetLang && srcMarks.length === 0) {
               this.#emptyRetries = 0;
               if (signal.aborted) return;
-              return await this.forward();
+              return await this.advance();
             }
             // Translation mode: an empty utterance almost always means this
             // paragraph isn't translated YET. Translate it ourselves and speak
@@ -787,7 +803,7 @@ export class TTSController extends EventTarget {
               return this.#end();
             }
             if (signal.aborted) return; // a newer session took over while we waited
-            return await this.forward();
+            return await this.advance();
           } else {
             this.#emptyRetries = 0;
             this.#consecutiveEmptySkips = 0;
@@ -797,6 +813,11 @@ export class TTSController extends EventTarget {
             // which is exactly the "highlight races ahead / it skipped
             // sentences" report. Every client dispatches its own mark at the
             // moment its audio actually starts.
+            // The cursor, though, stands on that sentence now, without drawing
+            // it: reading from the page (tts.from) leaves it without a mark,
+            // and a "next sentence" tapped before the voice reports its
+            // sentence then stepped from the paragraph's start.
+            if (!this.view.tts?.getLastRange()) this.#placeMark(marks[0]!.name);
           }
           // Fire-and-forget: awaiting here blocked the FIRST sound of every
           // cold paragraph until several sentences were fully generated at LOW
@@ -831,7 +852,7 @@ export class TTSController extends EventTarget {
         if (lastCode === 'end' && !signal.aborted && this.state === 'playing' && !oneTime) {
           this.#consecutiveSpeakErrors = 0;
           resolve();
-          await this.forward();
+          await this.advance();
         } else if (
           lastCode === 'error' &&
           canSkipOnError &&
@@ -851,7 +872,7 @@ export class TTSController extends EventTarget {
           this.#consecutiveSpeakErrors++;
           resolve();
           if (this.#consecutiveSpeakErrors <= TTS_NATIVE_SPEAK_MAX_CONSECUTIVE_ERRORS) {
-            await this.forward();
+            await this.advance();
           } else {
             this.#consecutiveSpeakErrors = 0;
             await this.stop();
@@ -961,38 +982,116 @@ export class TTSController extends EventTarget {
     this.state = 'stopped';
   }
 
-  // goto previous mark/paragraph
+  // Previous sentence (byMark) or paragraph.
   async backward(byMark = false) {
-    await this.initViewTTS();
-    const isPlaying = this.state === 'playing';
-    await this.stop();
-    if (!isPlaying) this.state = 'backward-paused';
-
-    const ssml = byMark ? this.view.tts?.prevMark(!isPlaying) : this.view.tts?.prev(!isPlaying);
-    if (!ssml) {
-      // toEnd=true: land on the previous chapter's LAST sentence, not its first.
-      await this.#handleNavigationWithoutSSML(() => this.#initTTSForPrevSection(), isPlaying, true);
-    } else {
-      await this.#handleNavigationWithSSML(ssml, isPlaying);
-    }
-    if (isPlaying && !byMark) this.preloadNextSSML();
+    await this.#navigate(-1, byMark);
   }
 
-  // goto next mark/paragraph
+  // Next sentence (byMark) or paragraph.
   async forward(byMark = false) {
+    await this.#navigate(1, byMark);
+  }
+
+  // A tap on the transport: one sentence or paragraph that the voice reads, in
+  // that direction (see ttsNavigation). The step is taken at once, so quick
+  // taps add up, each from where the last one landed; the latest one speaks.
+  // Its sentence is shown, and the page turned to it, without waiting for the
+  // voice.
+  async #navigate(dir: 1 | -1, byMark: boolean) {
     await this.initViewTTS();
+    const seq = ++this.#navSeq;
+    const isPlaying = this.#isListening();
+    if (isPlaying) this.#playingNavs++;
+    try {
+      const tts = this.view.tts;
+      let step = !tts
+        ? undefined
+        : byMark
+          ? stepSentence(tts, dir, this.#spokenMarks, this.#placeMark)
+          : stepParagraph(tts, dir, this.#spokenMarks);
+      await this.stop();
+      if (seq !== this.#navSeq) return;
+      if (!isPlaying) this.state = dir > 0 ? 'forward-paused' : 'backward-paused';
+      if (!step) {
+        step = await this.#stepIntoSection(dir, byMark);
+        if (seq !== this.#navSeq) return;
+      }
+      if (!step) {
+        // Past the book's last sentence.
+        if (isPlaying) this.#end();
+        return;
+      }
+      this.dispatchSpeakMark(step.mark);
+      if (isPlaying) {
+        void this.#speak(step.ssml);
+        if (!byMark) this.preloadNextSSML();
+      }
+    } finally {
+      if (isPlaying) this.#playingNavs--;
+    }
+  }
+
+  // A step past the chapter's edge: to the next chapter's first sentence, or
+  // the previous chapter's last paragraph (its last sentence for a sentence
+  // step), going on through chapters with nothing read. Before the book's
+  // first sentence, the step goes back to the start of the chapter it left.
+  async #stepIntoSection(dir: 1 | -1, byMark: boolean): Promise<TTSStep | undefined> {
+    const from = this.#ttsSectionIndex;
+    const sections = this.view.book.sections?.length ?? 0;
+    for (let i = 0; i < sections; i++) {
+      const entered =
+        dir > 0 ? await this.#initTTSForNextSection() : await this.#initTTSForPrevSection();
+      const tts = this.view.tts;
+      if (!entered || !tts) break;
+      const step =
+        dir > 0
+          ? firstStep(tts, this.#spokenMarks)
+          : lastStep(tts, this.#spokenMarks, this.#placeMark, byMark);
+      if (step) return step;
+    }
+    if (dir > 0) return undefined;
+    if (this.#ttsSectionIndex !== from && !(await this.#initTTSForSection(from))) return undefined;
+    return this.view.tts ? firstStep(this.view.tts, this.#spokenMarks) : undefined;
+  }
+
+  // On to the next paragraph once one is read (or skipped). Unlike a tap, it
+  // shows nothing before the voice gets there. A tap landing meanwhile takes
+  // over.
+  async advance() {
+    await this.initViewTTS();
+    const seq = this.#navSeq;
     const isPlaying = this.state === 'playing';
     await this.stop();
+    if (seq !== this.#navSeq) return;
     if (!isPlaying) this.state = 'forward-paused';
 
-    const ssml = byMark ? this.view.tts?.nextMark(!isPlaying) : this.view.tts?.next(!isPlaying);
+    const ssml = this.view.tts?.next(!isPlaying);
     if (!ssml) {
       await this.#handleNavigationWithoutSSML(() => this.#initTTSForNextSection(), isPlaying);
     } else {
       await this.#handleNavigationWithSSML(ssml, isPlaying);
     }
-    if (isPlaying && !byMark) this.preloadNextSSML();
+    if (isPlaying) this.preloadNextSSML();
   }
+
+  // Playing, or the voice being restarted: by a tap, or by #speak stopping the
+  // sentence before.
+  #isListening() {
+    return this.state === 'playing' || this.#playingNavs > 0 || this.#speaksStarting > 0;
+  }
+
+  #spokenMarks = (ssml: string): TTSMark[] => spokenMarks(ssml, this.ttsTargetLang);
+
+  // Stands foliate's cursor on a mark without drawing it: the highlight
+  // follows the voice.
+  #placeMark = (name: string) => {
+    this.#suppressMarkHighlight = true;
+    try {
+      this.view.tts?.setMark(name);
+    } finally {
+      this.#suppressMarkHighlight = false;
+    }
+  };
 
   async setLang(lang: string) {
     this.ttsLang = lang;

@@ -72,6 +72,7 @@ vi.mock('foliate-js/tts.js', () => ({
       nextMark: vi.fn().mockReturnValue('<speak>nextMark</speak>'),
       prevMark: vi.fn().mockReturnValue('<speak>prevMark</speak>'),
       setMark: vi.fn().mockReturnValue(new Range()),
+      getLastRange: vi.fn().mockReturnValue(undefined),
       doc: null,
     });
   }),
@@ -1201,6 +1202,11 @@ describe('TTSController', () => {
       tts.resume = ttsResumeMock;
       tts.next = vi.fn().mockReturnValue(undefined);
       tts.prev = vi.fn();
+      // A voice that never finishes. Finishing at once, it read through endless
+      // mock paragraphs until the heap ran out, and no test after this one ran.
+      controller.ttsClient.speak = vi.fn(async function* (_ssml: string, signal: AbortSignal) {
+        await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve()));
+      }) as unknown as TTSClient['speak'];
 
       // Simulate the race: state is 'stopped' (transient during forward())
       controller.state = 'stopped';
@@ -1237,6 +1243,68 @@ describe('TTSController', () => {
       controller.state = 'paused';
       await controller.backward();
       expect(controller.state).toBe('backward-paused');
+    });
+
+    // Sentences the mocked parser reads: each SSML holds one, named '0'.
+    const sentence = (text: string) => `<speak><mark name="0"/>${text}</speak>`;
+    const voiceUntilStopped = (heard: string[]) =>
+      vi.fn(async function* (ssml: string, signal: AbortSignal, preload?: boolean) {
+        if (!preload) heard.push(ssml);
+        await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve()));
+      }) as unknown as TTSClient['speak'];
+
+    test('quick taps while playing add up, keep playing, and speak once', async () => {
+      await controller.initViewTTS(0);
+      const tts = mockView.tts as unknown as Record<string, ReturnType<typeof vi.fn>>;
+      tts['getLastRange'] = vi.fn().mockReturnValue(new Range());
+      tts['resume'] = vi.fn().mockReturnValue(sentence('now'));
+      tts['prevMark'] = vi
+        .fn()
+        .mockReturnValueOnce(sentence('one back'))
+        .mockReturnValueOnce(sentence('two back'));
+      const heard: string[] = [];
+      controller.ttsClient.speak = voiceUntilStopped(heard);
+      controller.state = 'playing';
+
+      // The second tap lands while the first is still stopping the voice.
+      await Promise.all([controller.backward(true), controller.backward(true)]);
+      await vi.waitFor(() => expect(heard).toHaveLength(1));
+      expect(heard[0]).toContain('two back');
+      expect(controller.state).toBe('playing');
+    });
+
+    test('stands the cursor on the sentence the voice starts with', async () => {
+      // Reading from the page (tts.from) leaves foliate's cursor without a
+      // mark: a "next sentence" tapped before the voice reported its sentence
+      // stepped from the paragraph's start.
+      await controller.initViewTTS(0);
+      const tts = mockView.tts as unknown as Record<string, ReturnType<typeof vi.fn>>;
+      const heard: string[] = [];
+      controller.ttsClient.speak = voiceUntilStopped(heard);
+
+      await controller.speak(sentence('from the page'));
+      await vi.waitFor(() => expect(heard).toHaveLength(1));
+      expect(tts['setMark']).toHaveBeenCalledWith('0');
+    });
+
+    test('quick taps while paused move the highlight and stay paused', async () => {
+      await controller.initViewTTS(0);
+      const tts = mockView.tts as unknown as Record<string, ReturnType<typeof vi.fn>>;
+      tts['getLastRange'] = vi.fn().mockReturnValue(new Range());
+      tts['resume'] = vi.fn().mockReturnValue(sentence('now'));
+      tts['nextMark'] = vi
+        .fn()
+        .mockReturnValueOnce(sentence('one on'))
+        .mockReturnValueOnce(sentence('two on'));
+      const heard: string[] = [];
+      controller.ttsClient.speak = voiceUntilStopped(heard);
+      controller.state = 'paused';
+
+      await Promise.all([controller.forward(true), controller.forward(true)]);
+      expect(tts['nextMark']).toHaveBeenCalledTimes(2);
+      expect(tts['setMark']).toHaveBeenCalledWith('0');
+      expect(controller.state).toBe('forward-paused');
+      expect(heard).toHaveLength(0);
     });
   });
 
@@ -1302,10 +1370,10 @@ describe('TTSController', () => {
 
     test('skips a chunk the engine cannot speak and advances instead of dead-ending', async () => {
       const c = await makeAndroidNativeController();
-      // Stub forward() so the skip is observable without recursing through the
+      // Stub advance() so the skip is observable without recursing through the
       // mock sections; the point is that an error triggers an advance at all
       // (retrying the same unspeakable text would be futile).
-      const forwardSpy = vi.spyOn(c, 'forward').mockResolvedValue();
+      const advanceSpy = vi.spyOn(c, 'advance').mockResolvedValue();
 
       const state = { attempts: 0 };
       vi.mocked(c.ttsNativeClient!.speak).mockImplementation(alwaysErrorSpeakMock(state));
@@ -1314,7 +1382,7 @@ describe('TTSController', () => {
 
       await vi.waitFor(
         () => {
-          expect(forwardSpy).toHaveBeenCalled(); // advanced past the bad chunk
+          expect(advanceSpy).toHaveBeenCalled(); // advanced past the bad chunk
         },
         { timeout: 5000 },
       );
@@ -1382,6 +1450,7 @@ describe('TTSController', () => {
         prev: vi.fn().mockImplementation(() => {
           callOrder.push('prev');
         }),
+        getLastRange: vi.fn().mockReturnValue(undefined),
         doc: {},
       } as unknown as FoliateView['tts'];
 
@@ -1409,6 +1478,24 @@ describe('TTSController', () => {
       }
       // No next() should happen after an async operation
       expect(callOrder).not.toContain('next-after-async');
+    });
+
+    test('puts the cursor back on its sentence after looking ahead', async () => {
+      // next()/prev() clear foliate's mark: left cleared, a "next sentence"
+      // tapped before the voice reported its sentence started from the
+      // paragraph's beginning.
+      const setMark = vi.fn().mockReturnValue(new Range());
+      mockView.tts = {
+        next: vi.fn().mockReturnValueOnce('<speak>ahead</speak>').mockReturnValue(undefined),
+        prev: vi.fn(),
+        resume: vi.fn().mockReturnValue('<speak><mark name="3"/>now</speak>'),
+        getLastRange: vi.fn().mockReturnValue(new Range()),
+        setMark,
+        doc: {},
+      } as unknown as FoliateView['tts'];
+
+      await controller.preloadNextSSML(2);
+      expect(setMark).toHaveBeenLastCalledWith('3');
     });
   });
 

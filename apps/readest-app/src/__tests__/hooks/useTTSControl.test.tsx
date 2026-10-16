@@ -174,7 +174,10 @@ vi.mock('@/utils/cfi', () => ({
   isCfiInLocation: () => false,
 }));
 
-vi.mock('@/utils/misc', () => ({
+// Partial: modules on the hook's import path translate their labels with
+// stubTranslation at load time; without it the whole file failed to load.
+vi.mock('@/utils/misc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/misc')>()),
   getLocale: () => 'en',
 }));
 
