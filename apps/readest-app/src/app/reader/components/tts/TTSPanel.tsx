@@ -1,7 +1,6 @@
 import clsx from 'clsx';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  MdAdd,
   MdCheck,
   MdExpandLess,
   MdExpandMore,
@@ -10,7 +9,6 @@ import {
   MdOutlineCloudDownload,
   MdPause,
   MdPlayArrow,
-  MdRemove,
   MdSkipNext,
   MdSkipPrevious,
   MdVolumeDown,
@@ -30,15 +28,13 @@ import { eventDispatcher } from '@/utils/event';
 import { getLocale } from '@/utils/misc';
 import { baseLang, languageLabel, mergeVoiceGroups, voicesForLang } from '@/utils/voiceMenu';
 import {
-  MAX_RATE,
-  MIN_RATE,
   RATE_PRESETS,
   TIMER_PRESETS,
   clampRate,
   formatDuration,
   formatRate,
-  stepRate,
 } from '@/utils/ttsPlayer';
+import SpeedWheel from './SpeedWheel';
 
 type TTSPanelProps = {
   bookKey: string;
@@ -126,7 +122,7 @@ const TTSPanel = ({
   onToogleTTSBar,
 }: TTSPanelProps) => {
   const _ = useTranslation();
-  const { envConfig } = useEnv();
+  const { envConfig, appService } = useEnv();
   const { getViewSettings, setViewSettings } = useReaderStore();
   const { getBookData } = useBookDataStore();
   const { settings, setSettings, saveSettings } = useSettingsStore();
@@ -294,32 +290,12 @@ const TTSPanel = ({
           <span className='text-xl font-semibold tabular-nums'>{formatRate(rate, locale)}</span>
         }
       >
-        <div className='flex items-center gap-3'>
-          <RoundButton
-            label={_('Slower')}
-            onClick={() => applyRate(stepRate(rate, -1))}
-            className='bg-base-300 h-10 w-10 shrink-0'
-          >
-            <MdRemove size={22} />
-          </RoundButton>
-          <input
-            type='range'
-            className='range range-primary range-sm flex-1'
-            min={MIN_RATE}
-            max={MAX_RATE}
-            step={0.01}
-            value={rate}
-            aria-label={_('Speed')}
-            onChange={(e) => applyRate(Number(e.target.value))}
-          />
-          <RoundButton
-            label={_('Faster')}
-            onClick={() => applyRate(stepRate(rate, 1))}
-            className='bg-base-300 h-10 w-10 shrink-0'
-          >
-            <MdAdd size={22} />
-          </RoundButton>
-        </div>
+        <SpeedWheel
+          value={rate}
+          label={_('Speed')}
+          haptics={appService?.hasHaptics}
+          onChange={applyRate}
+        />
         <div className='mt-3 flex flex-wrap gap-2'>
           {RATE_PRESETS.map((preset) => (
             <button

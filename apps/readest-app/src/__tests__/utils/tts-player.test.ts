@@ -1,5 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import { clampRate, formatDuration, formatRate, stepRate } from '@/utils/ttsPlayer';
+import {
+  NOTCH_COUNT,
+  clampRate,
+  formatDuration,
+  formatRate,
+  notchToRate,
+  rateToNotch,
+  stepRate,
+} from '@/utils/ttsPlayer';
+
+// Asked 16 Oct 2026: a sensitive wheel rather than pressing plus or minus.
+describe('speed wheel', () => {
+  it('has one notch per hundredth, from 0.5 to 2.5', () => {
+    expect(NOTCH_COUNT).toBe(201);
+    expect(notchToRate(0)).toBe(0.5);
+    expect(notchToRate(200)).toBe(2.5);
+  });
+
+  it('turns rates into notches and back', () => {
+    expect(rateToNotch(1)).toBe(50);
+    expect(rateToNotch(1.05)).toBe(55);
+    expect(notchToRate(53)).toBe(1.03);
+    expect(notchToRate(rateToNotch(1.07))).toBe(1.07);
+  });
+
+  it('stays on the wheel', () => {
+    expect(notchToRate(-4)).toBe(0.5);
+    expect(notchToRate(999)).toBe(2.5);
+  });
+});
 
 // Reported 15 Oct 2026: steps of 0.1, and 1.1 too fast where 1.0 was too slow.
 describe('read-aloud speed', () => {

@@ -18,6 +18,18 @@ export const stepRate = (rate: number, dir: 1 | -1) => {
   return clampRate(next * RATE_STEP);
 };
 
+// The speed wheel: one notch per hundredth, rolled with a finger ("a sensitive
+// wheel rather than pressing plus or minus", asked 16 Oct 2026).
+const NOTCH = 0.01;
+export const NOTCH_COUNT = Math.round((MAX_RATE - MIN_RATE) / NOTCH) + 1;
+
+/** The wheel's notch for a rate, 0 at the slowest. */
+export const rateToNotch = (rate: number) => Math.round((clampRate(rate) - MIN_RATE) / NOTCH);
+
+/** The rate at a notch of the wheel. */
+export const notchToRate = (notch: number) =>
+  clampRate(MIN_RATE + Math.max(0, Math.min(NOTCH_COUNT - 1, Math.round(notch))) * NOTCH);
+
 /** "1,05×" in French, "1.05×" in English; one decimal at least ("1,0×"). */
 export const formatRate = (rate: number, locale?: string) =>
   `${new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(rate)}×`;

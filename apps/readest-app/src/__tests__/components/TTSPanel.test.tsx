@@ -91,14 +91,26 @@ describe('TTSPanel', () => {
   });
   afterEach(() => cleanup());
 
-  // Reported 15 Oct 2026: 1.0 too slow, 1.1 too fast, nothing in between.
-  it('nudges the speed by 0.05 and shows it to the hundredth', async () => {
+  // Reported 15 Oct 2026: 1.0 too slow, 1.1 too fast, nothing in between; and
+  // 16 Oct: a sensitive wheel rather than pressing plus or minus.
+  it('rolls the speed wheel to the hundredth', async () => {
     const p = await renderPanel();
-    fireEvent.click(screen.getByLabelText('Faster'));
+    const wheel = screen.getByRole('slider', { name: 'Speed' });
+    // 12 px per notch: 52 notches from 0.5 is 1.02.
+    Object.defineProperty(wheel, 'scrollLeft', { value: 52 * 12, configurable: true });
+    fireEvent.scroll(wheel);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(p.onSetRate).toHaveBeenLastCalledWith(1.02);
+    expect(screen.getAllByText('1.02×').length).toBeGreaterThan(0);
+  });
+
+  it('steps the wheel by a hundredth from the keyboard', async () => {
+    const p = await renderPanel();
+    const wheel = screen.getByRole('slider', { name: 'Speed' });
+    fireEvent.keyDown(wheel, { key: 'ArrowRight' });
+    expect(p.onSetRate).toHaveBeenLastCalledWith(1.01);
+    fireEvent.keyDown(wheel, { key: 'PageUp' });
     expect(p.onSetRate).toHaveBeenLastCalledWith(1.05);
-    expect(screen.getAllByText('1.05×').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByLabelText('Slower'));
-    expect(p.onSetRate).toHaveBeenLastCalledWith(1);
   });
 
   it('jumps to a preset speed', async () => {
