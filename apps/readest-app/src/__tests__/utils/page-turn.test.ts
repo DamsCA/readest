@@ -93,16 +93,16 @@ describe('the turning page', () => {
 
   it('rises from flat to on edge going on, and comes back down going back', () => {
     const on = turningFrames(1, false, 400, 0, 1);
-    expect(on[0]!.transform).toContain('rotateY(0.00deg)');
-    expect(on.at(-1)!.transform).toContain('rotateY(-90.00deg)');
-    expect(on[0]!.transformOrigin).toBe('left center');
+    expect(on[0]!['transform']).toContain('rotateY(0.00deg)');
+    expect(on.at(-1)!['transform']).toContain('rotateY(-90.00deg)');
+    expect(on[0]!['transformOrigin']).toBe('left center');
     const back = turningFrames(-1, false, 400, 0, 1);
-    expect(back[0]!.transform).toContain('rotateY(-90.00deg)');
-    expect(back.at(-1)!.transform).toContain('rotateY(0.00deg)');
+    expect(back[0]!['transform']).toContain('rotateY(-90.00deg)');
+    expect(back.at(-1)!['transform']).toContain('rotateY(0.00deg)');
     // A right-to-left book turns on its right edge.
     const rtl = turningFrames(1, true, 400, 0, 1);
-    expect(rtl[0]!.transformOrigin).toBe('right center');
-    expect(rtl.at(-1)!.transform).toContain('rotateY(90.00deg)');
+    expect(rtl[0]!['transformOrigin']).toBe('right center');
+    expect(rtl.at(-1)!['transform']).toContain('rotateY(90.00deg)');
   });
 });
 
