@@ -24,6 +24,8 @@ import AnnotationToolbarCustomizer from './AnnotationToolbarCustomizer';
 import { DEFAULT_ANNOTATION_TOOLBAR_ITEMS } from '@/utils/annotationToolbar';
 import { canShareText } from '@/utils/share';
 import { optInTelemetry, optOutTelemetry } from '@/utils/telemetry';
+import { applyPaginatorSwipe, supportsBookTurn } from '@/utils/pageTurn';
+import { ViewSettings } from '@/types/book';
 
 const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
@@ -56,6 +58,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const [copyToNotebook, setCopyToNotebook] = useState(viewSettings.copyToNotebook);
   const [showToolbarCustomizer, setShowToolbarCustomizer] = useState(false);
   const [animated, setAnimated] = useState(viewSettings.animated);
+  const [bookPageTurn, setBookPageTurn] = useState(viewSettings.bookPageTurn);
   const [isEink, setIsEink] = useState(viewSettings.isEink);
   const [isColorEink, setIsColorEink] = useState(viewSettings.isColorEink);
   const [autoScreenBrightness, setAutoScreenBrightness] = useState(settings.autoScreenBrightness);
@@ -83,6 +86,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
       disableSwipe: setIsDisableSwipe,
       swapClickArea: setSwapClickArea,
       animated: setAnimated,
+      bookPageTurn: setBookPageTurn,
       isEink: setIsEink,
       allowScript: setAllowScript,
       fullscreenClickArea: setFullscreenClickArea,
@@ -157,16 +161,22 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDisableClick]);
 
+  // The renderer reads `no-swipe` at touchmove/touchend time, so we have to
+  // push the attribute through immediately rather than waiting for the next
+  // recreateViewer pass. The book turn takes the swipe too (utils/pageTurn.ts).
+  const updatePaginatorSwipe = (changed: Partial<ViewSettings>) => {
+    const view = getView(bookKey);
+    if (!view) return;
+    applyPaginatorSwipe(
+      view.renderer,
+      { ...viewSettings, disableSwipe: isDisableSwipe, animated, bookPageTurn, isEink, ...changed },
+      view.isFixedLayout,
+    );
+  };
+
   useEffect(() => {
     saveViewSettings(envConfig, bookKey, 'disableSwipe', isDisableSwipe, false, false);
-    // The renderer reads `no-swipe` at touchmove/touchend time, so we have to
-    // push the attribute through immediately rather than waiting for the next
-    // recreateViewer pass.
-    if (isDisableSwipe) {
-      getView(bookKey)?.renderer.setAttribute('no-swipe', '');
-    } else {
-      getView(bookKey)?.renderer.removeAttribute('no-swipe');
-    }
+    updatePaginatorSwipe({ disableSwipe: isDisableSwipe });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDisableSwipe]);
 
@@ -192,8 +202,15 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     } else {
       getView(bookKey)?.renderer.removeAttribute('animated');
     }
+    updatePaginatorSwipe({ animated });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animated]);
+
+  useEffect(() => {
+    saveViewSettings(envConfig, bookKey, 'bookPageTurn', bookPageTurn, false, false);
+    updatePaginatorSwipe({ bookPageTurn });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookPageTurn]);
 
   useEffect(() => {
     saveViewSettings(envConfig, bookKey, 'isEink', isEink);
@@ -202,6 +219,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     } else {
       getView(bookKey)?.renderer.removeAttribute('eink');
     }
+    updatePaginatorSwipe({ isEink });
     applyEinkMode(isEink);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEink]);
@@ -426,6 +444,14 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
           checked={animated}
           onChange={() => setAnimated(!animated)}
         />
+        {animated && supportsBookTurn() && (
+          <SettingsSwitchRow
+            label={_('Turn Pages Like a Book')}
+            checked={bookPageTurn}
+            onChange={() => setBookPageTurn(!bookPageTurn)}
+            data-setting-id='settings.control.bookPageTurn'
+          />
+        )}
       </BoxedList>
 
       <BoxedList title={_('Device')} data-setting-id='settings.control.device'>

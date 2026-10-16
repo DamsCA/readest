@@ -297,6 +297,9 @@ export interface ViewConfig {
   progressInfoMode: ProgressBarMode;
 
   animated: boolean;
+  // With `animated`, a paginated book's pages turn like a book's instead of
+  // sliding (utils/pageTurn.ts).
+  bookPageTurn: boolean;
   isEink: boolean;
   isColorEink: boolean;
 

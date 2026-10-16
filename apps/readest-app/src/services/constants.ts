@@ -305,6 +305,7 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
 export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: false,
   animated: true,
+  bookPageTurn: true,
   defaultFont: 'Sans-serif',
   disableDoubleClick: true,
   spreadMode: 'none',
@@ -356,6 +357,7 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   progressInfoMode: 'all',
 
   animated: false,
+  bookPageTurn: false,
   isEink: false,
   isColorEink: false,
 

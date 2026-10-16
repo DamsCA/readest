@@ -75,6 +75,7 @@ import { isMetered } from '@/utils/network';
 import { eventDispatcher } from '@/utils/event';
 import { isFontType } from '@/utils/font';
 import { getScrollGapAttr } from '@/utils/webtoon';
+import { applyPaginatorSwipe } from '@/utils/pageTurn';
 import { ParagraphControl } from './paragraph';
 import AIProofreadBar from './AIProofreadBar';
 import Spinner from '@/components/Spinner';
@@ -309,6 +310,8 @@ const FoliateViewer: React.FC<{
         viewSettings.vertical = newVertical;
         viewSettings.rtl = newRtl;
         setViewSettings(bookKey, { ...viewSettings });
+        // A vertical book keeps the paginator's swipe: the book turn is for pages read across.
+        if (renderer) applyPaginatorSwipe(renderer, viewSettings, !!bookData?.isFixedLayout);
       }
 
       if (!bookData?.isFixedLayout) {
@@ -697,11 +700,7 @@ const FoliateViewer: React.FC<{
       if (appService?.isIOSApp) {
         view.renderer.setAttribute('gpu-composite', '');
       }
-      if (viewSettings.disableSwipe) {
-        view.renderer.setAttribute('no-swipe', '');
-      } else {
-        view.renderer.removeAttribute('no-swipe');
-      }
+      applyPaginatorSwipe(view.renderer, viewSettings, view.isFixedLayout);
       if (appService?.isAndroidApp) {
         if (eink) {
           view.renderer.setAttribute('eink', '');

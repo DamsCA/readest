@@ -734,6 +734,28 @@ input[type='range'].slider-input {
   border-radius: 8px;
 }
 
+/* Pages turned like a book's (utils/pageTurn.ts). Only the reading area is
+   photographed: the rest of the app stays live around the pictures, which
+   the script turns itself. */
+html.book-turning {
+  view-transition-name: none;
+}
+
+html.book-turning::view-transition {
+  pointer-events: none;
+}
+
+html.book-turning::view-transition-group(book-page),
+html.book-turning::view-transition-old(book-page),
+html.book-turning::view-transition-new(book-page) {
+  animation: none;
+}
+
+html.book-turning::view-transition-old(book-page),
+html.book-turning::view-transition-new(book-page) {
+  mix-blend-mode: normal;
+}
+
 /* View Transitions for library navigation */
 ::view-transition-old(root),
 ::view-transition-new(root) {

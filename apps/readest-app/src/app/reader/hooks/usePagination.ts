@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { FoliateView } from '@/types/view';
 import { ViewSettings } from '@/types/book';
@@ -11,6 +11,13 @@ import { eventDispatcher } from '@/utils/event';
 import { resolvePageTurn, normalizeDomKeyEvent, KeyCandidate } from '@/utils/keybinding';
 import { isTauriAppPlatform } from '@/services/environment';
 import { tauriGetWindowLogicalPosition } from '@/utils/window';
+import {
+  bookTurnActive,
+  dragPageLikeABook,
+  PageDrag,
+  turnPageLikeABook,
+  TurnDir,
+} from '@/utils/pageTurn';
 import { getReadingRulerMoveDirection } from '../utils/readingRuler';
 import { useTouchInterceptor } from './useTouchInterceptor';
 
@@ -173,11 +180,22 @@ export const viewPagination = (
         }
       case 'pan':
       case 'page':
-      default:
-        return side === 'left' || side === 'up' ? view.prev() : view.next();
+      default: {
+        const forward = !(side === 'left' || side === 'up');
+        if (bookTurnActive(viewSettings, view.isFixedLayout)) {
+          return turnPageLikeABook(view, forward ? 1 : -1, viewSettings.rtl);
+        }
+        return forward ? view.next() : view.prev();
+      }
     }
   }
 };
+
+const hasTextSelection = (view: FoliateView) =>
+  view.renderer.getContents().some(({ doc }) => {
+    const selection = doc?.getSelection();
+    return !!selection && selection.rangeCount > 0 && !selection.isCollapsed;
+  });
 
 export const usePagination = (
   bookKey: string,
@@ -486,6 +504,72 @@ export const usePagination = (
     hardwarePageTurner?.bindings.sectionPrev?.source,
     hardwarePageTurner?.bindings.sectionNext?.source,
   ]);
+
+  // The book turn takes the finger (utils/pageTurn.ts): drawn across the page,
+  // it turns the page along; let go past a third of the way, or flung, the
+  // page turns, else it lies back. While a page is still turning, a swipe
+  // turns the next one as it lifts.
+  const pageDragRef = useRef<{
+    drag: PageDrag | null;
+    dir: TurnDir;
+    sign: number;
+    x: number;
+    t: number;
+    vx: number;
+  } | null>(null);
+  useTouchInterceptor(
+    `book-turn-${bookKey}`,
+    (bk, detail) => {
+      if (bk !== bookKey) return false;
+      if (detail.phase === 'start') {
+        pageDragRef.current = null;
+        return false;
+      }
+      const view = viewRef.current;
+      const viewSettings = getViewSettings(bookKey);
+      if (!view || !viewSettings) return false;
+      let state = pageDragRef.current;
+      if (!state) {
+        if (detail.phase !== 'move') return false;
+        if (!bookTurnActive(viewSettings, view.isFixedLayout) || viewSettings.disableSwipe) {
+          return false;
+        }
+        const { deltaX, deltaY } = detail;
+        if (Math.abs(deltaX) < 12 || Math.abs(deltaX) < 1.5 * Math.abs(deltaY)) return false;
+        if (hasTextSelection(view)) return false;
+        // Drawn to the left, a left-to-right book's page turns to the next.
+        const dir: TurnDir = deltaX < 0 !== viewSettings.rtl ? 1 : -1;
+        state = {
+          drag: dragPageLikeABook(view, dir, viewSettings.rtl),
+          dir,
+          sign: deltaX < 0 ? -1 : 1,
+          x: detail.touch.screenX,
+          t: performance.now(),
+          vx: 0,
+        };
+        pageDragRef.current = state;
+      }
+      const width = containerRef.current?.clientWidth || window.innerWidth;
+      const progress = Math.max(0, (state.sign * detail.deltaX) / width);
+      if (detail.phase === 'move') {
+        const now = performance.now();
+        if (now > state.t) {
+          const vx = (detail.touch.screenX - state.x) / (now - state.t);
+          state.vx = 0.6 * vx + 0.4 * state.vx;
+          state.x = detail.touch.screenX;
+          state.t = now;
+        }
+        state.drag?.move(progress);
+        return true;
+      }
+      pageDragRef.current = null;
+      const commit = progress > 0.3 || (state.sign * state.vx > 0.35 && progress > 0.04);
+      if (state.drag) state.drag.release(commit);
+      else if (commit) void turnPageLikeABook(view, state.dir, viewSettings.rtl);
+      return true;
+    },
+    5, // after the reading ruler's drag (10), before the fixed-layout swipe (0)
+  );
 
   // Touch swipe page flip for fixed-layout books — registered as a touch interceptor
   // so it participates in the priority-based consumption chain.
