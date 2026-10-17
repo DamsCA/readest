@@ -1,4 +1,5 @@
 import { isSameLang } from '@/utils/lang';
+import { SAME_IN_TRANSLATION } from '@/utils/translationDom';
 import { blockSourceText, walkTextNodes } from '@/utils/walk';
 
 // Reading both languages, the voice reads what the page holds: a paragraph is
@@ -18,6 +19,7 @@ export const hasLangPart = (ssml: string, lang: string) => {
 const untranslated = (el: HTMLElement) =>
   !el.classList.contains('translation-target') &&
   !el.querySelector('.translation-target') &&
+  !el.hasAttribute(SAME_IN_TRANSLATION) &&
   LETTER.test(blockSourceText(el));
 
 /**

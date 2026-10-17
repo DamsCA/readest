@@ -436,7 +436,28 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       void handleStop(bookKey);
     };
 
+    // Reading both languages, the controller stopped on a paragraph without
+    // its French (it reads both or nothing): show it paused, and say why.
+    // Play reads that paragraph again.
+    const handleTranslationMissing = () => {
+      setIsPlaying(false);
+      setIsPaused(true);
+      emitPlaybackState('paused');
+      const mediaSession = mediaSessionRef.current;
+      if (mediaSession instanceof TauriMediaSession) {
+        void mediaSession.updatePlaybackState({ playing: false });
+      } else if (mediaSession) {
+        mediaSession.playbackState = 'paused';
+      }
+      eventDispatcher.dispatch('toast', {
+        message: _('No translation for this paragraph yet. Reading paused.'),
+        type: 'info',
+        timeout: 6000,
+      });
+    };
+
     ttsController.addEventListener('tts-ended', handleEnded);
+    ttsController.addEventListener('tts-translation-missing', handleTranslationMissing);
     ttsController.addEventListener('tts-need-auth', handleNeedAuth);
     ttsController.addEventListener('tts-engine-down', handleEngineDown);
     ttsController.addEventListener('tts-speak-mark', handleSpeakMark);
@@ -446,6 +467,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     ttsController.addEventListener('tts-banked-ahead', handleBankedAhead);
     return () => {
       ttsController.removeEventListener('tts-ended', handleEnded);
+      ttsController.removeEventListener('tts-translation-missing', handleTranslationMissing);
       ttsController.removeEventListener('tts-need-auth', handleNeedAuth);
       ttsController.removeEventListener('tts-engine-down', handleEngineDown);
       ttsController.removeEventListener('tts-speak-mark', handleSpeakMark);

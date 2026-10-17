@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TTS } from 'foliate-js/tts.js';
 import { TTSController } from '@/services/tts/TTSController';
 import { TTSClient, TTSMessageEvent } from '@/services/tts/TTSClient';
@@ -8,7 +8,7 @@ import { FoliateView } from '@/types/view';
 import { AppService } from '@/types/system';
 import { createRejectFilter } from '@/utils/node';
 import { ttsTextWalker } from '@/utils/ttsTextWalker';
-import { createTranslationWrapper } from '@/utils/translationDom';
+import { createTranslationWrapper, SAME_IN_TRANSLATION } from '@/utils/translationDom';
 
 // Reading both languages (the default: each paragraph in English, then in
 // French), the voice reads the page, and the reader's translator translates
@@ -177,7 +177,7 @@ describe('what the voice is about to read, not translated yet', () => {
   });
 });
 
-describe('reading both languages, the screen off', () => {
+describe('reading both languages', () => {
   let doc: Document;
   beforeEach(() => {
     doc = makePage();
@@ -222,43 +222,79 @@ describe('reading both languages, the screen off', () => {
     expect(text(heard[0])).toBe(`Line 0 B is here. ${french(ENGLISH[0]!)}`);
   });
 
-  it('goes on without waiting once the translator has missed twice in a row', async () => {
-    const { view, controller, heard, asked } = setUp(doc, () => {});
-    const tts = view.tts!;
-    await controller.speak(tts.start()!);
+  // "S'il n'y a pas la traduction, j'ai pas envie d'écouter ce qui est dit en
+  // anglais" (17 Oct 2026): no English alone — the voice stops on the
+  // paragraph, and Play reads it again once its French is there.
+  it('stops on a paragraph without its French, and reads it again on Play', async () => {
+    let translating = false;
+    const { view, controller, heard } = setUp(doc, (els, now) => {
+      if (now && translating) els.forEach(translate);
+    });
+    const missing = vi.fn();
+    controller.addEventListener('tts-translation-missing', missing);
+    await controller.speak(view.tts!.start()!);
+    await vi.waitFor(() => expect(missing).toHaveBeenCalledTimes(1));
+    expect(heard).toHaveLength(0);
+    expect(controller.state).toBe('stop-paused');
+
+    translating = true;
+    await controller.start();
     await vi.waitFor(() => expect(heard).toHaveLength(1));
-    await controller.speak(tts.next()!);
-    await vi.waitFor(() => expect(heard).toHaveLength(2));
-    await controller.speak(tts.next()!);
-    await vi.waitFor(() => expect(heard).toHaveLength(3));
-    // Read in English as they are; the third one is not waited for.
-    expect(heard.map(text)).toEqual(ENGLISH.slice(0, 3));
-    expect(asked.filter((ask) => ask.now).map((ask) => ask.texts)).toEqual([
-      [ENGLISH[0]],
-      [ENGLISH[1]],
-    ]);
+    expect(text(heard[0])).toBe(`${ENGLISH[0]} ${french(ENGLISH[0]!)}`);
+  });
+
+  it('reads as it is a paragraph that is the same in both languages', async () => {
+    doc.querySelector('p')!.setAttribute(SAME_IN_TRANSLATION, '');
+    const { view, controller, heard } = setUp(doc, () => {});
+    await controller.speak(view.tts!.start()!);
+    await vi.waitFor(() => expect(heard).toHaveLength(1));
+    expect(text(heard[0])).toBe(ENGLISH[0]);
   });
 
   // With the screen off, a wait between two sentences never ended: claire.61
   // (8 s) and claire.62 (0.4 s) fell silent at a paragraph without its French,
   // Android closed the media session, and the voice failed when the screen
   // came back on (emulator, 17 Oct 2026). The timers below never fire either.
-  it('with the screen off, never waits: the voice must not go quiet', async () => {
-    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
-    try {
-      const { view, controller, heard, asked } = setUp(doc, () => {});
-      await controller.speak(view.tts!.start()!);
-      for (let i = 0; i < 50 && heard.length === 0; i++) {
-        await new Promise((resolve) => setImmediate(resolve));
-      }
-      expect(text(heard[0])).toBe(ENGLISH[0]);
-      // Its translation is asked for all the same, for the page.
-      expect(asked).toContainEqual({ texts: [ENGLISH[0]], now: false });
-    } finally {
+  describe('with the screen off, timers never firing', () => {
+    let hidden: { mockRestore(): void };
+    beforeEach(() => {
+      hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+    });
+    afterEach(() => {
       vi.useRealTimers();
       hidden.mockRestore();
-    }
+    });
+    const settle = async (until: () => boolean) => {
+      for (let i = 0; i < 50 && !until(); i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    };
+
+    it('stops at once on a paragraph without its French', async () => {
+      const { view, controller, heard, asked } = setUp(doc, () => {});
+      controller.translateBlocks = (elements, now) => {
+        asked.push({ texts: elements.map((el) => el.textContent ?? ''), now });
+        return now ? new Promise<void>(() => {}) : Promise.resolve();
+      };
+      const missing = vi.fn();
+      controller.addEventListener('tts-translation-missing', missing);
+      await controller.speak(view.tts!.start()!);
+      await settle(() => missing.mock.calls.length > 0);
+      expect(missing).toHaveBeenCalledTimes(1);
+      expect(heard).toHaveLength(0);
+      // Its translation is asked for all the same, for the page.
+      expect(asked).toContainEqual({ texts: [ENGLISH[0]], now: true });
+    });
+
+    it('takes a translation that comes back at once (already in memory)', async () => {
+      const { view, controller, heard } = setUp(doc, (els, now) => {
+        if (now) els.forEach(translate);
+      });
+      await controller.speak(view.tts!.start()!);
+      await settle(() => heard.length > 0);
+      expect(text(heard[0])).toBe(`${ENGLISH[0]} ${french(ENGLISH[0]!)}`);
+    });
   });
 
   it('with the screen on, gives the translation more time', async () => {

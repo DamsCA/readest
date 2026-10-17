@@ -30,6 +30,7 @@ import {
   TTSStep,
 } from './ttsNavigation';
 import { hasLangPart, untranslatedParagraphs } from './ttsTranslation';
+import { voiceLog } from '@/utils/voiceLog';
 import { isSameLang, isValidLang } from '@/utils/lang';
 import {
   computeWordOffsets,
@@ -79,8 +80,25 @@ const TTS_EMPTY_RETRY_DELAY_MS = 800;
 // time as it came to a paragraph without its French; Android closed the app's
 // media session half a minute later, and the voice failed when the screen came
 // back on. claire.60, which never waited, read on.
+// Without its French a paragraph is not read: the voice stops there (see
+// #bringTranslation).
 const TTS_TRANSLATE_AHEAD = 6;
 const TTS_TRANSLATION_WAIT_MS = 4000;
+const TRANSLATION_MISSING = Symbol('translation missing');
+
+// Whether a promise settles within the task, through microtasks alone — no
+// timer, as with the screen off timers do not run. A translation already in
+// memory comes back that way; one that needs the database or the network
+// does not.
+const settlesAtOnce = async (promise: Promise<unknown>, hops = 1000) => {
+  let settled = false;
+  const done = () => {
+    settled = true;
+  };
+  void promise.then(done, done);
+  for (let i = 0; i < hops && !settled; i++) await Promise.resolve();
+  return settled;
+};
 
 type TTSState =
   | 'stopped'
@@ -113,7 +131,6 @@ export class TTSController extends EventTarget {
   // (useTextTranslation's 'translate-blocks'), `now` when the voice waits.
   bothLanguagesTarget?: () => string;
   translateBlocks?: (elements: HTMLElement[], now: boolean) => Promise<void>;
-  #translationMisses: number = 0;
   #nossmlCnt: number = 0;
   // Consecutive native-TTS utterances that ended in a terminal 'error' without
   // a successful 'end' in between. Reset on success; caps skip-on-error so a
@@ -459,8 +476,8 @@ export class TTSController extends EventTarget {
       }
 
       // Reading both languages too: the next chapter's first paragraphs are
-      // then translated before the voice gets there, which it does with the
-      // screen off as well, where it no longer waits (#bringTranslation).
+      // then translated before the voice gets there — with the screen off it
+      // cannot wait, and a paragraph without its French stops it.
       const target = this.ttsTargetLang || this.bothLanguagesTarget?.() || '';
       if (target && this.prefetchTranslations) {
         // Translation mode. Collect paragraph texts exactly as the reader's
@@ -696,6 +713,11 @@ export class TTSController extends EventTarget {
         if (!oneTime && rawSsml) {
           const translated = await this.#bringTranslation(rawSsml, signal);
           if (signal.aborted) return;
+          if (translated === TRANSLATION_MISSING) {
+            resolve();
+            this.#stopForTranslation();
+            return;
+          }
           if (translated) rawSsml = translated;
         }
         ssml = await this.#preprocessSSML(rawSsml);
@@ -1116,9 +1138,15 @@ export class TTSController extends EventTarget {
   // seen on, the voice went on in English only ("d'un coup, ça me traduisait
   // plus en français", 17 Oct 2026). Before reading a paragraph, the voice
   // asks for the next ones, and waits for this one if it is not translated
-  // yet: then reads it again from the page, French included. Returns that
-  // SSML, or nothing to read the paragraph as it is.
-  async #bringTranslation(rawSsml: string, signal: AbortSignal): Promise<string | undefined> {
+  // yet: then reads it again from the page, French included. Without its
+  // French the paragraph is not read at all: "s'il n'y a pas la traduction,
+  // j'ai pas envie d'écouter ce qui est dit en anglais parce que je vais pas
+  // forcément tout comprendre" (17 Oct 2026). Returns the SSML to read,
+  // nothing to read the paragraph as it is, or TRANSLATION_MISSING.
+  async #bringTranslation(
+    rawSsml: string,
+    signal: AbortSignal,
+  ): Promise<string | typeof TRANSLATION_MISSING | undefined> {
     const tts = this.view.tts;
     const lang = this.bothLanguagesTarget?.();
     if (!tts || !lang || !this.translateBlocks) return;
@@ -1145,19 +1173,21 @@ export class TTSController extends EventTarget {
     block.setEnd(end.endContainer, end.endOffset);
     const { current, next } = untranslatedParagraphs(tts.doc, block, TTS_TRANSLATE_AHEAD);
     if (next.length > 0) void this.translateBlocks(next, false).catch(() => {});
-    if (current.length === 0 || hasLangPart(rawSsml, lang)) {
-      this.#translationMisses = 0;
-      return;
-    }
-    // With the screen off, never wait (see TTS_TRANSLATION_WAIT_MS): the
-    // paragraph is read as it is, its translation asked for all the same.
+    if (current.length === 0 || hasLangPart(rawSsml, lang)) return;
+    const said = (current[0]?.textContent ?? '').trim().slice(0, 40);
+    // With the screen off, no timer (see TTS_TRANSLATION_WAIT_MS): the
+    // translation is taken if it comes back at once — already in memory, as
+    // the next chapter's first paragraphs are — else the voice stops.
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      void this.translateBlocks(current, false).catch(() => {});
-      return;
+      const request = this.translateBlocks(current, true).catch(() => {});
+      await settlesAtOnce(request);
+      if (signal.aborted || this.view.tts !== tts) return;
+      const ssml = tts.resume();
+      if (ssml && hasLangPart(ssml, lang)) return ssml;
+      voiceLog(`[voice] no French, screen off: stopping at "${said}"`);
+      return TRANSLATION_MISSING;
     }
-    // A translator that does not answer must not silence every paragraph:
-    // after two misses in a row, the voice goes on without waiting.
-    if (this.#translationMisses >= 2) return;
+    const asked = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
       this.translateBlocks(current, true).catch(() => {}),
@@ -1167,11 +1197,17 @@ export class TTSController extends EventTarget {
     if (signal.aborted || this.view.tts !== tts) return;
     const ssml = tts.resume();
     if (!ssml || !hasLangPart(ssml, lang)) {
-      this.#translationMisses++;
-      return;
+      voiceLog(`[voice] no French after ${Date.now() - asked} ms: stopping at "${said}"`);
+      return TRANSLATION_MISSING;
     }
-    this.#translationMisses = 0;
     return ssml;
+  }
+
+  // Without its French the paragraph is not read: the voice stops on it, the
+  // cursor on its first sentence, and Play reads it again from the page.
+  #stopForTranslation() {
+    this.state = 'stop-paused';
+    this.dispatchEvent(new CustomEvent('tts-translation-missing'));
   }
 
   // Stands foliate's cursor on a mark without drawing it: the highlight

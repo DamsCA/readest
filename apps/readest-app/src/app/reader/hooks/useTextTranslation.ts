@@ -9,7 +9,8 @@ import { eventDispatcher } from '@/utils/event';
 import { blockSourceText, walkTextNodes } from '@/utils/walk';
 import { debounce } from '@/utils/debounce';
 import { getLocale } from '@/utils/misc';
-import { createTranslationWrapper } from '@/utils/translationDom';
+import { createTranslationWrapper, SAME_IN_TRANSLATION } from '@/utils/translationDom';
+import { voiceLog } from '@/utils/voiceLog';
 import { applyRulesToText, getCorrectionRules } from '@/services/transformers/proofread';
 
 export function useTextTranslation(
@@ -292,7 +293,13 @@ export function useTextTranslation(
         translated[0] ?? '',
         getCorrectionRules(getViewSettings(bookKey)?.proofreadRules),
       );
-      if (!translatedText || text === translatedText) return;
+      if (!translatedText) return;
+      if (text === translatedText) {
+        // Nothing to translate (a name, a number…): the voice reads it as it
+        // is instead of stopping for want of a translation.
+        el.setAttribute(SAME_IN_TRANSLATION, '');
+        return;
+      }
 
       const wrapper = createTranslationWrapper(document, translatedText, {
         lang: targetLang || getLocale(),
@@ -384,8 +391,13 @@ export function useTextTranslation(
     const translateForVoice = (el: HTMLElement) => {
       let request = voiceRequests.current.get(el);
       if (!request) {
+        const asked = Date.now();
         request = translateElementRef.current(el, true).finally(() => {
           voiceRequests.current.delete(el);
+          const done = el.querySelector('.translation-target') ? 'translated' : 'NOT translated';
+          voiceLog(
+            `[voice] ${done} in ${Date.now() - asked} ms: "${blockSourceText(el).slice(0, 40)}"`,
+          );
         });
         voiceRequests.current.set(el, request);
       }

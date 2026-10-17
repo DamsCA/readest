@@ -28,6 +28,7 @@ vi.mock('@/services/transformers/proofread', () => ({
 
 import { useTextTranslation } from '@/app/reader/hooks/useTextTranslation';
 import { eventDispatcher } from '@/utils/event';
+import { SAME_IN_TRANSLATION } from '@/utils/translationDom';
 import { FoliateView } from '@/types/view';
 
 const makeDoc = () =>
@@ -140,6 +141,21 @@ describe('paragraphs the voice asks for', () => {
       now: true,
     });
     expect(one!.querySelectorAll('.translation-target-block')).toHaveLength(1);
+  });
+
+  it('marks a paragraph that is the same in translation, for the voice to read it', async () => {
+    const view = makeView();
+    renderHook(() => useTextTranslation('book-1', view));
+    const doc = makeDoc();
+    const [one] = Array.from(doc.querySelectorAll('p'));
+    translate.mockImplementationOnce(async (texts: string[]) => texts);
+    await eventDispatcher.dispatch('translate-blocks', {
+      bookKey: 'book-1',
+      elements: [one],
+      now: true,
+    });
+    expect(french(one!)).toBeUndefined();
+    expect(one!.hasAttribute(SAME_IN_TRANSLATION)).toBe(true);
   });
 
   it('is not the table of contents’ translator', async () => {

@@ -1,3 +1,7 @@
+// Set on a paragraph whose translation is the paragraph itself (a name, a
+// number…): nothing is appended, and the voice reads it as it is.
+export const SAME_IN_TRANSLATION = 'data-same-in-translation';
+
 // The element appended to a paragraph to show its translation. Lives outside
 // useTextTranslation so the TTS tests can build exactly the DOM the reader
 // produces without pulling in the hook's dependency chain.
