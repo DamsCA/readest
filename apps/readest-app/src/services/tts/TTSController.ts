@@ -29,6 +29,7 @@ import {
   stepSentence,
   TTSStep,
 } from './ttsNavigation';
+import { hasLangPart, untranslatedParagraphs } from './ttsTranslation';
 import { isSameLang, isValidLang } from '@/utils/lang';
 import {
   computeWordOffsets,
@@ -69,6 +70,12 @@ const TTS_MAX_CONSECUTIVE_EMPTY_SKIPS = 30;
 // then needs a couple of seconds, so the budget must cover a full round trip.
 const TTS_MAX_EMPTY_RETRIES = 8;
 const TTS_EMPTY_RETRY_DELAY_MS = 800;
+// Reading both languages (#bringTranslation): how many paragraphs ahead of the
+// voice are sent to the translator, and how long the voice waits for the
+// translation of the one it is about to read (the AI takes 1-2 s; past that
+// it is not answering, and Google takes the paragraph after 30 s).
+const TTS_TRANSLATE_AHEAD = 6;
+const TTS_TRANSLATION_WAIT_MS = 8000;
 
 type TTSState =
   | 'stopped'
@@ -95,6 +102,13 @@ export class TTSController extends EventTarget {
   // (translation cache warm + audio pre-generation) while the current one is
   // still playing, so the chapter flip is seamless.
   prefetchTranslations?: (texts: string[]) => Promise<(string | null)[] | null>;
+  // Reading both languages (useTTSControl): the language the reader's
+  // translator puts in the page, '' when the voice reads one language or
+  // nothing is translated; and the way to ask that translator for paragraphs
+  // (useTextTranslation's 'translate-blocks'), `now` when the voice waits.
+  bothLanguagesTarget?: () => string;
+  translateBlocks?: (elements: HTMLElement[], now: boolean) => Promise<void>;
+  #translationMisses: number = 0;
   #nossmlCnt: number = 0;
   // Consecutive native-TTS utterances that ended in a terminal 'error' without
   // a successful 'end' in between. Reset on success; caps skip-on-error so a
@@ -669,7 +683,12 @@ export class TTSController extends EventTarget {
         // Keep the RAW (unfiltered) SSML: in translation mode its source-language
         // marks are the only way to locate this paragraph in the view while the
         // translation hasn't been injected yet (the filtered SSML is empty then).
-        const rawSsml = await ssml;
+        let rawSsml = await ssml;
+        if (!oneTime && rawSsml) {
+          const translated = await this.#bringTranslation(rawSsml, signal);
+          if (signal.aborted) return;
+          if (translated) rawSsml = translated;
+        }
         ssml = await this.#preprocessSSML(rawSsml);
         if (!ssml) {
           this.#nossmlCnt++;
@@ -1081,6 +1100,64 @@ export class TTSController extends EventTarget {
   }
 
   #spokenMarks = (ssml: string): TTSMark[] => spokenMarks(ssml, this.ttsTargetLang);
+
+  // Reading both languages, the voice reads the page, and the reader's
+  // translator translates what the screen shows (and what follows it). With
+  // the screen off nothing is drawn, nothing new is shown: from the last page
+  // seen on, the voice went on in English only ("d'un coup, ça me traduisait
+  // plus en français", 17 Oct 2026). Before reading a paragraph, the voice
+  // asks for the next ones, and waits for this one if it is not translated
+  // yet: then reads it again from the page, French included. Returns that
+  // SSML, or nothing to read the paragraph as it is.
+  async #bringTranslation(rawSsml: string, signal: AbortSignal): Promise<string | undefined> {
+    const tts = this.view.tts;
+    const lang = this.bothLanguagesTarget?.();
+    if (!tts || !lang || !this.translateBlocks) return;
+    if (this.ttsLang && isSameLang(this.ttsLang, lang)) return;
+    const { marks } = parseSSMLMarks(rawSsml);
+    const first = marks[0];
+    const last = marks[marks.length - 1];
+    if (!first || !last) return;
+    // The paragraph's extent, from its marks; the cursor is left on its first
+    // one, as #speak would leave it, and from there it is read again.
+    const rangeOf = (name: string) => {
+      this.#suppressMarkHighlight = true;
+      try {
+        return tts.setMark(name)?.cloneRange();
+      } finally {
+        this.#suppressMarkHighlight = false;
+      }
+    };
+    const end = rangeOf(last.name);
+    const start = rangeOf(first.name);
+    if (!start || !end) return;
+    const block = tts.doc.createRange();
+    block.setStart(start.startContainer, start.startOffset);
+    block.setEnd(end.endContainer, end.endOffset);
+    const { current, next } = untranslatedParagraphs(tts.doc, block, TTS_TRANSLATE_AHEAD);
+    if (next.length > 0) void this.translateBlocks(next, false).catch(() => {});
+    if (current.length === 0 || hasLangPart(rawSsml, lang)) {
+      this.#translationMisses = 0;
+      return;
+    }
+    // A translator that does not answer must not silence every paragraph:
+    // after two misses in a row, the voice goes on without waiting.
+    if (this.#translationMisses >= 2) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      this.translateBlocks(current, true).catch(() => {}),
+      new Promise((resolve) => (timer = setTimeout(resolve, TTS_TRANSLATION_WAIT_MS))),
+    ]);
+    clearTimeout(timer);
+    if (signal.aborted || this.view.tts !== tts) return;
+    const ssml = tts.resume();
+    if (!ssml || !hasLangPart(ssml, lang)) {
+      this.#translationMisses++;
+      return;
+    }
+    this.#translationMisses = 0;
+    return ssml;
+  }
 
   // Stands foliate's cursor on a mark without drawing it: the highlight
   // follows the voice.

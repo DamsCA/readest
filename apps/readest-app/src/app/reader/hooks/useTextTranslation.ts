@@ -212,8 +212,10 @@ export function useTextTranslation(
     allTextNodes.current.forEach((el) => observer.observe(el));
   };
 
-  const translateElement = async (el: HTMLElement) => {
-    if (!enabled.current) return;
+  // `now`: put the translation in the page at once instead of with the next
+  // batch of page updates — the voice is waiting for it (see 'translate-blocks').
+  const translateElement = async (el: HTMLElement, now = false) => {
+    if (!enabled.current || el.querySelector('.translation-target')) return;
     // blockSourceText, not textContent: the latter glues child fragments with no
     // separator (a two-part heading became "Chapter 15You Are a Perfect...").
     // TTSController's prefetch uses the same helper — they must agree or the
@@ -292,12 +294,14 @@ export function useTextTranslation(
       if (el.querySelector('.translation-target')) {
         return;
       }
-      batchDOMUpdate(() => {
+      const inject = () => {
         if (!enabled.current || el.querySelector('.translation-target')) return;
         updateSourceNodes(el);
         el.appendChild(wrapper);
         translatedElements.current.push(el);
-      });
+      };
+      if (now) inject();
+      else batchDOMUpdate(inject);
     } catch (err) {
       console.warn('Translation failed:', err);
     }
@@ -351,6 +355,33 @@ export function useTextTranslation(
     }, 500),
     [scheduleTranslation],
   );
+
+  // The voice, reading both languages, asks for the paragraphs it is about to
+  // read (TTSController#bringTranslation): what is translated above follows
+  // the screen, and with the screen off nothing is drawn — no page turns, no
+  // visible paragraphs — so from the last page shown on, the voice went on in
+  // English only (17 Oct 2026). `now`: the voice waits for these; the others
+  // are the ones it reads next.
+  const translateElementRef = useRef(translateElement);
+  const scheduleTranslationRef = useRef(scheduleTranslation);
+  useEffect(() => {
+    translateElementRef.current = translateElement;
+    scheduleTranslationRef.current = scheduleTranslation;
+  });
+  useEffect(() => {
+    if (!view || !('renderer' in view)) return;
+    const onTranslateBlocks = async (event: CustomEvent) => {
+      const detail = event.detail as { bookKey: string; elements: HTMLElement[]; now?: boolean };
+      if (detail.bookKey !== bookKey || !enabled.current) return;
+      if (!detail.now) {
+        detail.elements.forEach((el) => scheduleTranslationRef.current(el));
+        return;
+      }
+      await Promise.all(detail.elements.map((el) => translateElementRef.current(el, true)));
+    };
+    eventDispatcher.on('translate-blocks', onTranslateBlocks);
+    return () => eventDispatcher.off('translate-blocks', onTranslateBlocks);
+  }, [bookKey, view]);
 
   useEffect(() => {
     if (enabled.current && progress) {

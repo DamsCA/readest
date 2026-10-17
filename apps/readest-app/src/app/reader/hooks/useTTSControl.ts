@@ -831,6 +831,18 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           }
         };
 
+        // Reading both languages, the voice asks the reader's translator for
+        // the paragraphs it is about to read (TTSController#bringTranslation):
+        // with the screen off, the translator saw no new page.
+        ttsController.bothLanguagesTarget = () => {
+          const vs = getViewSettings(bookKey);
+          if (!vs?.translationEnabled) return '';
+          if (vs.ttsReadAloudText === 'translated' || vs.ttsReadAloudText === 'source') return '';
+          return vs.translateTargetLang || getLocale();
+        };
+        ttsController.translateBlocks = (elements, now) =>
+          eventDispatcher.dispatch('translate-blocks', { bookKey, elements, now });
+
         await ttsController.init();
         await ttsController.initViewTTS(ttsFromIndex);
         ttsController.updateHighlightOptions(
