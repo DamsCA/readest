@@ -239,21 +239,24 @@ describe('reading both languages, the screen off', () => {
     ]);
   });
 
-  // claire.61 waited up to 8 s, screen off too: the sound stopped, Android
-  // closed the app's media session, and the voice never came back (emulator,
-  // 17 Oct 2026). With the screen off the voice reads the paragraph as it is.
-  it('with the screen off, hardly waits for a translation that is not there', async () => {
+  // With the screen off, a wait between two sentences never ended: claire.61
+  // (8 s) and claire.62 (0.4 s) fell silent at a paragraph without its French,
+  // Android closed the media session, and the voice failed when the screen
+  // came back on (emulator, 17 Oct 2026). The timers below never fire either.
+  it('with the screen off, never waits: the voice must not go quiet', async () => {
     const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
     try {
-      const { view, controller, heard } = setUp(doc, () => {});
-      controller.translateBlocks = (_elements, now) =>
-        now ? new Promise<void>(() => {}) : Promise.resolve();
-      const started = Date.now();
+      const { view, controller, heard, asked } = setUp(doc, () => {});
       await controller.speak(view.tts!.start()!);
-      await vi.waitFor(() => expect(heard).toHaveLength(1), { timeout: 1500 });
-      expect(Date.now() - started).toBeLessThan(1500);
+      for (let i = 0; i < 50 && heard.length === 0; i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
       expect(text(heard[0])).toBe(ENGLISH[0]);
+      // Its translation is asked for all the same, for the page.
+      expect(asked).toContainEqual({ texts: [ENGLISH[0]], now: false });
     } finally {
+      vi.useRealTimers();
       hidden.mockRestore();
     }
   });

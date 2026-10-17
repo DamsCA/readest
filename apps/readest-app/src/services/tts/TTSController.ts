@@ -72,15 +72,15 @@ const TTS_MAX_EMPTY_RETRIES = 8;
 const TTS_EMPTY_RETRY_DELAY_MS = 800;
 // Reading both languages (#bringTranslation): how many paragraphs ahead of the
 // voice are sent to the translator, and how long the voice waits, at most, for
-// the translation of the one it is about to read: the AI takes 1-2 s, a cached
-// translation a few milliseconds. With the screen off the voice must not go
-// quiet: claire.61 waited up to 8 s there, and on the emulator (17 Oct 2026)
-// the sound stopped at 12:56:35 as the voice entered a chapter, Android closed
-// the app's media session at 12:57:04, and nothing was heard again until the
-// screen came back on at 12:59:32 — when the voice failed and stopped.
+// the translation of the one it is about to read (the AI takes 1-2 s, a cached
+// translation a few milliseconds) — with the screen on only. With the screen
+// off, a wait between two sentences never ends: on the emulator (17 Oct 2026)
+// claire.61 (8 s) fell silent at 12:56:35, claire.62 (0.4 s) at 14:13:20, each
+// time as it came to a paragraph without its French; Android closed the app's
+// media session half a minute later, and the voice failed when the screen came
+// back on. claire.60, which never waited, read on.
 const TTS_TRANSLATE_AHEAD = 6;
 const TTS_TRANSLATION_WAIT_MS = 4000;
-const TTS_TRANSLATION_WAIT_HIDDEN_MS = 400;
 
 type TTSState =
   | 'stopped'
@@ -1149,17 +1149,19 @@ export class TTSController extends EventTarget {
       this.#translationMisses = 0;
       return;
     }
+    // With the screen off, never wait (see TTS_TRANSLATION_WAIT_MS): the
+    // paragraph is read as it is, its translation asked for all the same.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      void this.translateBlocks(current, false).catch(() => {});
+      return;
+    }
     // A translator that does not answer must not silence every paragraph:
     // after two misses in a row, the voice goes on without waiting.
     if (this.#translationMisses >= 2) return;
-    const wait =
-      typeof document !== 'undefined' && document.visibilityState === 'hidden'
-        ? TTS_TRANSLATION_WAIT_HIDDEN_MS
-        : TTS_TRANSLATION_WAIT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
       this.translateBlocks(current, true).catch(() => {}),
-      new Promise((resolve) => (timer = setTimeout(resolve, wait))),
+      new Promise((resolve) => (timer = setTimeout(resolve, TTS_TRANSLATION_WAIT_MS))),
     ]);
     clearTimeout(timer);
     if (signal.aborted || this.view.tts !== tts) return;
