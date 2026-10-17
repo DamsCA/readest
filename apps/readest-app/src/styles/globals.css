@@ -736,7 +736,8 @@ input[type='range'].slider-input {
 
 /* Pages turned like a book's (utils/pageTurn.ts). Only the reading area is
    photographed: the rest of the app stays live around the pictures, which
-   the script turns itself. */
+   the script cuts along the fold; the fold itself (book-curl) is drawn over
+   them. */
 html.book-turning {
   view-transition-name: none;
 }
@@ -747,12 +748,15 @@ html.book-turning::view-transition {
 
 html.book-turning::view-transition-group(book-page),
 html.book-turning::view-transition-old(book-page),
-html.book-turning::view-transition-new(book-page) {
+html.book-turning::view-transition-new(book-page),
+html.book-turning::view-transition-group(book-curl),
+html.book-turning::view-transition-new(book-curl) {
   animation: none;
 }
 
 html.book-turning::view-transition-old(book-page),
-html.book-turning::view-transition-new(book-page) {
+html.book-turning::view-transition-new(book-page),
+html.book-turning::view-transition-new(book-curl) {
   mix-blend-mode: normal;
 }
 

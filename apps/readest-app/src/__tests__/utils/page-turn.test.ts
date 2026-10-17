@@ -4,20 +4,122 @@ import { FoliateView } from '@/types/view';
 import {
   applyPaginatorSwipe,
   bookTurnActive,
+  carried,
   dragPageLikeABook,
-  turnAngle,
-  turningFrames,
+  foldPage,
+  Pt,
   turnPageLikeABook,
 } from '@/utils/pageTurn';
 
-// The book turn (utils/pageTurn.ts) against a stand-in for the browser's view
-// transitions and for foliate's paginator: what the paginator is asked to do,
-// and what is animated.
+// The book turn (utils/pageTurn.ts): the fold's geometry, then the turn
+// against a stand-in for the browser's view transitions and for foliate's
+// paginator — what the paginator is asked to do, and what is drawn.
+
+const area = (poly: Pt[]) =>
+  Math.abs(
+    poly.reduce((sum, p, i) => {
+      const q = poly[(i + 1) % poly.length]!;
+      return sum + p.x * q.y - q.x * p.y;
+    }, 0) / 2,
+  );
+const xs = (poly: Pt[]) => poly.map((p) => p.x);
+
+describe('the fold', () => {
+  const w = 400;
+  const h = 800;
+
+  it('leaves the page flat until its corner moves', () => {
+    const fold = foldPage(w, h, { x: w, y: h }, { x: w, y: h });
+    expect(area(fold.front)).toBe(w * h);
+    expect(fold.flap).toHaveLength(0);
+  });
+
+  it('turns over what is past the fold, drawn narrower than it is', () => {
+    // The corner carried to the spine: the fold halfway, straight down.
+    const fold = foldPage(w, h, { x: w, y: 400 }, { x: 0, y: 400 });
+    expect(Math.max(...xs(fold.front))).toBeCloseTo(w / 2, 6);
+    expect(area(fold.front)).toBeCloseTo((w * h) / 2, 6);
+    expect(Math.min(...xs(fold.bare))).toBeCloseTo(w / 2, 6);
+    // The folded half lies over the front, from the fold towards the spine,
+    // rounded: 0.86 of its width.
+    expect(Math.max(...xs(fold.flap))).toBeCloseTo(w / 2, 6);
+    expect(Math.min(...xs(fold.flap))).toBeCloseTo(w / 2 - 0.86 * (w / 2), 6);
+  });
+
+  it('is gone once the corner is past the spine', () => {
+    const fold = foldPage(w, h, { x: w, y: 400 }, { x: -w, y: 400 });
+    expect(area(fold.front)).toBeCloseTo(0, 6);
+    expect(Math.max(...xs(fold.flap))).toBeLessThanOrEqual(1e-6);
+  });
+
+  it('leans when the corner rises', () => {
+    const fold = foldPage(w, h, { x: w, y: h }, carried(w, h, h, 0.5, 0.12));
+    const bottom = fold.front.filter((p) => Math.abs(p.y - h) < 1e-6).map((p) => p.x);
+    const top = fold.front.filter((p) => Math.abs(p.y) < 1e-6).map((p) => p.x);
+    // The lifted corner leads: the fold reaches further at the bottom.
+    expect(Math.max(...bottom)).toBeLessThan(Math.max(...top));
+  });
+
+  it('carries the corner over the spine and back down', () => {
+    expect(carried(w, h, h, 0, 0.12)).toEqual({ x: w, y: h });
+    const half = carried(w, h, h, 0.5, 0.12);
+    expect(half.x).toBeCloseTo(0, 6);
+    expect(half.y).toBeCloseTo(h - 0.12 * h, 6);
+    const end = carried(w, h, h, 1, 0.12);
+    expect(end.x).toBeCloseTo(-w, 6);
+    expect(end.y).toBeCloseTo(h, 6);
+  });
+});
+
+describe('when the book turn applies', () => {
+  const settings = (changed: Partial<ViewSettings> = {}) =>
+    ({
+      animated: true,
+      bookPageTurn: true,
+      isEink: false,
+      vertical: false,
+      scrolled: false,
+      disableSwipe: false,
+      ...changed,
+    }) as ViewSettings;
+
+  beforeEach(() => {
+    Object.assign(document, { startViewTransition: vi.fn() });
+  });
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  });
+
+  it('takes a paginated reflowable book read across, with paging animation', () => {
+    expect(bookTurnActive(settings(), false)).toBe(true);
+    expect(bookTurnActive(settings({ scrolled: true }), false)).toBe(false);
+    expect(bookTurnActive(settings({ animated: false }), false)).toBe(false);
+    expect(bookTurnActive(settings({ bookPageTurn: false }), false)).toBe(false);
+    expect(bookTurnActive(settings({ isEink: true }), false)).toBe(false);
+    expect(bookTurnActive(settings({ vertical: true }), false)).toBe(false);
+    expect(bookTurnActive(settings(), true)).toBe(false);
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+    expect(bookTurnActive(settings(), false)).toBe(false);
+  });
+
+  it('takes the swipe from the paginator, scrolled mode or not', () => {
+    const renderer = document.createElement('div');
+    applyPaginatorSwipe(renderer, settings(), false);
+    expect(renderer.hasAttribute('no-swipe')).toBe(true);
+    applyPaginatorSwipe(renderer, settings({ scrolled: true }), false);
+    expect(renderer.hasAttribute('no-swipe')).toBe(true);
+    applyPaginatorSwipe(renderer, settings({ bookPageTurn: false }), false);
+    expect(renderer.hasAttribute('no-swipe')).toBe(false);
+    applyPaginatorSwipe(renderer, settings({ bookPageTurn: false, disableSwipe: true }), false);
+    expect(renderer.hasAttribute('no-swipe')).toBe(true);
+  });
+});
 
 interface FakeAnimation {
   options: KeyframeAnimationOptions;
   finished: Promise<void>;
   currentTime: number;
+  frames: Keyframe[][];
   pause: ReturnType<typeof vi.fn>;
   cancel: ReturnType<typeof vi.fn>;
 }
@@ -43,14 +145,18 @@ const install = () => {
     },
   });
   Object.assign(document.documentElement, {
-    animate: vi.fn((_frames: Keyframe[], options: KeyframeAnimationOptions) => {
+    animate: vi.fn((frames: Keyframe[], options: KeyframeAnimationOptions) => {
       const animation: FakeAnimation = {
         options,
         finished: Promise.resolve(),
         currentTime: 0,
+        frames: [frames],
         pause: vi.fn(),
         cancel: vi.fn(),
       };
+      Object.assign(animation, {
+        effect: { setKeyframes: (next: Keyframe[]) => animation.frames.push(next) },
+      });
       animations.push(animation);
       return animation;
     }),
@@ -60,13 +166,14 @@ const install = () => {
 const uninstall = () => {
   delete (document as { startViewTransition?: unknown }).startViewTransition;
   delete (document.documentElement as { animate?: unknown }).animate;
+  document.querySelectorAll('svg').forEach((svg) => svg.remove());
 };
 
 // A paginator that records each turn, and whether it slid or jumped.
 const makeView = ({ atEnd = false } = {}) => {
   const renderer = document.createElement('div');
   renderer.setAttribute('animated', '');
-  Object.assign(renderer, { atStart: false, atEnd });
+  Object.assign(renderer, { atStart: false, atEnd, getContents: () => [] });
   const turns: string[] = [];
   const turn = (name: string) =>
     vi.fn(async () => {
@@ -82,69 +189,9 @@ const settle = async () => {
   for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
-const pictures = () => animations.map((a) => a.options.pseudoElement);
-
-describe('the turning page', () => {
-  it('keeps its edge under the finger', () => {
-    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
-      expect(Math.cos((turnAngle(p) * Math.PI) / 180)).toBeCloseTo(1 - p, 6);
-    }
-  });
-
-  it('rises from flat to on edge going on, and comes back down going back', () => {
-    const on = turningFrames(1, false, 400, 0, 1);
-    expect(on[0]!['transform']).toContain('rotateY(0.00deg)');
-    expect(on.at(-1)!['transform']).toContain('rotateY(-90.00deg)');
-    expect(on[0]!['transformOrigin']).toBe('left center');
-    const back = turningFrames(-1, false, 400, 0, 1);
-    expect(back[0]!['transform']).toContain('rotateY(-90.00deg)');
-    expect(back.at(-1)!['transform']).toContain('rotateY(0.00deg)');
-    // A right-to-left book turns on its right edge.
-    const rtl = turningFrames(1, true, 400, 0, 1);
-    expect(rtl[0]!['transformOrigin']).toBe('right center');
-    expect(rtl.at(-1)!['transform']).toContain('rotateY(90.00deg)');
-  });
-});
-
-describe('when the book turn applies', () => {
-  const settings = (changed: Partial<ViewSettings> = {}) =>
-    ({
-      animated: true,
-      bookPageTurn: true,
-      isEink: false,
-      vertical: false,
-      scrolled: false,
-      disableSwipe: false,
-      ...changed,
-    }) as ViewSettings;
-
-  beforeEach(install);
-  afterEach(uninstall);
-
-  it('takes a paginated reflowable book read across, with paging animation', () => {
-    expect(bookTurnActive(settings(), false)).toBe(true);
-    expect(bookTurnActive(settings({ scrolled: true }), false)).toBe(false);
-    expect(bookTurnActive(settings({ animated: false }), false)).toBe(false);
-    expect(bookTurnActive(settings({ bookPageTurn: false }), false)).toBe(false);
-    expect(bookTurnActive(settings({ isEink: true }), false)).toBe(false);
-    expect(bookTurnActive(settings({ vertical: true }), false)).toBe(false);
-    expect(bookTurnActive(settings(), true)).toBe(false);
-    uninstall();
-    expect(bookTurnActive(settings(), false)).toBe(false);
-  });
-
-  it('takes the swipe from the paginator, scrolled mode or not', () => {
-    const renderer = document.createElement('div');
-    applyPaginatorSwipe(renderer, settings(), false);
-    expect(renderer.hasAttribute('no-swipe')).toBe(true);
-    applyPaginatorSwipe(renderer, settings({ scrolled: true }), false);
-    expect(renderer.hasAttribute('no-swipe')).toBe(true);
-    applyPaginatorSwipe(renderer, settings({ bookPageTurn: false }), false);
-    expect(renderer.hasAttribute('no-swipe')).toBe(false);
-    applyPaginatorSwipe(renderer, settings({ bookPageTurn: false, disableSwipe: true }), false);
-    expect(renderer.hasAttribute('no-swipe')).toBe(true);
-  });
-});
+// The turning page's picture: its last cut.
+const cutPicture = () => animations.find((a) => a.frames.length > 1);
+const lastCut = () => String(cutPicture()?.frames.at(-1)?.[0]?.['clipPath'] ?? '');
 
 describe('a tap', () => {
   beforeEach(install);
@@ -153,26 +200,30 @@ describe('a tap', () => {
     uninstall();
   });
 
-  it('turns the page under its picture without the slide, and turns the picture', async () => {
+  it('turns the page under its picture without the slide, and folds the picture', async () => {
     const { view, renderer, turns } = makeView();
     await turnPageLikeABook(view, 1);
-    await settle();
     expect(turns).toEqual(['next:jump']);
     expect(renderer.hasAttribute('animated')).toBe(true);
-    expect(pictures()).toContain('::view-transition-old(book-page)');
-    expect(pictures()).toContain('::view-transition-new(book-page)');
+    // The current page's picture is cut along the fold, frame after frame.
+    await vi.waitFor(() => expect(cutPicture()?.frames.length).toBeGreaterThan(3), {
+      timeout: 2000,
+    });
+    expect(cutPicture()?.options.pseudoElement).toBe('::view-transition-old(book-page)');
     // Once turned, only the live page is left.
-    expect(view.style.getPropertyValue('view-transition-name')).toBe('');
+    await vi.waitFor(() => expect(view.style.getPropertyValue('view-transition-name')).toBe(''), {
+      timeout: 2000,
+    });
     expect(document.documentElement.classList.contains('book-turning')).toBe(false);
+    expect(document.querySelector('svg')).toBeNull();
   });
 
-  it('going back, brings the previous page down over the current one', async () => {
+  it('going back, cuts the previous page’s picture as it comes down', async () => {
     const { view, turns } = makeView();
     await turnPageLikeABook(view, -1);
-    await settle();
     expect(turns).toEqual(['prev:jump']);
-    const turning = animations.find((a) => a.options.easing?.startsWith('cubic-bezier'));
-    expect(turning?.options.pseudoElement).toBe('::view-transition-new(book-page)');
+    await vi.waitFor(() => expect(cutPicture()).toBeDefined(), { timeout: 2000 });
+    expect(cutPicture()?.options.pseudoElement).toBe('::view-transition-new(book-page)');
   });
 
   it('turns plainly where there is no page to turn to, or no view transitions', async () => {
@@ -194,38 +245,36 @@ describe('a finger', () => {
     uninstall();
   });
 
-  it('turns the page along, and the page turns when let go far enough', async () => {
+  it('folds the page along, and the page turns when let go far enough', async () => {
     const { view, turns } = makeView();
-    const drag = dragPageLikeABook(view, 1)!;
+    const drag = dragPageLikeABook(view, 1, { x: 900, y: 1000 })!;
     await settle();
-    drag.move(0.5);
-    const still = animations.filter((a) => a.options.easing === 'linear');
-    expect(still).toHaveLength(2);
-    for (const a of still) {
-      expect(a.pause).toHaveBeenCalled();
-      expect(a.currentTime).toBe(240);
-    }
+    drag.move({ x: 450, y: 1000 });
+    expect(drag.progress()).toBeCloseTo(0.5, 6);
+    expect(lastCut()).toMatch(/^polygon\(/);
     drag.release(true);
-    await settle();
+    // Settled: the fold is gone, and the page stays turned.
+    await vi.waitFor(() => expect(document.querySelector('svg')).toBeNull(), { timeout: 2000 });
     expect(turns).toEqual(['next:jump']);
   });
 
   it('lets the page lie back down, the paginator back on its page', async () => {
     const { view, turns } = makeView();
-    const drag = dragPageLikeABook(view, 1)!;
-    drag.move(0.1);
+    const drag = dragPageLikeABook(view, 1, { x: 900, y: 1000 })!;
+    drag.move({ x: 850, y: 1000 });
     drag.release(false);
-    await settle();
-    expect(turns).toEqual(['next:jump', 'prev:jump']);
+    await vi.waitFor(() => expect(turns).toEqual(['next:jump', 'prev:jump']), { timeout: 2000 });
+    await vi.waitFor(() => expect(document.querySelector('svg')).toBeNull(), { timeout: 2000 });
   });
 
   it('waits for a page still turning: the swipe turns plainly', async () => {
     const { view } = makeView();
     void turnPageLikeABook(view, 1);
-    expect(dragPageLikeABook(view, 1)).toBeNull();
+    expect(dragPageLikeABook(view, 1, { x: 900, y: 1000 })).toBeNull();
     await settle();
-    const drag = dragPageLikeABook(view, 1);
+    const drag = dragPageLikeABook(view, 1, { x: 900, y: 1000 });
     expect(drag).not.toBeNull();
     drag!.release(true);
+    await vi.waitFor(() => expect(document.querySelector('svg')).toBeNull(), { timeout: 2000 });
   });
 });

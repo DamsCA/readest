@@ -506,7 +506,7 @@ export const usePagination = (
   ]);
 
   // The book turn takes the finger (utils/pageTurn.ts): drawn across the page,
-  // it turns the page along; let go past a third of the way, or flung, the
+  // it folds the page along; let go past a third of the way, or flung, the
   // page turns, else it lies back. While a page is still turning, a swipe
   // turns the next one as it lifts.
   const pageDragRef = useRef<{
@@ -528,6 +528,12 @@ export const usePagination = (
       const view = viewRef.current;
       const viewSettings = getViewSettings(bookKey);
       if (!view || !viewSettings) return false;
+      // Touches come in screen coordinates; the fold is drawn in the page's.
+      const rect = view.getBoundingClientRect();
+      const local = (touch: { screenX: number; screenY: number }) => ({
+        x: touch.screenX - (window.screenX || 0) - rect.left,
+        y: touch.screenY - (window.screenY || 0) - rect.top,
+      });
       let state = pageDragRef.current;
       if (!state) {
         if (detail.phase !== 'move') return false;
@@ -540,7 +546,7 @@ export const usePagination = (
         // Drawn to the left, a left-to-right book's page turns to the next.
         const dir: TurnDir = deltaX < 0 !== viewSettings.rtl ? 1 : -1;
         state = {
-          drag: dragPageLikeABook(view, dir, viewSettings.rtl),
+          drag: dragPageLikeABook(view, dir, local(detail.touchStart), viewSettings.rtl),
           dir,
           sign: deltaX < 0 ? -1 : 1,
           x: detail.touch.screenX,
@@ -549,8 +555,6 @@ export const usePagination = (
         };
         pageDragRef.current = state;
       }
-      const width = containerRef.current?.clientWidth || window.innerWidth;
-      const progress = Math.max(0, (state.sign * detail.deltaX) / width);
       if (detail.phase === 'move') {
         const now = performance.now();
         if (now > state.t) {
@@ -559,10 +563,14 @@ export const usePagination = (
           state.x = detail.touch.screenX;
           state.t = now;
         }
-        state.drag?.move(progress);
+        state.drag?.move(local(detail.touch));
         return true;
       }
       pageDragRef.current = null;
+      const width = rect.width || window.innerWidth;
+      const progress = state.drag
+        ? state.drag.progress()
+        : Math.max(0, (state.sign * detail.deltaX) / width);
       const commit = progress > 0.3 || (state.sign * state.vx > 0.35 && progress > 0.04);
       if (state.drag) state.drag.release(commit);
       else if (commit) void turnPageLikeABook(view, state.dir, viewSettings.rtl);
