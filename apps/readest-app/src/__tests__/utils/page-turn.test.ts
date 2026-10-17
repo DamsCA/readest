@@ -218,6 +218,17 @@ describe('a tap', () => {
     expect(document.querySelector('svg')).toBeNull();
   });
 
+  // The animations name the pictures; left alive, a turn's last cut (empty
+  // once the page has turned) hid the next turn's page: after a few turns both
+  // pages showed blank (emulator, claire.59, 17 Oct 2026).
+  it('stops every animation it made once the page has turned', async () => {
+    const { view } = makeView();
+    await turnPageLikeABook(view, 1);
+    await vi.waitFor(() => expect(document.querySelector('svg')).toBeNull(), { timeout: 2000 });
+    expect(animations.length).toBeGreaterThan(1);
+    for (const a of animations) expect(a.cancel).toHaveBeenCalled();
+  });
+
   it('going back, cuts the previous page’s picture as it comes down', async () => {
     const { view, turns } = makeView();
     await turnPageLikeABook(view, -1);

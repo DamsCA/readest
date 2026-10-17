@@ -30,8 +30,10 @@ const SQUEEZE = 0.86;
 const TAP_LIFT = 0.12;
 const DRAG_LIFT = 0.06;
 // A drag left without news this long is let go: a touch end that never comes
-// must not leave the page frozen as a picture.
-const IDLE_RELEASE_MS = 3000;
+// must not leave the page frozen as a picture. Long enough to hold a page
+// half turned and look at the next one (3 s let it fall back under a still
+// finger on the emulator, 17 Oct 2026).
+const IDLE_RELEASE_MS = 10_000;
 // The page jumps within the transition; past this, it is pictured as it is.
 const MOVE_TIMEOUT_MS = 1500;
 
@@ -372,6 +374,11 @@ const startTurn = (view: FoliateView, dir: TurnDir) => {
   });
   current = turn;
   void turn.transition.finished.finally(() => {
+    // Its animations name the pictures, they do not own them: left alive, the
+    // last cut (an empty one, once a page has turned) hid the next turn's
+    // page, and after a few turns both pages showed blank (emulator, 17 Oct
+    // 2026).
+    for (const a of turn.animations) a.cancel();
     turn.overlay?.svg.remove();
     if (current !== turn) return;
     current = null;
