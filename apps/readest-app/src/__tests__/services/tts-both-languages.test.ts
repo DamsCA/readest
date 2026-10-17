@@ -239,6 +239,35 @@ describe('reading both languages, the screen off', () => {
     ]);
   });
 
+  // claire.61 waited up to 8 s, screen off too: the sound stopped, Android
+  // closed the app's media session, and the voice never came back (emulator,
+  // 17 Oct 2026). With the screen off the voice reads the paragraph as it is.
+  it('with the screen off, hardly waits for a translation that is not there', async () => {
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    try {
+      const { view, controller, heard } = setUp(doc, () => {});
+      controller.translateBlocks = (_elements, now) =>
+        now ? new Promise<void>(() => {}) : Promise.resolve();
+      const started = Date.now();
+      await controller.speak(view.tts!.start()!);
+      await vi.waitFor(() => expect(heard).toHaveLength(1), { timeout: 1500 });
+      expect(Date.now() - started).toBeLessThan(1500);
+      expect(text(heard[0])).toBe(ENGLISH[0]);
+    } finally {
+      hidden.mockRestore();
+    }
+  });
+
+  it('with the screen on, gives the translation more time', async () => {
+    const { view, controller, heard } = setUp(doc, () => {});
+    controller.translateBlocks = (_elements, now) =>
+      now ? new Promise<void>(() => {}) : Promise.resolve();
+    await controller.speak(view.tts!.start()!);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(heard).toHaveLength(0);
+    await controller.stop();
+  });
+
   it('leaves a voice reading one language alone', async () => {
     const { view, controller, heard, asked } = setUp(doc, () => {});
     controller.bothLanguagesTarget = () => '';

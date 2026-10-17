@@ -44,6 +44,9 @@ export function useTextTranslation(
   const translationQueue = useRef<HTMLElement[]>([]);
   const activeTranslations = useRef(0);
   const MAX_CONCURRENT_TRANSLATIONS = 5;
+  // Longer than any translator's own limit (the AI gives up after 30 s and
+  // hands the paragraph to Google, which gives up after 15 s).
+  const TRANSLATION_SLOT_MS = 60_000;
   const pendingDOMUpdates = useRef<Array<() => void>>([]);
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,7 +185,14 @@ export function useTextTranslation(
       const el = translationQueue.current.shift()!;
       if (el.querySelector('.translation-target') || !enabled.current) continue;
       activeTranslations.current++;
-      translateElement(el).finally(() => {
+      // A translation that never settles must not keep its place for good:
+      // with five of them, nothing else would ever be translated.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      Promise.race([
+        translateElement(el),
+        new Promise((resolve) => (timer = setTimeout(resolve, TRANSLATION_SLOT_MS))),
+      ]).finally(() => {
+        clearTimeout(timer);
         activeTranslations.current--;
         drainTranslationQueue();
       });
@@ -361,23 +371,31 @@ export function useTextTranslation(
   // the screen, and with the screen off nothing is drawn — no page turns, no
   // visible paragraphs — so from the last page shown on, the voice went on in
   // English only (17 Oct 2026). `now`: the voice waits for these; the others
-  // are the ones it reads next.
+  // are the ones it reads next. Neither goes through the queue above: the
+  // voice's few paragraphs must not wait behind the screen's, and the same
+  // paragraph asked for again shares the request already made.
   const translateElementRef = useRef(translateElement);
-  const scheduleTranslationRef = useRef(scheduleTranslation);
   useEffect(() => {
     translateElementRef.current = translateElement;
-    scheduleTranslationRef.current = scheduleTranslation;
   });
+  const voiceRequests = useRef(new Map<HTMLElement, Promise<void>>());
   useEffect(() => {
     if (!view || !('renderer' in view)) return;
+    const translateForVoice = (el: HTMLElement) => {
+      let request = voiceRequests.current.get(el);
+      if (!request) {
+        request = translateElementRef.current(el, true).finally(() => {
+          voiceRequests.current.delete(el);
+        });
+        voiceRequests.current.set(el, request);
+      }
+      return request;
+    };
     const onTranslateBlocks = async (event: CustomEvent) => {
       const detail = event.detail as { bookKey: string; elements: HTMLElement[]; now?: boolean };
       if (detail.bookKey !== bookKey || !enabled.current) return;
-      if (!detail.now) {
-        detail.elements.forEach((el) => scheduleTranslationRef.current(el));
-        return;
-      }
-      await Promise.all(detail.elements.map((el) => translateElementRef.current(el, true)));
+      const requests = detail.elements.map(translateForVoice);
+      if (detail.now) await Promise.all(requests);
     };
     eventDispatcher.on('translate-blocks', onTranslateBlocks);
     return () => eventDispatcher.off('translate-blocks', onTranslateBlocks);

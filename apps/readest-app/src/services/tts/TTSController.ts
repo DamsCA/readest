@@ -71,11 +71,16 @@ const TTS_MAX_CONSECUTIVE_EMPTY_SKIPS = 30;
 const TTS_MAX_EMPTY_RETRIES = 8;
 const TTS_EMPTY_RETRY_DELAY_MS = 800;
 // Reading both languages (#bringTranslation): how many paragraphs ahead of the
-// voice are sent to the translator, and how long the voice waits for the
-// translation of the one it is about to read (the AI takes 1-2 s; past that
-// it is not answering, and Google takes the paragraph after 30 s).
+// voice are sent to the translator, and how long the voice waits, at most, for
+// the translation of the one it is about to read: the AI takes 1-2 s, a cached
+// translation a few milliseconds. With the screen off the voice must not go
+// quiet: claire.61 waited up to 8 s there, and on the emulator (17 Oct 2026)
+// the sound stopped at 12:56:35 as the voice entered a chapter, Android closed
+// the app's media session at 12:57:04, and nothing was heard again until the
+// screen came back on at 12:59:32 — when the voice failed and stopped.
 const TTS_TRANSLATE_AHEAD = 6;
-const TTS_TRANSLATION_WAIT_MS = 8000;
+const TTS_TRANSLATION_WAIT_MS = 4000;
+const TTS_TRANSLATION_WAIT_HIDDEN_MS = 400;
 
 type TTSState =
   | 'stopped'
@@ -453,7 +458,11 @@ export class TTSController extends EventTarget {
         html.setAttribute('xml:lang', this.ttsLang);
       }
 
-      if (this.ttsTargetLang && this.prefetchTranslations) {
+      // Reading both languages too: the next chapter's first paragraphs are
+      // then translated before the voice gets there, which it does with the
+      // screen off as well, where it no longer waits (#bringTranslation).
+      const target = this.ttsTargetLang || this.bothLanguagesTarget?.() || '';
+      if (target && this.prefetchTranslations) {
         // Translation mode. Collect paragraph texts exactly as the reader's
         // translator does (same element walk, same normalization), so the warm
         // shares cache keys with the injection that happens after the flip.
@@ -485,7 +494,7 @@ export class TTSController extends EventTarget {
           if (signal.aborted) return;
           const chunk = sentences.slice(i, i + 4);
           const body = chunk.map((s, j) => `<mark name="pf${i + j}"/>${s}`).join('');
-          const ssml = `<speak xml:lang="${this.ttsTargetLang}">${body}</speak>`;
+          const ssml = `<speak xml:lang="${target}">${body}</speak>`;
           await this.preloadSSML(ssml, signal);
         }
       }
@@ -1143,10 +1152,14 @@ export class TTSController extends EventTarget {
     // A translator that does not answer must not silence every paragraph:
     // after two misses in a row, the voice goes on without waiting.
     if (this.#translationMisses >= 2) return;
+    const wait =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden'
+        ? TTS_TRANSLATION_WAIT_HIDDEN_MS
+        : TTS_TRANSLATION_WAIT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
       this.translateBlocks(current, true).catch(() => {}),
-      new Promise((resolve) => (timer = setTimeout(resolve, TTS_TRANSLATION_WAIT_MS))),
+      new Promise((resolve) => (timer = setTimeout(resolve, wait))),
     ]);
     clearTimeout(timer);
     if (signal.aborted || this.view.tts !== tts) return;

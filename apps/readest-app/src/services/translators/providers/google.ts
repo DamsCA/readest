@@ -4,6 +4,8 @@ import { isTauriAppPlatform } from '@/services/environment';
 import { normalizeToShortLang } from '@/utils/lang';
 import { TranslationProvider } from '../types';
 
+const TIMEOUT_MS = 15_000;
+
 export const googleProvider: TranslationProvider = {
   name: 'google',
   label: _('Google Translate'),
@@ -26,13 +28,20 @@ export const googleProvider: TranslationProvider = {
       url.searchParams.append('q', line);
 
       const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Translation failed with status ${response.status}`);
+      // A request left hanging must fail at some point: the reader's
+      // translator and the voice wait on it.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+      let data: unknown;
+      try {
+        const response = await fetch(url.toString(), { signal: ctrl.signal });
+        if (!response.ok) {
+          throw new Error(`Translation failed with status ${response.status}`);
+        }
+        data = await response.json();
+      } finally {
+        clearTimeout(timer);
       }
-
-      const data = await response.json();
       if (Array.isArray(data) && Array.isArray(data[0])) {
         const translatedText = data[0]
           .filter((segment) => Array.isArray(segment) && segment[0])

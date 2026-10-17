@@ -77,19 +77,45 @@ describe('paragraphs the voice asks for', () => {
     expect(french(two!)).toBeUndefined();
   });
 
-  it('translates the ones the voice reads next with the page’s next updates', async () => {
+  it('translates the ones the voice reads next without making it wait', async () => {
     const view = makeView();
     renderHook(() => useTextTranslation('book-1', view));
     const doc = makeDoc();
     const paragraphs = Array.from(doc.querySelectorAll('p'));
+    let answer = () => {};
+    translate.mockImplementationOnce(
+      (texts: string[]) =>
+        new Promise((resolve) => (answer = () => resolve(texts.map((t) => `FR ${t}`)))),
+    );
+    // Answered before the translation comes back.
     await eventDispatcher.dispatch('translate-blocks', {
       bookKey: 'book-1',
       elements: paragraphs,
       now: false,
     });
+    expect(french(paragraphs[0]!)).toBeUndefined();
+    answer();
     await vi.waitFor(() =>
       expect(paragraphs.map(french)).toEqual(['FR One is here.', 'FR Two is here.']),
     );
+  });
+
+  it('asks the translator once for a paragraph asked for again meanwhile', async () => {
+    const view = makeView();
+    renderHook(() => useTextTranslation('book-1', view));
+    const doc = makeDoc();
+    const [one] = Array.from(doc.querySelectorAll('p'));
+    await Promise.all([
+      eventDispatcher.dispatch('translate-blocks', { bookKey: 'book-1', elements: [one] }),
+      eventDispatcher.dispatch('translate-blocks', { bookKey: 'book-1', elements: [one] }),
+      eventDispatcher.dispatch('translate-blocks', {
+        bookKey: 'book-1',
+        elements: [one],
+        now: true,
+      }),
+    ]);
+    expect(french(one!)).toBe('FR One is here.');
+    expect(translate).toHaveBeenCalledTimes(1);
   });
 
   it('leaves another book’s paragraphs, and a translated one, alone', async () => {
