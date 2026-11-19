@@ -130,6 +130,9 @@ export class TTSController extends EventTarget {
   // nothing is translated; and the way to ask that translator for paragraphs
   // (useTextTranslation's 'translate-blocks'), `now` when the voice waits.
   bothLanguagesTarget?: () => string;
+  // The book rewritten in its own language (the "Rewrite" switch): the
+  // rewrite is read in place of the text.
+  rewriting?: () => boolean;
   translateBlocks?: (elements: HTMLElement[], now: boolean) => Promise<void>;
   #nossmlCnt: number = 0;
   // Consecutive native-TTS utterances that ended in a terminal 'error' without
@@ -1148,9 +1151,13 @@ export class TTSController extends EventTarget {
     signal: AbortSignal,
   ): Promise<string | typeof TRANSLATION_MISSING | undefined> {
     const tts = this.view.tts;
-    const lang = this.bothLanguagesTarget?.();
-    if (!tts || !lang || !this.translateBlocks) return;
-    if (this.ttsLang && isSameLang(this.ttsLang, lang)) return;
+    // Rewriting the book in its own language: the rewrite replaces the text,
+    // and a paragraph not rewritten yet is read as it is — it is in the
+    // reader's language, unlike a paragraph without its translation.
+    const rewriting = this.rewriting?.() ?? false;
+    const lang = rewriting ? '' : this.bothLanguagesTarget?.();
+    if (!tts || (!lang && !rewriting) || !this.translateBlocks) return;
+    if (lang && this.ttsLang && isSameLang(this.ttsLang, lang)) return;
     const { marks } = parseSSMLMarks(rawSsml);
     const first = marks[0];
     const last = marks[marks.length - 1];
@@ -1173,8 +1180,22 @@ export class TTSController extends EventTarget {
     block.setEnd(end.endContainer, end.endOffset);
     const { current, next } = untranslatedParagraphs(tts.doc, block, TTS_TRANSLATE_AHEAD);
     if (next.length > 0) void this.translateBlocks(next, false).catch(() => {});
-    if (current.length === 0 || hasLangPart(rawSsml, lang)) return;
+    // Translated: the SSML has a part in the translation. Rewritten: each of
+    // the paragraph's elements carries its rewrite (both are in one language).
+    const done = (ssml: string) =>
+      rewriting
+        ? untranslatedParagraphs(tts.doc, block, 0).current.length === 0
+        : hasLangPart(ssml, lang!);
+    if (current.length === 0 || done(rawSsml)) return;
     const said = (current[0]?.textContent ?? '').trim().slice(0, 40);
+    const missing = (why: string) => {
+      voiceLog(
+        rewriting
+          ? `[voice] not rewritten ${why}: reading as it is "${said}"`
+          : `[voice] no French ${why}: stopping at "${said}"`,
+      );
+      return rewriting ? undefined : TRANSLATION_MISSING;
+    };
     // With the screen off, no timer (see TTS_TRANSLATION_WAIT_MS): the
     // translation is taken if it comes back at once — already in memory, as
     // the next chapter's first paragraphs are — else the voice stops.
@@ -1183,9 +1204,8 @@ export class TTSController extends EventTarget {
       await settlesAtOnce(request);
       if (signal.aborted || this.view.tts !== tts) return;
       const ssml = tts.resume();
-      if (ssml && hasLangPart(ssml, lang)) return ssml;
-      voiceLog(`[voice] no French, screen off: stopping at "${said}"`);
-      return TRANSLATION_MISSING;
+      if (ssml && done(ssml)) return ssml;
+      return missing('(screen off)');
     }
     const asked = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1196,10 +1216,7 @@ export class TTSController extends EventTarget {
     clearTimeout(timer);
     if (signal.aborted || this.view.tts !== tts) return;
     const ssml = tts.resume();
-    if (!ssml || !hasLangPart(ssml, lang)) {
-      voiceLog(`[voice] no French after ${Date.now() - asked} ms: stopping at "${said}"`);
-      return TRANSLATION_MISSING;
-    }
+    if (!ssml || !done(ssml)) return missing(`after ${Date.now() - asked} ms`);
     return ssml;
   }
 

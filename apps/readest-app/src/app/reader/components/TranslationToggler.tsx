@@ -21,7 +21,11 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
   const viewSettings = getViewSettings(bookKey)!;
   const [translationEnabled, setTranslationEnabled] = useState(viewSettings.translationEnabled!);
   const [translationAvailable, setTranslationAvailable] = useState(
-    isTranslationAvailable(bookData?.book, viewSettings.translateTargetLang),
+    isTranslationAvailable(
+      bookData?.book,
+      viewSettings.translateTargetLang,
+      viewSettings.translationProvider,
+    ),
   );
 
   useEffect(() => {
@@ -38,9 +42,18 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
   useEffect(() => {
     setTranslationEnabled(viewSettings.translationEnabled);
     setTranslationAvailable(
-      isTranslationAvailable(bookData?.book, viewSettings.translateTargetLang),
+      isTranslationAvailable(
+        bookData?.book,
+        viewSettings.translateTargetLang,
+        viewSettings.translationProvider,
+      ),
     );
-  }, [bookData, viewSettings.translationEnabled, viewSettings.translateTargetLang]);
+  }, [
+    bookData,
+    viewSettings.translationEnabled,
+    viewSettings.translateTargetLang,
+    viewSettings.translationProvider,
+  ]);
 
   return (
     <Button

@@ -13,6 +13,12 @@ export interface TranslationProvider {
    * again — no other code changes required.
    */
   disabled?: boolean;
+  /**
+   * Rewrites a book in its own language instead of translating it (the
+   * "Rewrite" switch of the language settings): never listed among the
+   * translators, never fallen back to.
+   */
+  sameLanguage?: boolean;
   translate: (
     texts: string[],
     sourceLang: string,

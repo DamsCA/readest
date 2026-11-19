@@ -107,5 +107,55 @@ export const aiProvider: TranslationProvider = {
   },
 };
 
+// Rewriting a book in its own language (relay /v1/rewrite): a book already in
+// the reader's language but badly transcribed or awkwardly translated —
+// "Comment se faire des amis", 19 Nov 2026: "les phrases en français sont
+// bizarrement dites, il y a même des erreurs très bizarres". Each paragraph
+// comes back correct and natural, nothing added or left out (the relay keeps
+// the paragraph as it is when the rewrite strays). Same model and free daily
+// allocation as the translation.
+//
+// A paragraph that could not be rewritten (allocation used up, network) comes
+// back empty: not cached, shown as it is, asked for again later. Never the
+// paragraph itself, which the cache would keep as its final rewrite.
+const rewriteOne = async (text: string, lang: string) => {
+  if (isAIPaused()) throw new Error('AI rewrite paused until 00:00 UTC');
+  const response = await postToRelay('/v1/rewrite', { text, lang }, TIMEOUT_MS);
+  if (!response.ok) throw await relayError(response, 'AI rewrite');
+  const data = (await response.json()) as { rewrite?: unknown };
+  const rewrite = typeof data.rewrite === 'string' ? data.rewrite.trim() : '';
+  if (!rewrite) throw new Error('AI rewrite came back empty');
+  return rewrite;
+};
+
+export const aiRewriteProvider: TranslationProvider = {
+  name: 'ai-rewrite',
+  label: _('AI rewrite'),
+  sameLanguage: true,
+  disabled: !getRelayUrl(),
+  translate: async (texts: string[], _sourceLang: string, targetLang: string) => {
+    const results: string[] = texts.map(() => '');
+    let next = 0;
+    const worker = async () => {
+      while (next < texts.length) {
+        const i = next++;
+        const text = texts[i]!;
+        // Titles, numbers and labels stay as they are (see MIN_WORDS_FOR_AI).
+        if (!text?.trim() || wordCount(text) < MIN_WORDS_FOR_AI) {
+          results[i] = text;
+          continue;
+        }
+        try {
+          results[i] = await rewriteOne(text, targetLang);
+        } catch (err) {
+          console.warn('AI rewrite failed, the paragraph stays as it is for now:', err);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, texts.length) }, worker));
+    return results;
+  },
+};
+
 /** Test hook: forget a paused allocation. */
 export const resetAITranslationPause = resetAIPause;

@@ -26,10 +26,17 @@ export const getDailyUsage = (date?: string): number | null => {
   return null;
 };
 
-export const isTranslationAvailable = (book?: Book | null, targetLanguage?: string | null) => {
+export const isTranslationAvailable = (
+  book?: Book | null,
+  targetLanguage?: string | null,
+  provider?: string | null,
+) => {
   if (!book || book.format === 'PDF') {
     return false;
   }
+
+  // The rewrite works in the book's own language (the "Rewrite" switch).
+  if (provider === 'ai-rewrite') return true;
 
   const primaryLanguage = book.primaryLanguage || '';
   if (!primaryLanguage || primaryLanguage.toLowerCase() === 'und') {

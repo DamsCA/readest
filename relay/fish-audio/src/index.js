@@ -193,6 +193,91 @@ async function handleTranslate(request, env) {
   }
 }
 
+// --- Reecriture dans la langue du livre (/v1/rewrite) ----------------------
+// POST { text, lang } -> { rewrite, unchanged? }
+//
+// Un livre deja dans la langue du lecteur, mais mal transcrit (espaces perdues
+// apres la ponctuation, majuscules au milieu des phrases, accords faux) ou a la
+// traduction vieillie. Damien, le 19/11/2026, a propos de « Comment se faire
+// des amis » : « les phrases en francais sont bizarrement dites, il y a meme des
+// erreurs tres bizarres ». Chaque paragraphe revient correct et naturel, sans
+// rien ajouter ni retrancher. Quand la reecriture s'ecarte trop du texte (trop
+// courte, trop longue, un nombre change, un commentaire du modele), le relais
+// renvoie le texte tel quel (`unchanged`) : l'app le garde en cache et ne
+// redemande pas ce paragraphe.
+const rewritePrompt = (lang) =>
+  `You are a meticulous ${lang} copy editor. The user's message is one paragraph of a ` +
+  `${lang} book that was badly transcribed (missing spaces after punctuation, capital ` +
+  `letters in the middle of sentences, typos, wrong agreements, stray characters) and whose ` +
+  `wording is sometimes awkward or dated. Rewrite it in correct, natural, fluent modern ` +
+  `${lang}, as a careful native editor would: fix every error and smooth awkward phrasing, ` +
+  `but keep the meaning, every idea, example, name, number and quotation, the tone, and the ` +
+  `sentences in their order. Never summarize, shorten, add, explain or comment, and never ` +
+  `continue the text. Follow ${lang} typography (for French: « » quotation marks and a space ` +
+  `before ; : ! ?). Reply with the rewritten paragraph only.`;
+// Un nombre de la reecriture doit venir du texte : « 3 clients » peut devenir
+// « trois clients » (essai du 19/11/2026), pas « 4 clients » ni « 1953 ».
+const numbersIn = (s) => s.match(/\d+/g) || [];
+const rewriteDrifts = (source, rewrite) => {
+  const known = new Set(numbersIn(source));
+  return (
+    rewrite.length < source.length * 0.7 - 20 ||
+    rewrite.length > source.length * 1.4 + 30 ||
+    numbersIn(rewrite).some((n) => !known.has(n)) ||
+    /^(voici|here is|paragraphe r[ée][ée]crit)/i.test(rewrite)
+  );
+};
+
+async function handleRewrite(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (request.method !== 'POST') return json(404, { error: 'not found' }, CORS);
+  if (!env.RELAY_TOKEN || request.headers.get('X-Relay-Token') !== env.RELAY_TOKEN) {
+    return json(403, { error: 'forbidden' }, CORS);
+  }
+  if (env.TRANSLATE_LIMITER) {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await env.TRANSLATE_LIMITER.limit({ key: ip });
+    if (!success) return json(429, { error: 'rate limited' }, CORS);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { error: 'invalid json' }, CORS);
+  }
+  const text = typeof body?.text === 'string' ? body.text.trim() : '';
+  const lang = langName(body?.lang);
+  if (!text || !lang) return json(400, { error: 'text and lang required' }, CORS);
+  if (text.length > MAX_TRANSLATE_CHARS) {
+    return json(413, { error: `text over ${MAX_TRANSLATE_CHARS} chars` }, CORS);
+  }
+  // Un titre de deux mots se lit comme une consigne d'ecriture (voir plus haut).
+  if (text.split(/\s+/).length < 4) return json(200, { rewrite: text, unchanged: true }, CORS);
+  try {
+    const out = await env.AI.run(TRANSLATE_MODEL, {
+      messages: [
+        { role: 'system', content: rewritePrompt(lang) },
+        { role: 'user', content: text },
+      ],
+      max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
+      temperature: 0.2,
+    });
+    const rewrite =
+      typeof out?.response === 'string' ? decodeEntities(decodeEntities(out.response.trim())) : '';
+    if (!rewrite) return json(502, { error: 'empty rewrite' }, CORS);
+    if (rewriteDrifts(text, rewrite)) {
+      return json(200, { rewrite: text, unchanged: true, usage: out.usage ?? null }, CORS);
+    }
+    return json(200, { rewrite, usage: out.usage ?? null }, CORS);
+  } catch (err) {
+    const message = String(err?.message || err);
+    if (/4006|neuron|allocation/i.test(message)) {
+      return json(429, { error: 'daily free allocation exhausted' }, CORS);
+    }
+    return json(502, { error: message.slice(0, 200) }, CORS);
+  }
+}
+
 // --- Relecture IA d'une page (/v1/proofread) -------------------------------
 // POST { paragraphs: string[] } -> { corrections: [{ p, find, replace }] }
 //
@@ -581,6 +666,7 @@ export default {
       return json(200, { status: 'ok', model: FREE_MODEL, keyConfigured: !!env.FISH_KEY });
     }
     if (url.pathname === '/v1/translate') return handleTranslate(request, env);
+    if (url.pathname === '/v1/rewrite') return handleRewrite(request, env);
     if (url.pathname === '/v1/proofread') return handleProofread(request, env);
     const upstreamUrl = FISH_ROUTES.get(url.pathname);
     if (request.method !== 'POST' || !upstreamUrl) {

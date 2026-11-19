@@ -1,5 +1,5 @@
 import { TranslationProvider } from '../types';
-import { aiProvider } from './ai';
+import { aiProvider, aiRewriteProvider } from './ai';
 import { deeplProvider } from './deepl';
 import { azureProvider } from './azure';
 import { googleProvider } from './google';
@@ -22,10 +22,13 @@ const deeplTranslator = createTranslator('deepl', deeplProvider);
 const azureTranslator = createTranslator('azure', azureProvider);
 const googleTranslator = createTranslator('google', googleProvider);
 const yandexTranslator = createTranslator('yandex', yandexProvider);
+const aiRewriteTranslator = createTranslator('ai-rewrite', aiRewriteProvider);
 
 // First available wins whenever the configured provider is unusable (e.g. the
 // DeepL default without a Readest account): the AI translator renders idioms
 // naturally instead of word for word, and is only listed when the relay exists.
+// The rewriter comes last, so that it is never the first available: it is no
+// translator, only the "Rewrite" switch picks it (`sameLanguage`).
 const availableTranslators = [
   aiTranslator,
   deeplTranslator,
@@ -33,6 +36,7 @@ const availableTranslators = [
   googleTranslator,
   yandexTranslator,
   // Add more translators here
+  aiRewriteTranslator,
 ];
 
 export type TranslatorName = (typeof availableTranslators)[number]['name'];

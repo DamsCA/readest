@@ -17,7 +17,9 @@ import { TRANSLATED_LANGS, TRANSLATOR_LANGS } from '@/services/constants';
 import { ConvertChineseVariant } from '@/types/book';
 import { SettingsPanelPanelProp } from './SettingsDialog';
 import { getDirFromLanguage } from '@/utils/rtl';
-import { isCJKEnv } from '@/utils/misc';
+import { getLocale, isCJKEnv } from '@/utils/misc';
+import { isSameLang } from '@/utils/lang';
+import { useBookDataStore } from '@/store/bookDataStore';
 import {
   BoxedList,
   NavigationRow,
@@ -36,6 +38,7 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   const { settings, applyUILanguage, activeSettingsItemId, setActiveSettingsItemId } =
     useSettingsStore();
   const { getView, getViewSettings, setViewSettings, recreateViewer } = useReaderStore();
+  const { getBookData } = useBookDataStore();
   const view = getView(bookKey);
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
@@ -122,13 +125,15 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   };
 
   const getTranslationProviderOptions = () => {
-    return getTranslators().map((t) => ({
-      value: t.name,
-      label: getTranslatorDisplayLabel(t, !!token, _),
-      // Providers marked `disabled` (e.g. upstream relay is down) stay in the
-      // dropdown so users can see them, but cannot be selected.
-      disabled: !!t.disabled,
-    }));
+    return getTranslators()
+      .filter((t) => !t.sameLanguage)
+      .map((t) => ({
+        value: t.name,
+        label: getTranslatorDisplayLabel(t, !!token, _),
+        // Providers marked `disabled` (e.g. upstream relay is down) stay in the
+        // dropdown so users can see them, but cannot be selected.
+        disabled: !!t.disabled,
+      }));
   };
 
   const getCurrentTranslationProviderOption = () => {
@@ -161,6 +166,28 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     saveViewSettings(envConfig, bookKey, 'translateTargetLang', option, false, false);
     viewSettings.translateTargetLang = option;
     setViewSettings(bookKey, { ...viewSettings });
+  };
+
+  // Rewriting the book in its own language (relay /v1/rewrite): a book already
+  // in the reader's language, but badly transcribed or awkwardly translated
+  // ("Comment se faire des amis", 19 Nov 2026). It goes through the
+  // translation display — the rewrite in place of the text, and read aloud —
+  // for this book only (never the global settings, which the other books use).
+  const bookLanguage = getBookData(bookKey)?.book?.primaryLanguage || getLocale();
+  const rewriting = translationEnabled && translationProvider === 'ai-rewrite';
+  const toggleRewrite = async () => {
+    const on = !rewriting;
+    const provider = on ? 'ai-rewrite' : 'ai';
+    const target = on ? bookLanguage : '';
+    await saveViewSettings(envConfig, bookKey, 'translationProvider', provider, true, false);
+    await saveViewSettings(envConfig, bookKey, 'translateTargetLang', target, true, false);
+    await saveViewSettings(envConfig, bookKey, 'showTranslateSource', !on, true, false);
+    await saveViewSettings(envConfig, bookKey, 'translationEnabled', on, true, false);
+    setTranslationProvider(provider);
+    setTranslateTargetLang(target);
+    setShowTranslateSource(!on);
+    setTranslationEnabled(on);
+    recreateViewer(envConfig, bookKey);
   };
 
   const handleSelectTTSText = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -327,6 +354,20 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
           title={_('Word Lens')}
           status={_('Show a short native-language hint above difficult words.')}
           onClick={() => setShowWordLens(true)}
+        />
+      </BoxedList>
+
+      <BoxedList title={_('Rewrite')} data-setting-id='settings.language.rewrite'>
+        <SettingsSwitchRow
+          label={
+            isSameLang(bookLanguage, 'fr') ? _('Rewrite in Good French') : _('Rewrite Properly')
+          }
+          description={_(
+            'Fixes errors and awkward sentences, in the language of the book, as you read. This book only.',
+          )}
+          checked={rewriting}
+          onChange={toggleRewrite}
+          disabled={!bookKey}
         />
       </BoxedList>
 

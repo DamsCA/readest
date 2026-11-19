@@ -862,6 +862,10 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           if (vs.ttsReadAloudText === 'translated' || vs.ttsReadAloudText === 'source') return '';
           return vs.translateTargetLang || getLocale();
         };
+        ttsController.rewriting = () => {
+          const vs = getViewSettings(bookKey);
+          return !!vs?.translationEnabled && vs.translationProvider === 'ai-rewrite';
+        };
         ttsController.translateBlocks = (elements, now) =>
           eventDispatcher.dispatch('translate-blocks', { bookKey, elements, now });
 

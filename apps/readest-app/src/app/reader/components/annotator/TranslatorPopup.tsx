@@ -77,7 +77,9 @@ const TranslatorPopup: React.FC<TranslatorPopupProps> = ({
 
   const handleProviderChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const requestedProvider = event.target.value;
-    const availableTranslators = getTranslators().filter((t) => isTranslatorAvailable(t, !!token));
+    const availableTranslators = getTranslators().filter(
+      (t) => !t.sameLanguage && isTranslatorAvailable(t, !!token),
+    );
     const selectedTranslator =
       availableTranslators.find((t) => t.name === requestedProvider) || availableTranslators[0]!;
     if (selectedTranslator) {
@@ -88,11 +90,13 @@ const TranslatorPopup: React.FC<TranslatorPopupProps> = ({
   };
 
   useEffect(() => {
-    const availableProviders = translators.map((t) => ({
-      name: t.name,
-      label: getTranslatorDisplayLabel(t, !!token, _),
-      disabled: !!t.disabled,
-    }));
+    const availableProviders = translators
+      .filter((t) => !t.sameLanguage)
+      .map((t) => ({
+        name: t.name,
+        label: getTranslatorDisplayLabel(t, !!token, _),
+        disabled: !!t.disabled,
+      }));
     setProviders(availableProviders);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translators]);

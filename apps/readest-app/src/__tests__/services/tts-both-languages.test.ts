@@ -315,3 +315,72 @@ describe('reading both languages', () => {
     expect(asked).toHaveLength(0);
   });
 });
+
+// The book rewritten in its own language (the "Rewrite" switch): the rewrite
+// replaces the text on the page — the source emptied, as with "translation
+// only" — and the voice reads it. A paragraph whose rewrite does not come is
+// read as it is: it is in the reader's language (19 Nov 2026).
+describe('reading a book rewritten in its own language', () => {
+  const rewritten = (english: string) => `${english} (rewritten)`;
+  const rewrite = (el: HTMLElement) => {
+    const source = el.textContent ?? '';
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE) node.textContent = '';
+    }
+    el.appendChild(
+      createTranslationWrapper(el.ownerDocument, rewritten(source), {
+        lang: 'en',
+        hidden: false,
+        lineBreak: false,
+        blockClassName: 'translation-target-block',
+      }),
+    );
+  };
+  const setUpRewriting = (translator: (els: HTMLElement[], now: boolean) => void) => {
+    const setup = setUp(makePage(), translator);
+    setup.controller.bothLanguagesTarget = () => 'en';
+    setup.controller.rewriting = () => true;
+    return setup;
+  };
+
+  it('waits for the paragraph’s rewrite, and reads it in place of the text', async () => {
+    const { view, controller, heard, asked } = setUpRewriting((els, now) => {
+      if (now) els.forEach(rewrite);
+    });
+    await controller.speak(view.tts!.start()!);
+    await vi.waitFor(() => expect(heard).toHaveLength(1));
+    expect(text(heard[0])).toBe(rewritten(ENGLISH[0]!));
+    expect(asked).toEqual([
+      { texts: ENGLISH.slice(1, 7), now: false },
+      { texts: [ENGLISH[0]], now: true },
+    ]);
+  });
+
+  it('reads as it is a paragraph whose rewrite does not come, without stopping', async () => {
+    const { view, controller, heard } = setUpRewriting(() => {});
+    const missing = vi.fn();
+    controller.addEventListener('tts-translation-missing', missing);
+    await controller.speak(view.tts!.start()!);
+    await vi.waitFor(() => expect(heard).toHaveLength(1));
+    expect(text(heard[0])).toBe(ENGLISH[0]);
+    expect(missing).not.toHaveBeenCalled();
+  });
+
+  it('with the screen off, reads it as it is at once', async () => {
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const { view, controller, heard } = setUpRewriting(() => {});
+      controller.translateBlocks = (_elements, now) =>
+        now ? new Promise<void>(() => {}) : Promise.resolve();
+      await controller.speak(view.tts!.start()!);
+      for (let i = 0; i < 50 && heard.length === 0; i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      expect(text(heard[0])).toBe(ENGLISH[0]);
+    } finally {
+      vi.useRealTimers();
+      hidden.mockRestore();
+    }
+  });
+});
