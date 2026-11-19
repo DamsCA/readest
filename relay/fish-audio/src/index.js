@@ -20,6 +20,8 @@
 // PLUS l'instant de chaque mot (Server-Sent Events) : c'est ce qui permet a
 // l'app de tourner la page sur le mot prononce. Le flux est renvoye tel quel,
 // sans le lire : aucun calcul ici (le forfait gratuit accorde 10 ms de CPU).
+import Anthropic from '@anthropic-ai/sdk';
+
 const FISH_ROUTES = new Map([
   ['/v1/tts', 'https://api.fish.audio/v1/tts'],
   ['/v1/tts/stream/with-timestamp', 'https://api.fish.audio/v1/tts/stream/with-timestamp'],
@@ -213,8 +215,10 @@ const rewritePrompt = (lang) =>
   `${lang}, as a careful native editor would: fix every error and smooth awkward phrasing, ` +
   `but keep the meaning, every idea, example, name, number and quotation, the tone, and the ` +
   `sentences in their order. Never summarize, shorten, add, explain or comment, and never ` +
-  `continue the text. Follow ${lang} typography (for French: « » quotation marks and a space ` +
-  `before ; : ! ?). Reply with the rewritten paragraph only.`;
+  `continue the text. A quotation may run on over several paragraphs: never open or close ` +
+  `one that the paragraph leaves open. Follow ${lang} typography (for French: « » quotation ` +
+  `marks and a space before ; : ! ?). Plain text only, no Markdown: no asterisks or ` +
+  `underscores around titles or words. Reply with the rewritten paragraph only.`;
 // Un nombre de la reecriture doit venir du texte : « 3 clients » peut devenir
 // « trois clients » (essai du 19/11/2026), pas « 4 clients » ni « 1953 ».
 const numbersIn = (s) => s.match(/\d+/g) || [];
@@ -253,29 +257,81 @@ async function handleRewrite(request, env) {
   }
   // Un titre de deux mots se lit comme une consigne d'ecriture (voir plus haut).
   if (text.split(/\s+/).length < 4) return json(200, { rewrite: text, unchanged: true }, CORS);
-  try {
-    const out = await env.AI.run(TRANSLATE_MODEL, {
-      messages: [
-        { role: 'system', content: rewritePrompt(lang) },
-        { role: 'user', content: text },
-      ],
-      max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
-      temperature: 0.2,
-    });
-    const rewrite =
-      typeof out?.response === 'string' ? decodeEntities(decodeEntities(out.response.trim())) : '';
-    if (!rewrite) return json(502, { error: 'empty rewrite' }, CORS);
-    if (rewriteDrifts(text, rewrite)) {
-      return json(200, { rewrite: text, unchanged: true, usage: out.usage ?? null }, CORS);
+  let out = env.ANTHROPIC_API_KEY ? await rewriteWithClaude(env, text, lang) : null;
+  if (!out) {
+    try {
+      out = await rewriteWithMistral(env, text, lang);
+    } catch (err) {
+      const message = String(err?.message || err);
+      if (/4006|neuron|allocation/i.test(message)) {
+        return json(429, { error: 'daily free allocation exhausted' }, CORS);
+      }
+      return json(502, { error: message.slice(0, 200) }, CORS);
     }
-    return json(200, { rewrite, usage: out.usage ?? null }, CORS);
-  } catch (err) {
-    const message = String(err?.message || err);
-    if (/4006|neuron|allocation/i.test(message)) {
-      return json(429, { error: 'daily free allocation exhausted' }, CORS);
-    }
-    return json(502, { error: message.slice(0, 200) }, CORS);
   }
+  const { model, usage } = out;
+  // L'app affiche du texte brut : un titre en *italique Markdown* (Claude, essai
+  // du 19/11/2026) s'afficherait avec ses asterisques.
+  let rewrite = decodeEntities(decodeEntities(out.rewrite.trim()))
+    .replace(/\*{1,2}([^*\n]+?)\*{1,2}/g, '$1')
+    .replace(/(^|[\s(«])_([^_\n]+?)_(?=[\s).,;:!?»]|$)/g, '$1$2');
+  if (!rewrite) return json(502, { error: 'empty rewrite' }, CORS);
+  // Une citation ouverte dans ce paragraphe continue dans le suivant : le
+  // modele la refermait quand meme, consigne ou pas (essai du 19/11/2026).
+  const quoteBalance = (s) => (s.match(/«/g) || []).length - (s.match(/»/g) || []).length;
+  if (quoteBalance(rewrite) < quoteBalance(text) && /\s*»\s*$/.test(rewrite)) {
+    rewrite = rewrite.replace(/\s*»\s*$/, '');
+  }
+  if (rewriteDrifts(text, rewrite)) {
+    return json(200, { rewrite: text, unchanged: true, model, usage }, CORS);
+  }
+  return json(200, { rewrite, model, usage }, CORS);
+}
+
+// Claude, quand la cle API de Damien est la (secret ANTHROPIC_API_KEY) : un
+// francais bien meilleur que Mistral Small, et une phrase sans queue ni tete
+// mieux reperee (« utilise le modele de Claude, si c'est meilleur »,
+// 19/11/2026). Effort bas : c'est de la mise au propre, pas un raisonnement, et
+// la reflexion est facturee. Rien ne revient (null) si Claude refuse ou ne
+// repond pas (cle invalide, credit epuise, reseau) : Mistral prend la suite.
+const REWRITE_CLAUDE_MODEL = 'claude-opus-5-5';
+async function rewriteWithClaude(env, text, lang) {
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 1 });
+    const response = await client.beta.messages.create({
+      model: REWRITE_CLAUDE_MODEL,
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'low' },
+      system: rewritePrompt(lang),
+      messages: [{ role: 'user', content: text }],
+    });
+    if (response.stop_reason === 'refusal') return null;
+    const rewrite = response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('')
+      .trim();
+    if (!rewrite || response.stop_reason === 'max_tokens') return null;
+    return { rewrite, model: response.model, usage: response.usage ?? null };
+  } catch (err) {
+    console.warn('Claude rewrite failed, Mistral takes it:', String(err?.message || err).slice(0, 200));
+    return null;
+  }
+}
+
+async function rewriteWithMistral(env, text, lang) {
+  const out = await env.AI.run(TRANSLATE_MODEL, {
+    messages: [
+      { role: 'system', content: rewritePrompt(lang) },
+      { role: 'user', content: text },
+    ],
+    max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
+    temperature: 0.2,
+  });
+  const rewrite = typeof out?.response === 'string' ? out.response : '';
+  return { rewrite, model: TRANSLATE_MODEL, usage: out?.usage ?? null };
 }
 
 // --- Relecture IA d'une page (/v1/proofread) -------------------------------

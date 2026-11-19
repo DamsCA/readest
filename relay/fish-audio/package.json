@@ -1,0 +1,9 @@
+{
+  "name": "readest-fish-relay",
+  "private": true,
+  "description": "Cloudflare Worker relay of the Readest app (voice, translation, rewrite).",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.10.0"
+  }
+}
