@@ -217,7 +217,8 @@ const rewritePrompt = (lang) =>
   `sentences in their order. Never summarize, shorten, add, explain or comment, and never ` +
   `continue the text. A quotation may run on over several paragraphs: never open or close ` +
   `one that the paragraph leaves open. Follow ${lang} typography (for French: « » quotation ` +
-  `marks and a space before ; : ! ?). Plain text only, no Markdown: no asterisks or ` +
+  `marks, a space before ; : ! ? and the curly apostrophe ’, never the straight one). ` +
+  `Plain text only, no Markdown: no asterisks or ` +
   `underscores around titles or words. Reply with the rewritten paragraph only.`;
 // Un nombre de la reecriture doit venir du texte : « 3 clients » peut devenir
 // « trois clients » (essai du 19/11/2026), pas « 4 clients » ni « 1953 ».
@@ -282,6 +283,10 @@ async function handleRewrite(request, env) {
   if (quoteBalance(rewrite) < quoteBalance(text) && /\s*»\s*$/.test(rewrite)) {
     rewrite = rewrite.replace(/\s*»\s*$/, '');
   }
+  // L'apostrophe du livre : Claude ecrivait « l'homme » (droite) dans un livre
+  // en « l’homme » (typographique), et les deux se melangeaient sur une meme
+  // page (« Comment se faire des amis », 20/11/2026).
+  if (text.includes('’')) rewrite = rewrite.replace(/(\p{L})'(?=\p{L})/gu, '$1’');
   if (rewriteDrifts(text, rewrite)) {
     return json(200, { rewrite: text, unchanged: true, model, usage }, CORS);
   }

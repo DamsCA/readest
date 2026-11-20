@@ -14,8 +14,17 @@ const languagePolishers: Record<string, Polisher> = {
   es: (text: string) =>
     text.replace(/\?([A-ZÁÉÍÓÚÑÜ])/g, '? $1').replace(/\!([A-ZÁÉÍÓÚÑÜ])/g, '! $1'),
 
-  // French - fix punctuation spacing
-  fr: (text: string) => text.replace(/\s+([!?:;])/g, ' $1').replace(/([!?:;])\s+/g, '$1 '),
+  // French - a space before ; : ! ? (French typography). basicPolish has just
+  // removed it, which is right for English, and this polisher used to look for
+  // a space that was no longer there: "Pourquoi ?" came out "Pourquoi?" in
+  // every French translation, and in the rewrite of "Comment se faire des
+  // amis" (20 Nov 2026). It comes back as a no-break space, so the mark never
+  // starts a line on its own. Only after a word and before a space or the end:
+  // times, verses and links (10:30, 3:16, http://) stay as they are.
+  fr: (text: string) =>
+    text
+      .replace(/([^\s!?:;«([{])([!?:;]+)(?=\s|$|[»)\]}"”’.…,])/g, '$1 $2')
+      .replace(/([!?:;])\s+/g, '$1 '),
 
   // Japanese - fix punctuation spacing
   ja: (text: string) => text.replace(/\s+([。、！？])/g, '$1').replace(/([。、！？])\s+/g, '$1'),

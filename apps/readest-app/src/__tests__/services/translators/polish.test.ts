@@ -89,24 +89,47 @@ describe('getPolisher', () => {
   describe('French (fr)', () => {
     const polisher = getPolisher('fr');
 
-    it('basicPolish removes space before punctuation first, then French polisher runs', () => {
-      // basicPolish: 'Bonjour  !' -> 'Bonjour!'
-      // French polisher: no \s+ before !, so no change
-      // This documents the actual interaction between basic and French polishing
-      expect(polisher('Bonjour  !')).toBe('Bonjour!');
+    const NBSP = ' ';
+
+    // basicPolish removes the space before punctuation (English); French wants
+    // it back. "Pourquoi ?" came out "Pourquoi?" (20 Nov 2026).
+    it('keeps the space before ; : ! ? that French typography wants', () => {
+      expect(polisher('Pourquoi ? Parce que.')).toBe(`Pourquoi${NBSP}? Parce que.`);
+      expect(polisher('précieuse : cette')).toBe(`précieuse${NBSP}: cette`);
+      expect(polisher('Eh bien ; voilà !')).toBe(`Eh bien${NBSP}; voilà${NBSP}!`);
+    });
+
+    it('puts the space back when the translator left it out', () => {
+      expect(polisher('Pourquoi? Parce que.')).toBe(`Pourquoi${NBSP}? Parce que.`);
+      expect(polisher('Bonjour  !')).toBe(`Bonjour${NBSP}!`);
+    });
+
+    it('a no-break space, whatever space came in', () => {
+      expect(polisher('Bonjour !')).toBe(`Bonjour${NBSP}!`);
+      expect(polisher(`Bonjour${NBSP}!`)).toBe(`Bonjour${NBSP}!`);
+    });
+
+    it('one space before a run of marks, and inside quotes', () => {
+      expect(polisher('Quoi ?!')).toBe(`Quoi${NBSP}?!`);
+      expect(polisher('celui-ci!...')).toBe(`celui-ci${NBSP}!...`);
+      expect(polisher('« Viens ! » dit-il : « Vite ! »')).toBe(
+        `« Viens${NBSP}! » dit-il${NBSP}: « Vite${NBSP}! »`,
+      );
+    });
+
+    it('leaves times, verses and links alone', () => {
+      expect(polisher('à 10:30 précises')).toBe('à 10:30 précises');
+      expect(polisher('Jean 3:16 le dit')).toBe('Jean 3:16 le dit');
+      expect(polisher('voir https://exemple.fr ici')).toBe('voir https://exemple.fr ici');
+    });
+
+    it('gives the same text when polished twice', () => {
+      const once = polisher('Pourquoi ? Eh bien : « Non ! »');
+      expect(polisher(once)).toBe(once);
     });
 
     it('normalizes space after high punctuation', () => {
-      // basicPolish: '!  Bonjour' -> '! Bonjour' (multiple spaces -> single)
-      // French polisher: /([!?:;])\s+/g -> '$1 ' which keeps exactly one space
       expect(polisher('!  Bonjour')).toBe('! Bonjour');
-    });
-
-    it('preserves single space before French high punctuation when already correct', () => {
-      // If the input already has exactly the right spacing and basicPolish
-      // removes the space, the French polisher cannot restore it.
-      // basicPolish: 'Bonjour !' -> 'Bonjour!'
-      expect(polisher('Bonjour !')).toBe('Bonjour!');
     });
 
     it('handles text without high punctuation', () => {
