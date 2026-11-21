@@ -321,7 +321,10 @@ async function rewriteWithClaude(env, text, lang) {
     if (!rewrite || response.stop_reason === 'max_tokens') return null;
     return { rewrite, model: response.model, usage: response.usage ?? null };
   } catch (err) {
-    console.warn('Claude rewrite failed, Mistral takes it:', String(err?.message || err).slice(0, 200));
+    console.warn(
+      'Claude rewrite failed, Mistral takes it:',
+      String(err?.message || err).slice(0, 200),
+    );
     return null;
   }
 }
@@ -601,7 +604,10 @@ async function handleProofread(request, env) {
   const model = PROOFREAD_MODELS.includes(body?.model) ? body.model : PROOFREAD_MODELS[0];
   if (body?.task === 'verify') {
     const candidates = (Array.isArray(body.candidates) ? body.candidates : [])
-      .filter((c) => Number.isInteger(c?.p) && typeof c?.find === 'string' && typeof c?.replace === 'string')
+      .filter(
+        (c) =>
+          Number.isInteger(c?.p) && typeof c?.find === 'string' && typeof c?.replace === 'string',
+      )
       .slice(0, 20);
     try {
       const maxTokens = Math.min(1024, Math.max(4, Number(body.maxTokens) || 4));
@@ -758,7 +764,9 @@ export default {
     if (text.length > MAX_CHARS) return json(413, { error: `text over ${MAX_CHARS} chars` });
 
     const voice =
-      typeof body.reference_id === 'string' && body.reference_id ? body.reference_id : DEFAULT_VOICE;
+      typeof body.reference_id === 'string' && body.reference_id
+        ? body.reference_id
+        : DEFAULT_VOICE;
     const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: {
