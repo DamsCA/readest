@@ -9,6 +9,7 @@ import { isTauriAppPlatform } from '@/services/environment';
 import { ingestFile } from '@/services/ingestService';
 import { drainInbox, DEFAULT_MAX_ITEMS_PER_PASS } from '@/services/send/inboxDrainer';
 import { isInboxDrainEnabled } from '@/services/send/devicePrefs';
+import { SEND_TO_READEST_ENABLED } from '@/services/features';
 import {
   convertToEpubWithWorker,
   convertFileIfNeeded,
@@ -45,7 +46,7 @@ export function useInboxDrainer(): void {
   const lastDrainAtRef = useRef(0);
 
   const runDrain = useCallback(async () => {
-    if (!user || !appService || runningRef.current) return;
+    if (!SEND_TO_READEST_ENABLED || !user || !appService || runningRef.current) return;
     // Per-device opt-out: this device does not claim/process inbox items.
     if (!isInboxDrainEnabled()) return;
     // Throttle: drain (and so claim_inbox_item) at most once per interval, so
@@ -175,7 +176,7 @@ export function useInboxDrainer(): void {
   }, [user, appService, settings, envConfig]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!SEND_TO_READEST_ENABLED || !user) return;
     void runDrain();
     const interval = setInterval(() => void runDrain(), DRAIN_INTERVAL_MS);
     const onFocus = () => void runDrain();

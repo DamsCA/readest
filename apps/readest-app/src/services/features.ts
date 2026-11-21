@@ -20,6 +20,12 @@ export const DEMO_BOOKS_ENABLED = false;
 export const READEST_PREMIUM_ENABLED = false;
 
 /**
+ * "Send to Readest" (books sent by e-mail to an inbox) needs Readest's e-mail
+ * worker and the send_* tables: not offered, so the inbox is never polled.
+ */
+export const SEND_TO_READEST_ENABLED = false;
+
+/**
  * Sign-in by e-mail link and the "forgot password" e-mail need an e-mail
  * sender of our own (custom SMTP on Supabase, which needs a domain). Until
  * then the sign-in page offers e-mail and password only. Turn on with

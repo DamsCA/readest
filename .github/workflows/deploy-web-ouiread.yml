@@ -59,6 +59,11 @@ jobs:
           NEXT_PUBLIC_APP_PLATFORM: web
           NEXT_PUBLIC_CLOUD_ENABLED: 'true'
           NEXT_PUBLIC_AUTH_PROVIDERS: ${{ vars.OUIREAD_AUTH_PROVIDERS }}
+          # The app's own address, baked in so that no request ever falls back to
+          # Readest's servers before /runtime-config.js has loaded. Change the
+          # repository variable OUIREAD_WEB_ORIGIN when Ouiread gets its own domain.
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.OUIREAD_WEB_ORIGIN || 'https://ouiread.damien-aure99c.workers.dev' }}
+          NEXT_PUBLIC_NODE_BASE_URL: ${{ vars.OUIREAD_WEB_ORIGIN || 'https://ouiread.damien-aure99c.workers.dev' }}
         run: |
           sed -i 's/next build"/next build --webpack"/' package.json
           npx opennextjs-cloudflare build
