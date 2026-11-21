@@ -9,29 +9,29 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/bricolage-grotesque';
 import '../styles/globals.css';
 
-const url = 'https://web.readest.com/';
-const title = 'Readest — Where You Read, Digest and Get Insight';
+// Ouiread's own address (the web build bakes NEXT_PUBLIC_API_BASE_URL).
+const url = `${(process.env['NEXT_PUBLIC_API_BASE_URL'] || 'https://ouiread.damien-aure99c.workers.dev').replace(/\/$/, '')}/`;
+const title = 'Ouiread — la liseuse qui traduit et lit vos livres';
 const description =
-  'Discover Readest, the ultimate online ebook reader for immersive and organized reading. ' +
-  'Enjoy seamless access to your digital library, powerful tools for highlighting, bookmarking, ' +
-  'and note-taking, and support for multiple book views. ' +
-  'Perfect for deep reading, analysis, and understanding. Explore now!';
-const previewImage = 'https://cdn.readest.com/images/open_graph_preview_read_now.png';
+  'Ouiread traduit vos livres en français et vous les lit à voix haute. ' +
+  'Votre bibliothèque vous suit sur tous vos appareils, et un livre vous est offert ' +
+  'à l’inscription : « Ça marche ».';
+const previewImage = '/og-ouiread.png';
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
   title: {
     default: title,
-    template: '%s | Readest',
+    template: '%s | Ouiread',
   },
   description,
   generator: 'Next.js',
   manifest: '/manifest.json',
-  keywords: ['epub', 'pdf', 'ebook', 'reader', 'readest', 'pwa'],
+  keywords: ['liseuse', 'livres', 'traduction', 'lecture à voix haute', 'epub', 'pdf', 'ouiread'],
   authors: [
     {
-      name: 'readest',
-      url: 'https://github.com/readest/readest',
+      name: 'Ouiread',
+      url,
     },
   ],
   icons: {
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Readest',
+    title: 'Ouiread',
     statusBarStyle: 'default',
   },
   openGraph: {
@@ -48,7 +48,9 @@ export const metadata: Metadata = {
     url,
     title,
     description,
-    images: [previewImage],
+    locale: 'fr_FR',
+    siteName: 'Ouiread',
+    images: [{ url: previewImage, width: 1200, height: 630, alt: 'Ouiread' }],
   },
   twitter: {
     card: 'summary_large_image',
@@ -58,7 +60,7 @@ export const metadata: Metadata = {
   },
   other: {
     'apple-mobile-web-app-capable': 'yes',
-    'twitter:domain': 'web.readest.com',
+    'twitter:domain': new URL(url).host,
     'twitter:url': url,
   },
 };
