@@ -1000,3 +1000,15 @@ textarea:focus-within,
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Reader top bar: round buttons, a little roomier under a finger. */
+.header-bar .btn-ghost {
+  border-radius: 9999px;
+}
+@media (max-width: 639px) {
+  .header-bar .btn-ghost {
+    height: 2.5rem;
+    min-height: 2.5rem;
+    width: 2.5rem;
+  }
+}

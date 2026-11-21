@@ -87,6 +87,10 @@ export interface BookDoc {
   pageList?: Array<TOCItem>;
   sections: Array<SectionItem>;
   transformTarget?: EventTarget;
+  /** A PDF opened in text mode (rebuilt as flowing chapters). */
+  isPdfText?: boolean;
+  /** Text mode only: first PDF page (0-based) of each section. */
+  pdfSectionStarts?: number[];
   splitTOCHref(href: string): Array<string | number>;
   getCover(): Promise<Blob | null>;
 }
@@ -127,15 +131,22 @@ export interface DocumentLoaderOptions {
    * EPUB when the prefetch cache is hit.
    */
   nativeFilePath?: string;
+  /**
+   * Open a PDF in text mode: its text is rebuilt into flowing chapters, so it
+   * reads, translates and speaks like an EPUB. See `libs/pdfText`.
+   */
+  pdfTextMode?: boolean;
 }
 
 export class DocumentLoader {
   private file: File;
   private nativeFilePath?: string;
+  private pdfTextMode: boolean;
 
   constructor(file: File, options: DocumentLoaderOptions = {}) {
     this.file = file;
     this.nativeFilePath = options.nativeFilePath;
+    this.pdfTextMode = !!options.pdfTextMode;
   }
 
   private async isZip(): Promise<boolean> {
@@ -387,8 +398,13 @@ export class DocumentLoader {
           format = 'EPUB';
         }
       } else if (await this.isPDF()) {
-        const { makePDF } = await import('foliate-js/pdf.js');
-        book = await makePDF(this.file);
+        if (this.pdfTextMode) {
+          const { makePDFTextBook } = await import('./pdfText/book');
+          book = await makePDFTextBook(this.file);
+        } else {
+          const { makePDF } = await import('foliate-js/pdf.js');
+          book = await makePDF(this.file);
+        }
         format = 'PDF';
       } else if (await (await import('foliate-js/mobi.js')).isMOBI(this.file)) {
         const fflate = await import('foliate-js/vendor/fflate.js');

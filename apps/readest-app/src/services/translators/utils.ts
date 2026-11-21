@@ -31,7 +31,7 @@ export const isTranslationAvailable = (
   targetLanguage?: string | null,
   provider?: string | null,
 ) => {
-  if (!book || book.format === 'PDF') {
+  if (!book) {
     return false;
   }
 
@@ -40,7 +40,9 @@ export const isTranslationAvailable = (
 
   const primaryLanguage = book.primaryLanguage || '';
   if (!primaryLanguage || primaryLanguage.toLowerCase() === 'und') {
-    return false;
+    // A PDF seldom declares its language: text mode, which translation
+    // switches on, detects it from the text itself.
+    return book.format === 'PDF';
   }
 
   if (targetLanguage && isSameLang(primaryLanguage, targetLanguage)) {

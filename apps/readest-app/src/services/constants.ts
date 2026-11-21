@@ -225,8 +225,8 @@ export const DEFAULT_MOBILE_READSETTINGS: Partial<ReadSettings> = {
 };
 
 export const DEFAULT_BOOK_FONT: BookFont = {
-  serifFont: 'Bitter',
-  sansSerifFont: 'Roboto',
+  serifFont: 'Source Serif 4',
+  sansSerifFont: 'Atkinson Hyperlegible',
   monospaceFont: 'Consolas',
   defaultFont: 'Serif',
   defaultCJKFont: 'LXGW WenKai GB Screen',
@@ -306,7 +306,10 @@ export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: false,
   animated: true,
   bookPageTurn: true,
-  defaultFont: 'Sans-serif',
+  // A book face (Source Serif 4) and a little more air between lines: the
+  // phone reads like a printed page, not like a web page.
+  defaultFont: 'Serif',
+  lineHeight: 1.55,
   disableDoubleClick: true,
   spreadMode: 'none',
 };
@@ -370,12 +373,16 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   readingRulerColor: 'transparent',
 };
 
+// The sentence being read lights up in the app's soft yellow (the C design),
+// gentle on the paper page and still visible at night.
+export const DEFAULT_TTS_HIGHLIGHT_COLOR = '#F2C14E';
+
 export const DEFAULT_TTS_CONFIG: TTSConfig = {
   ttsRate: 1.3,
   ttsVoice: '',
   ttsLocation: '',
   showTTSBar: false,
-  ttsHighlightOptions: { style: 'highlight', color: '#808080' },
+  ttsHighlightOptions: { style: 'highlight', color: DEFAULT_TTS_HIGHLIGHT_COLOR },
   ttsHighlightGranularity: 'sentence',
   ttsMediaMetadata: 'sentence',
 };
@@ -447,6 +454,7 @@ export const DEFAULT_VIEW_SETTINGS_CONFIG: ViewSettingsConfig = {
 export const SYSTEM_SETTINGS_VERSION = 1;
 
 export const SERIF_FONTS = [
+  'Source Serif 4',
   'Bitter',
   'Literata',
   'Merriweather',
@@ -470,7 +478,14 @@ export const CJK_SERIF_FONTS = [
 
 export const CJK_SANS_SERIF_FONTS = ['Noto Sans SC', 'Noto Sans TC'];
 
-export const SANS_SERIF_FONTS = ['Roboto', 'Noto Sans', 'Open Sans', 'PT Sans', 'Helvetica'];
+export const SANS_SERIF_FONTS = [
+  'Atkinson Hyperlegible',
+  'Roboto',
+  'Noto Sans',
+  'Open Sans',
+  'PT Sans',
+  'Helvetica',
+];
 
 export const MONOSPACE_FONTS = [
   'Fira Code',
@@ -794,6 +809,22 @@ export const CJK_FONTS_PATTENS = new RegExp(
 export const BOOK_IDS_SEPARATOR = '+';
 
 export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=readest_web';
+
+// The app's name, shown in the library header. Provisional until the owner
+// picks the final name for the store listing.
+export const APP_DISPLAY_NAME = 'Ouiread';
+
+// AGPL-3.0: the app is a modified version of Readest and must say so, with a
+// date (section 5a), and point to its complete source (sections 6 and 13).
+// The build stamps the exact commit and date; a local build falls back to the
+// branch and to the day the redesign began.
+export const SOURCE_CODE_REPO_URL = 'https://github.com/DamsCA/readest';
+export const UPSTREAM_SOURCE_URL = 'https://github.com/readest/readest';
+export const getSourceCodeUrl = () => {
+  const commit = process.env['NEXT_PUBLIC_SOURCE_COMMIT'];
+  return `${SOURCE_CODE_REPO_URL}/tree/${commit || 'play-release'}`;
+};
+export const getModifiedOn = () => process.env['NEXT_PUBLIC_BUILD_DATE'] || '2026-11-21';
 
 export const READEST_WEB_BASE_URL = 'https://web.readest.com';
 export const READEST_NODE_BASE_URL = 'https://node.readest.com';

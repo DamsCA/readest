@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 
 import { Book } from '@/types/book';
@@ -272,7 +273,7 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 onDeleteLocalCopy={handleBookDeleteLocalCopy ? handleDeleteLocalCopy : undefined}
                 onDownload={handleBookDownload ? handleRedownload : undefined}
                 onUpload={handleBookUpload ? handleReupload : undefined}
-                onShare={handleShare}
+                onShare={READEST_CLOUD_ENABLED ? handleShare : undefined}
                 onExport={handleBookExport}
               />
             )}

@@ -414,9 +414,9 @@ export function useTextTranslation(
   }, [bookKey, view]);
 
   useEffect(() => {
-    if (enabled.current && progress) {
-      const { range } = progress;
-      translateInRange(range);
+    // No range yet right after a book reopens (a PDF switching to text mode).
+    if (enabled.current && progress?.range) {
+      translateInRange(progress.range);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress]);

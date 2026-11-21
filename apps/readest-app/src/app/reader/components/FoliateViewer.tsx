@@ -64,6 +64,9 @@ import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
 import { lockScreenOrientation } from '@/utils/bridge';
 import { useTextTranslation } from '../hooks/useTextTranslation';
+import { usePdfTranslationSwitch } from '../hooks/usePdfTranslationSwitch';
+import { consumePendingPdfLocation } from '../utils/pdfTextMode';
+import { pdfTocItemAt } from '@/libs/pdfText/position';
 import { useBookCoverAutoSave } from '../hooks/useAutoSaveBookCover';
 import { useDiscordPresence } from '@/hooks/useDiscordPresence';
 import { manageSyntaxHighlighting } from '@/utils/highlightjs';
@@ -152,6 +155,7 @@ const FoliateViewer: React.FC<{
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
   useWebDAVSync(bookKey);
   useTextTranslation(bookKey, viewRef.current);
+  usePdfTranslationSwitch(bookKey);
 
   // Coalesce setProgress writes within a single animation frame.
   //
@@ -188,10 +192,16 @@ const FoliateViewer: React.FC<{
     const { current, next, total } = detail.location as PageInfo;
     const currentPage = atEnd && total > 0 ? total - 1 : current;
     const pageInfo = { current: currentPage, next, total };
+    // A PDF in text mode may get its table of contents after opening.
+    const tocItem =
+      detail.tocItem ??
+      (bookDoc.isPdfText
+        ? pdfTocItemAt(bookDoc, detail.range, detail.section?.current ?? 0)
+        : undefined);
     setProgress(
       bookKey,
       detail.cfi,
-      detail.tocItem,
+      tocItem,
       detail.pageItem,
       detail.section,
       pageInfo,
@@ -199,7 +209,7 @@ const FoliateViewer: React.FC<{
       detail.range,
       detail.fraction,
     );
-  }, [bookKey, setProgress]);
+  }, [bookKey, bookDoc, setProgress]);
 
   const progressRelocateHandler = (event: Event) => {
     // Always stash the latest detail; if another rAF is already pending
@@ -732,7 +742,9 @@ const FoliateViewer: React.FC<{
       const thisId = bookKey.split('-')[0];
       const overrideLocation = cfiParam && primaryId === thisId ? cfiParam : null;
 
-      const lastLocation = overrideLocation ?? config.location;
+      // A PDF switching between page and text mode reopens on the same page.
+      const lastLocation =
+        overrideLocation ?? consumePendingPdfLocation(bookKey) ?? config.location;
       if (lastLocation) {
         await view.init({ lastLocation });
       } else {
@@ -817,7 +829,7 @@ const FoliateViewer: React.FC<{
         applyScrollbarStyle(document, viewSettings.hideScrollbar || false);
       });
 
-      if (bookData?.book?.format === 'PDF' && themeCode && renderer) {
+      if (bookData?.book?.format === 'PDF' && bookData.isFixedLayout && themeCode && renderer) {
         renderer.pageColors = viewSettings.applyThemeToPDF
           ? {
               background: themeCode.bg,

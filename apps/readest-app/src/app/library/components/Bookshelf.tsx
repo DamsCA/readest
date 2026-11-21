@@ -60,6 +60,17 @@ import ShareBookDialog from './ShareBookDialog';
 import { useAuth } from '@/context/AuthContext';
 import GroupingModal from './GroupingModal';
 import SetStatusAlert from './SetStatusAlert';
+import ContinueReadingCard from './ContinueReadingCard';
+import LibraryFilterChips from './LibraryFilterChips';
+import { LIBRARY_TAB_BAR_HEIGHT } from './LibraryTabBar';
+import { useOpenBook } from '../hooks/useOpenBook';
+import { requestListenOnOpen } from '@/utils/listenOnOpen';
+import {
+  ensureLibraryFilter,
+  getContinueReadingBook,
+  LibraryFilter,
+  matchesLibraryFilter,
+} from '../utils/continueReading';
 
 interface BookshelfProps {
   libraryBooks: Book[];
@@ -90,11 +101,15 @@ interface BookshelfProps {
 type BookshelfListContext = {
   autoColumns: boolean;
   fixedColumns: number;
+  // Scrolls with the books: the "Continue reading" card and the filter chips.
+  header: React.ReactNode;
+  // Room left under the last row (the phone's tab bar sits there).
+  footerHeight: number;
 };
 
 const BOOKSHELF_GRID_CLASSES =
-  'bookshelf-items transform-wrapper grid gap-x-4 px-4 sm:gap-x-0 sm:px-2 ' +
-  'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-12';
+  'bookshelf-items transform-wrapper grid gap-x-3 px-4 sm:gap-x-0 sm:px-2 ' +
+  'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8';
 
 const BOOKSHELF_LIST_CLASSES = 'bookshelf-items transform-wrapper flex flex-col';
 
@@ -128,13 +143,20 @@ const BookshelfLinearList: Components['List'] = React.forwardRef<HTMLDivElement,
 );
 BookshelfLinearList.displayName = 'BookshelfLinearList';
 
+const BookshelfHeader = ({ context }: { context?: BookshelfListContext }) => <>{context?.header}</>;
+const BookshelfFooter = ({ context }: { context?: BookshelfListContext }) => (
+  <div style={{ height: context?.footerHeight ?? 34 }} />
+);
+
 const GRID_VIRTUOSO_COMPONENTS: GridComponents<BookshelfListContext> = {
   List: BookshelfGridList,
-  Footer: () => <div style={{ height: 34 }} />,
+  Header: BookshelfHeader,
+  Footer: BookshelfFooter,
 };
-const LIST_VIRTUOSO_COMPONENTS: Components = {
+const LIST_VIRTUOSO_COMPONENTS: Components<unknown, BookshelfListContext> = {
   List: BookshelfLinearList,
-  Footer: () => <div style={{ height: 34 }} />,
+  Header: BookshelfHeader,
+  Footer: BookshelfFooter,
 };
 
 const Bookshelf: React.FC<BookshelfProps> = ({
@@ -163,6 +185,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const groupId = searchParams?.get('group') || '';
   const queryTerm = searchParams?.get('q') || null;
+  const filter = ensureLibraryFilter(searchParams?.get('filter'));
   const viewMode = searchParams?.get('view') || settings.libraryViewMode;
   const storedSortBy = ensureLibrarySortByType(searchParams?.get('sort'), settings.librarySortBy);
   const sortOrder = searchParams?.get('order') || (settings.librarySortAscending ? 'asc' : 'desc');
@@ -226,8 +249,10 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const filteredBooks = useMemo(() => {
     const bookFilter = createBookFilter(queryTerm);
-    return queryTerm ? libraryBooks.filter((book) => bookFilter(book)) : libraryBooks;
-  }, [libraryBooks, queryTerm]);
+    return libraryBooks.filter(
+      (book) => (!queryTerm || bookFilter(book)) && matchesLibraryFilter(book, filter),
+    );
+  }, [libraryBooks, queryTerm, filter]);
 
   const currentBookshelfItems = useMemo(() => {
     if (groupBy === LibraryGroupByType.Group) {
@@ -668,12 +693,58 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   // last book; list mode doesn't have an import tile.
   const gridTotalCount = hasItems ? sortedBookshelfItems.length + 1 : 0;
 
+  const openBook = useOpenBook(handleBookDownload, setLoading);
+  const continueBook = useMemo(() => getContinueReadingBook(libraryBooks), [libraryBooks]);
+  const showShelfHeader = !isSelectMode;
+  const listenToBook = useCallback(
+    (book: Book) => {
+      requestListenOnOpen(book.hash);
+      openBook(book);
+    },
+    [openBook],
+  );
+  const handleFilterChange = useCallback(
+    (value: LibraryFilter) => updateUrlParams({ filter: value === 'all' ? null : value }),
+    [updateUrlParams],
+  );
+  const shelfHeader = useMemo(
+    () =>
+      showShelfHeader ? (
+        <>
+          {continueBook && !groupId && !queryTerm && filter === 'all' && (
+            <ContinueReadingCard book={continueBook} onOpen={openBook} onListen={listenToBook} />
+          )}
+          <LibraryFilterChips filter={filter} onChange={handleFilterChange} />
+        </>
+      ) : null,
+    [
+      showShelfHeader,
+      continueBook,
+      groupId,
+      queryTerm,
+      filter,
+      openBook,
+      listenToBook,
+      handleFilterChange,
+    ],
+  );
+
   const listContext = useMemo<BookshelfListContext>(
     () => ({
       autoColumns: settings.libraryAutoColumns,
       fixedColumns: settings.libraryColumns,
+      header: shelfHeader,
+      footerHeight: appService?.isMobile
+        ? LIBRARY_TAB_BAR_HEIGHT + (safeAreaInsets?.bottom ?? 0) + 24
+        : 34,
     }),
-    [settings.libraryAutoColumns, settings.libraryColumns],
+    [
+      settings.libraryAutoColumns,
+      settings.libraryColumns,
+      shelfHeader,
+      appService?.isMobile,
+      safeAreaInsets?.bottom,
+    ],
   );
 
   const renderBookshelfItem = useCallback(
@@ -681,7 +752,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       if (isGridMode && index === sortedBookshelfItems.length) {
         return (
           <div
-            className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
+            className={clsx('bookshelf-import-item mx-0 my-1.5 sm:mx-3 sm:my-3')}
             style={
               coverFit === 'fit'
                 ? { display: 'flex', paddingBottom: `${iconSize15 + 24}px` }
@@ -691,7 +762,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
             <button
               aria-label={_('Import Books')}
               className={clsx(
-                'bookitem-main bg-base-100 hover:bg-base-300/50',
+                'bookitem-main bg-base-100 hover:bg-base-300/50 rounded-3xl',
                 'flex items-center justify-center',
                 'aspect-[28/41] w-full',
               )}
@@ -774,6 +845,14 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       className='bookshelf min-h-0 flex-grow focus:outline-none'
     >
       <div ref={osRootRef} data-overlayscrollbars-initialize='' className='h-full'>
+        {!hasItems && (
+          <div className='h-full overflow-y-auto'>
+            {shelfHeader}
+            <p className='text-neutral-content px-6 py-10 text-center text-sm'>
+              {_('No books here yet.')}
+            </p>
+          </div>
+        )}
         {hasItems && isGridMode && (
           <VirtuosoGrid<unknown, BookshelfListContext>
             overscan={200}
@@ -786,10 +865,11 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           />
         )}
         {hasItems && !isGridMode && (
-          <Virtuoso
+          <Virtuoso<unknown, BookshelfListContext>
             overscan={200}
             totalCount={sortedBookshelfItems.length}
             components={LIST_VIRTUOSO_COMPONENTS}
+            context={listContext}
             computeItemKey={computeItemKey}
             itemContent={renderBookshelfItem}
             scrollerRef={handleScrollerRef}

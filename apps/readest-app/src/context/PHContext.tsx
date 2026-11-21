@@ -1,6 +1,7 @@
 'use client';
 
 import posthog from 'posthog-js';
+import { TELEMETRY_ENABLED } from '@/services/features';
 import { ReactNode, useEffect } from 'react';
 import { PostHogProvider } from 'posthog-js/react';
 import { TELEMETRY_DECISION_KEY, TELEMETRY_OPT_OUT_KEY } from '@/utils/telemetry';
@@ -22,9 +23,12 @@ const shouldOptOutAtBoot = () => {
 const posthogUrl =
   process.env['NEXT_PUBLIC_POSTHOG_HOST'] ||
   atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_URL_BASE64']!);
-const posthogKey =
-  process.env['NEXT_PUBLIC_POSTHOG_KEY'] ||
-  atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']!);
+// Readest's own PostHog project is never a fallback: without a key of our
+// own, no usage statistic leaves the device.
+const posthogKey = TELEMETRY_ENABLED
+  ? process.env['NEXT_PUBLIC_POSTHOG_KEY'] ||
+    atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']!)
+  : process.env['NEXT_PUBLIC_POSTHOG_KEY'] || '';
 
 if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'production' && posthogKey) {
   posthog.init(posthogKey, {

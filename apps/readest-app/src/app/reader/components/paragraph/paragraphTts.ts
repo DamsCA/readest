@@ -1,4 +1,5 @@
 import { TTSHighlightOptions } from '@/services/tts/types';
+import { DEFAULT_TTS_HIGHLIGHT_COLOR } from '@/services/constants';
 
 // Detail payload for the app-bus `tts-speak` event (see useTTSControl.handleTTSSpeak,
 // which honors a passed `range` + `index`). Paragraph mode starts audio from the
@@ -96,7 +97,7 @@ export const decideParagraphTtsHighlight = (input: {
 //   - highlight/outline → a translucent background of the chosen color
 //   - underline/squiggly/strikethrough → a text-decoration in the chosen color
 export const buildTtsHighlightCssText = (options?: TTSHighlightOptions): string => {
-  const color = options?.color || '#808080';
+  const color = options?.color || DEFAULT_TTS_HIGHLIGHT_COLOR;
   switch (options?.style) {
     case 'underline':
       return `text-decoration: underline; text-decoration-color: ${color}; text-decoration-thickness: 2px; text-underline-offset: 2px;`;

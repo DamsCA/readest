@@ -58,7 +58,9 @@ export const NavigationPanel: React.FC<NavigationPanelProps> = ({
   );
 
   const classes = clsx(
-    'footerbar-progress-mobile not-eink:bg-base-200 eink:bg-base-100 absolute flex w-full flex-col items-center gap-y-8 px-4 transition-all',
+    'footerbar-progress-mobile not-eink:bg-base-100 eink:bg-base-100 absolute flex w-full flex-col items-center gap-y-8 px-5 transition-all',
+    // A sheet rising from the bottom bar, in one piece with it.
+    'rounded-t-[2rem] not-eink:shadow-[0_-16px_40px_rgba(0,0,0,0.12)]',
     'eink:border-base-content eink:border-t',
     !forceMobileLayout && 'sm:hidden',
     actionTab === 'progress'

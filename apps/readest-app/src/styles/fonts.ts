@@ -5,6 +5,8 @@ import { md5Fingerprint } from '@/utils/md5';
 export type FontFormat = 'ttf' | 'otf' | 'woff' | 'woff2';
 
 const basicGoogleFonts = [
+  { family: 'Source Serif 4', weights: 'ital,opsz,wght@0,8..60,200..900;1,8..60,200..900' },
+  { family: 'Atkinson Hyperlegible', weights: 'ital,wght@0,400;0,700;1,400;1,700' },
   { family: 'Bitter', weights: 'ital,wght@0,100..900;1,100..900' },
   { family: 'Fira Code', weights: 'wght@300..700' },
   { family: 'Literata', weights: 'ital,opsz,wght@0,7..72,200..900;1,7..72,200..900' },

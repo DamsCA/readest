@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MdChevronRight } from 'react-icons/md';
@@ -215,12 +216,14 @@ const IntegrationsPanel: React.FC = () => {
               status={opdsStatus}
               onClick={() => setSubPage('opds')}
             />
-            <IntegrationRow
-              icon={RiSendPlaneLine}
-              title={_('Send to Readest')}
-              status={_('Email books to your library')}
-              onClick={() => setSubPage('send')}
-            />
+            {READEST_CLOUD_ENABLED && (
+              <IntegrationRow
+                icon={RiSendPlaneLine}
+                title={_('Send to Readest')}
+                status={_('Email books to your library')}
+                onClick={() => setSubPage('send')}
+              />
+            )}
           </div>
         </div>
       </div>

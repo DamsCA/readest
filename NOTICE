@@ -1,0 +1,23 @@
+Liseuse (provisional name) - a modified version of Readest
+
+This program is a modified version of Readest
+(https://github.com/readest/readest), Copyright (C) Bilingify LLC and the
+Readest contributors, licensed under the GNU Affero General Public License,
+version 3 (see LICENSE).
+
+Modified on 2026-11-21 and later; every change is in this repository's git
+history (branch play-release). The modifications are released under the same
+license.
+
+Main modifications:
+- a new look and design system (colours, type, shapes; light, sepia, dark
+  and OLED black themes);
+- a redesigned library ("Continue reading" card, filter chips, bottom bar)
+  and reading screen (bottom tools, theme panel, read-aloud player);
+- translation of books into French and reading them aloud, through a relay
+  (relay/fish-audio);
+- no Readest account or Readest server: sign-in, cloud sync and storage,
+  shared links, "Send to Readest", online metadata search, purchases and
+  usage statistics are switched off (src/services/features.ts).
+
+Complete corresponding source code: https://github.com/DamsCA/readest

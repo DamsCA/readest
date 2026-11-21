@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import React, { useEffect } from 'react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ import { eventDispatcher } from '@/utils/event';
 import { getMaxInlineSize } from '@/utils/config';
 import dayjs from 'dayjs';
 import { saveViewSettings } from '@/helpers/settings';
+import { switchPdfTextMode } from '../utils/pdfTextMode';
 import { tauriHandleToggleFullScreen } from '@/utils/window';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
@@ -401,35 +403,37 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
-      <MenuItem
-        label={
-          !user
-            ? _('Sign in to Sync')
-            : lastSyncTime
-              ? _('Synced {{time}}', {
-                  time: dayjs(lastSyncTime).fromNow(),
-                })
-              : _('Never synced')
-        }
-        Icon={user ? MdSync : MdSyncProblem}
-        iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
-        onClick={handleSync}
-        siblings={
-          <button
-            aria-label={_('Sync Info')}
-            title={_('Sync Info')}
-            className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
-            onClick={() => {
-              setIsDropdownOpen?.(false);
-              onShowMetaHashDialog?.();
-            }}
-          >
-            <MdInfoOutline size={16} />
-          </button>
-        }
-      />
+      {READEST_CLOUD_ENABLED && (
+        <MenuItem
+          label={
+            !user
+              ? _('Sign in to Sync')
+              : lastSyncTime
+                ? _('Synced {{time}}', {
+                    time: dayjs(lastSyncTime).fromNow(),
+                  })
+                : _('Never synced')
+          }
+          Icon={user ? MdSync : MdSyncProblem}
+          iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
+          onClick={handleSync}
+          siblings={
+            <button
+              aria-label={_('Sync Info')}
+              title={_('Sync Info')}
+              className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
+              onClick={() => {
+                setIsDropdownOpen?.(false);
+                onShowMetaHashDialog?.();
+              }}
+            >
+              <MdInfoOutline size={16} />
+            </button>
+          }
+        />
+      )}
 
-      <hr aria-hidden='true' className='border-base-300 my-1' />
+      {READEST_CLOUD_ENABLED && <hr aria-hidden='true' className='border-base-300 my-1' />}
 
       {appService?.hasWindow && <MenuItem label={_('Fullscreen')} onClick={handleFullScreen} />}
       <MenuItem
@@ -443,13 +447,26 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
         Icon={themeMode === 'dark' ? BiMoon : themeMode === 'light' ? BiSun : TbSunMoon}
         onClick={cycleThemeMode}
       />
-      {bookData.book?.format === 'PDF' && appService?.supportsCanvasContext2DFilter && (
+      {bookData.book?.format === 'PDF' && (
         <MenuItem
-          label={_('Apply Theme Colors to PDF')}
-          Icon={applyThemeToPDF ? MdCheck : undefined}
-          onClick={() => setApplyThemeToPDF(!applyThemeToPDF)}
+          label={_('Text Mode')}
+          tooltip={_('Reflow the text like an ebook: translation, voice and text size')}
+          Icon={bookData.bookDoc?.isPdfText ? MdCheck : undefined}
+          onClick={() => {
+            setIsDropdownOpen?.(false);
+            switchPdfTextMode(envConfig, bookKey, !bookData.bookDoc?.isPdfText);
+          }}
         />
       )}
+      {bookData.book?.format === 'PDF' &&
+        bookData.isFixedLayout &&
+        appService?.supportsCanvasContext2DFilter && (
+          <MenuItem
+            label={_('Apply Theme Colors to PDF')}
+            Icon={applyThemeToPDF ? MdCheck : undefined}
+            onClick={() => setApplyThemeToPDF(!applyThemeToPDF)}
+          />
+        )}
       <MenuItem
         label={_('Invert Image In Dark Mode')}
         disabled={!isDarkMode}
@@ -459,7 +476,9 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
-      <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
+      {READEST_CLOUD_ENABLED && (
+        <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
+      )}
     </Menu>
   );
 };

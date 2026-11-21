@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { VscLibrary } from 'react-icons/vsc';
 import { MdOutlineMenu } from 'react-icons/md';
+import { ChevronLeft } from 'lucide-react';
 
 import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
@@ -182,7 +183,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         role='banner'
         aria-label={_('Header Bar')}
         className={clsx(
-          `header-bar bg-base-100 absolute top-0 z-10 flex h-11 w-full items-center pr-4`,
+          `header-bar bg-base-100 absolute top-0 z-10 flex h-12 w-full items-center pr-3 sm:h-11 sm:pr-4`,
           `shadow-xs transition-[opacity,margin-top] duration-300`,
           trafficLightInHeader ? 'pl-20' : isSideBarVisible ? 'ps-4' : 'ps-4 sm:ps-1.5',
           appService?.hasRoundedWindow && 'rounded-window-top-right',
@@ -215,10 +216,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             )}
             <button
               title={_('Go to Library')}
-              className='btn btn-ghost hidden h-8 min-h-8 w-8 p-0 sm:flex'
+              aria-label={_('Go to Library')}
+              className='btn btn-ghost flex h-8 min-h-8 w-8 p-0'
               onClick={onGoToLibrary}
             >
-              <VscLibrary size={iconSize18} className='fill-base-content' />
+              {/* A back arrow on a phone, the library shelf on a wide screen. */}
+              <ChevronLeft aria-hidden='true' className='h-5 w-5 sm:hidden' />
+              <VscLibrary size={iconSize18} className='fill-base-content hidden sm:block' />
             </button>
             <BookmarkToggler bookKey={bookKey} />
             <TranslationToggler bookKey={bookKey} />

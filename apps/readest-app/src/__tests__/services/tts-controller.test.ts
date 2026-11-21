@@ -259,6 +259,20 @@ describe('TTSController', () => {
       expect(controller.ttsClient.name).toBe('edge');
     });
 
+    test('keeps the free voice first even when Fish Audio is available', async () => {
+      // FISH_VOICE_BY_DEFAULT is off: Fish's free model is for personal use only.
+      vi.spyOn(controller.ttsFishClient, 'init').mockResolvedValue(true);
+      await controller.init();
+      expect(controller.ttsClient.name).toBe('edge');
+    });
+
+    test('falls back to the browser voice, not Fish, when Edge is unreachable', async () => {
+      vi.spyOn(controller.ttsFishClient, 'init').mockResolvedValue(true);
+      vi.mocked(controller.ttsEdgeClient.init).mockResolvedValue(false);
+      await controller.init();
+      expect(controller.ttsClient.name).toBe('web');
+    });
+
     test('fetches voices from web and edge clients', async () => {
       await controller.init();
 
@@ -310,6 +324,23 @@ describe('TTSController', () => {
       expect(controller.state).toBe('setvoice-paused');
       expect(TTSUtils.setPreferredClient).toHaveBeenCalledWith('edge');
       expect(TTSUtils.setPreferredVoice).toHaveBeenCalledWith('edge', 'en', 'edge-voice-1');
+    });
+
+    test('with no voice chosen yet, takes the free Edge voice rather than Fish', async () => {
+      controller.ttsFishVoices = [{ id: 'fish-voice-1', name: 'Claire', lang: 'fr-FR' }];
+      controller.ttsEdgeVoices = [{ id: 'edge-voice-1', name: 'Edge Voice', lang: 'fr-FR' }];
+      await controller.setVoice('', 'fr');
+
+      expect(controller.ttsClient.name).toBe('edge');
+      expect(TTSUtils.setPreferredClient).toHaveBeenCalledWith('edge');
+    });
+
+    test('still switches to Fish when its voice is picked on purpose', async () => {
+      controller.ttsFishVoices = [{ id: 'fish-voice-1', name: 'Claire', lang: 'fr-FR' }];
+      controller.ttsEdgeVoices = [{ id: 'edge-voice-1', name: 'Edge Voice', lang: 'fr-FR' }];
+      await controller.setVoice('fish-voice-1', 'fr');
+
+      expect(controller.ttsClient).toBe(controller.ttsFishClient);
     });
 
     test('switches to web client when voice not in edge or native', async () => {

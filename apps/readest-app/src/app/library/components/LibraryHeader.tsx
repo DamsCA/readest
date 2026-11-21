@@ -1,26 +1,20 @@
 import clsx from 'clsx';
 import React, { useCallback, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FaSearch } from 'react-icons/fa';
-import { PiPlus } from 'react-icons/pi';
-import { PiSelectionAll, PiSelectionAllFill } from 'react-icons/pi';
-import { PiDotsThreeCircle } from 'react-icons/pi';
-import { MdOutlineMenu } from 'react-icons/md';
-import { IoMdCloseCircle } from 'react-icons/io';
+import { Menu, Plus, Search, SquareCheckBig, SquareDashed, X } from 'lucide-react';
 
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTrafficLight } from '@/hooks/useTrafficLight';
-import { useResponsiveSize } from '@/hooks/useResponsiveSize';
+import { APP_DISPLAY_NAME } from '@/services/constants';
 import { debounce } from '@/utils/debounce';
 import useShortcuts from '@/hooks/useShortcuts';
 import WindowButtons from '@/components/WindowButtons';
 import Dropdown from '@/components/Dropdown';
 import SettingsMenu from './SettingsMenu';
 import ImportMenu from './ImportMenu';
-import ViewMenu from './ViewMenu';
 
 interface LibraryHeaderProps {
   isSelectMode: boolean;
@@ -35,6 +29,14 @@ interface LibraryHeaderProps {
   onDeselectAll: () => void;
 }
 
+const ROUND_BUTTON =
+  'bg-base-100 text-base-content flex h-11 min-h-11 w-11 items-center justify-center rounded-full border-0 p-0';
+
+/**
+ * The library's top bar: the app's name, then round buttons — search,
+ * selection (on wide screens), the menu, and "+" to add books. The search
+ * field opens under the bar only when it is wanted.
+ */
 const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   isSelectMode,
   isSelectAll,
@@ -51,14 +53,13 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { appService } = useEnv();
-  const { systemUIVisible, statusBarHeight } = useThemeStore();
+  const { systemUIVisible, statusBarHeight, safeAreaInsets: insets } = useThemeStore();
   const { currentBookshelf } = useLibraryStore();
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('q') ?? '');
+  const [isSearchOpen, setIsSearchOpen] = useState(() => !!searchParams?.get('q'));
 
   const headerRef = useRef<HTMLDivElement>(null);
   const { isTrafficLightVisible } = useTrafficLight(headerRef);
-  const iconSize18 = useResponsiveSize(18);
-  const { safeAreaInsets: insets } = useThemeStore();
 
   useShortcuts({
     onToggleSelectMode,
@@ -84,6 +85,14 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
     debouncedUpdateQueryParam(newQuery);
   };
 
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    if (searchQuery) {
+      setSearchQuery('');
+      debouncedUpdateQueryParam('');
+    }
+  };
+
   const windowButtonVisible = appService?.hasWindowBar && !isTrafficLightVisible;
   const currentBooksCount = currentBookshelf.reduce(
     (acc, item) => acc + ('books' in item ? item.books.length : 1),
@@ -97,66 +106,65 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   return (
     <div
       ref={headerRef}
-      className={clsx(
-        'titlebar z-10 flex h-[52px] w-full items-center py-2 pr-4 sm:h-[44px]',
-        windowButtonVisible ? 'sm:pr-4' : 'sm:pr-6',
-        isTrafficLightVisible ? 'pl-16' : 'pl-0 sm:pl-2',
-      )}
+      className={clsx('titlebar z-10 flex w-full flex-col', isTrafficLightVisible && 'pl-16')}
       style={{
         marginTop: appService?.hasSafeAreaInset
           ? `max(${insets.top}px, ${systemUIVisible ? statusBarHeight : 0}px)`
           : '0px',
       }}
     >
-      <div className='flex w-full items-center justify-between space-x-6 sm:space-x-12'>
-        <div className='exclude-title-bar-mousedown relative flex w-full items-center pl-4'>
-          <div className='relative flex h-9 w-full items-center sm:h-7'>
-            <span className='text-base-content/50 absolute ps-3'>
-              <FaSearch className='h-4 w-4' />
-            </span>
-            <input
-              type='text'
-              value={searchQuery}
-              placeholder={
-                currentBooksCount > 1
-                  ? _('Search in {{count}} Book(s)...', {
-                      count: currentBooksCount,
-                    })
-                  : _('Search Books...')
-              }
-              onChange={handleSearchChange}
-              spellCheck='false'
-              className={clsx(
-                'search-input input h-9 w-full rounded-full pr-[30%] ps-10 sm:h-7',
-                'bg-base-300/45 border-0',
-                'font-sans text-sm font-light',
-                'placeholder:text-base-content/50 truncate',
-                'focus:outline-none focus:ring-0',
-              )}
-            />
-          </div>
-          <div className='text-base-content/50 absolute right-4 flex items-center space-x-2 sm:space-x-4'>
-            {searchQuery && (
+      <div
+        className={clsx(
+          'flex h-[64px] w-full items-center justify-between gap-3 pe-4 ps-5 sm:h-[56px]',
+          windowButtonVisible ? 'sm:pe-4' : 'sm:pe-6',
+        )}
+      >
+        <span className='font-display text-base-content truncate text-[26px] font-extrabold tracking-[-0.03em]'>
+          {APP_DISPLAY_NAME}
+        </span>
+        {isSelectMode ? (
+          <button
+            onClick={isSelectAll ? onDeselectAll : onSelectAll}
+            className='exclude-title-bar-mousedown bg-base-100 text-base-content h-11 shrink-0 rounded-full px-5 text-sm font-semibold'
+            aria-label={isSelectAll ? _('Deselect') : _('Select All')}
+          >
+            {isSelectAll ? _('Deselect') : _('Select All')}
+          </button>
+        ) : (
+          <div className='exclude-title-bar-mousedown flex shrink-0 items-center gap-2'>
+            <button
+              type='button'
+              aria-label={_('Search')}
+              aria-expanded={isSearchOpen}
+              onClick={() => (isSearchOpen ? closeSearch() : setIsSearchOpen(true))}
+              className={ROUND_BUTTON}
+            >
+              <Search aria-hidden='true' className='h-5 w-5' />
+            </button>
+            {!isMobile && (
               <button
                 type='button'
-                onClick={() => {
-                  setSearchQuery('');
-                  debouncedUpdateQueryParam('');
-                }}
-                className='text-base-content/40 hover:text-base-content/60 pe-1'
-                aria-label={_('Clear Search')}
+                onClick={onToggleSelectMode}
+                aria-label={_('Select Books')}
+                title={_('Select Books')}
+                className={ROUND_BUTTON}
               >
-                <IoMdCloseCircle className='h-4 w-4' />
+                <SquareDashed aria-hidden='true' className='h-5 w-5' />
               </button>
             )}
-            <span className='bg-base-content/50 mx-2 h-4 w-[0.5px]'></span>
+            <Dropdown
+              label={_('Settings Menu')}
+              className='dropdown-bottom dropdown-end'
+              buttonClassName={ROUND_BUTTON}
+              toggleButton={<Menu role='none' className='h-5 w-5' />}
+            >
+              <SettingsMenu onPullLibrary={onPullLibrary} />
+            </Dropdown>
             <Dropdown
               label={_('Import Books')}
-              className={clsx(
-                'exclude-title-bar-mousedown dropdown-bottom dropdown-center cursor-pointer',
-              )}
-              buttonClassName='p-0 h-6 min-h-6 w-6 flex touch-target items-center justify-center !bg-transparent'
-              toggleButton={<PiPlus role='none' className='m-0.5 h-5 w-5' />}
+              className='dropdown-bottom dropdown-end'
+              buttonClassName='bg-base-content text-base-100 flex h-11 min-h-11 w-11 items-center justify-center rounded-full border-0 p-0'
+              toggleButton={<Plus role='none' className='h-5 w-5' />}
             >
               <ImportMenu
                 onImportBooksFromFiles={onImportBooksFromFiles}
@@ -164,57 +172,6 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
                 onImportBookFromUrl={onImportBookFromUrl}
                 onOpenCatalogManager={onOpenCatalogManager}
               />
-            </Dropdown>
-            {isMobile ? null : (
-              <button
-                onClick={onToggleSelectMode}
-                aria-label={_('Select Books')}
-                title={_('Select Books')}
-                className='h-6'
-              >
-                {isSelectMode ? (
-                  <PiSelectionAllFill role='button' className='text-base-content/60 h-6 w-6' />
-                ) : (
-                  <PiSelectionAll role='button' className='text-base-content/60 h-6 w-6' />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-        {isSelectMode ? (
-          <div
-            className={clsx(
-              'flex h-full items-center',
-              'w-max-[72px] w-min-[72px] sm:w-max-[80px] sm:w-min-[80px]',
-            )}
-          >
-            <button
-              onClick={isSelectAll ? onDeselectAll : onSelectAll}
-              className='btn btn-ghost text-base-content/85 h-8 min-h-8 w-[72px] p-0 sm:w-[80px]'
-              aria-label={isSelectAll ? _('Deselect') : _('Select All')}
-            >
-              <span className='font-sans text-base font-normal sm:text-sm whitespace-nowrap truncate'>
-                {isSelectAll ? _('Deselect') : _('Select All')}
-              </span>
-            </button>
-          </div>
-        ) : (
-          <div className='flex h-full items-center gap-x-2 sm:gap-x-4'>
-            <Dropdown
-              label={_('View Menu')}
-              className='exclude-title-bar-mousedown dropdown-bottom dropdown-end'
-              buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
-              toggleButton={<PiDotsThreeCircle role='none' size={iconSize18} />}
-            >
-              <ViewMenu />
-            </Dropdown>
-            <Dropdown
-              label={_('Settings Menu')}
-              className='exclude-title-bar-mousedown dropdown-bottom dropdown-end'
-              buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
-              toggleButton={<MdOutlineMenu role='none' size={iconSize18} />}
-            >
-              <SettingsMenu onPullLibrary={onPullLibrary} />
             </Dropdown>
             {appService?.hasWindowBar && (
               <WindowButtons
@@ -226,7 +183,51 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             )}
           </div>
         )}
+        {isSelectMode && !isMobile && (
+          <button
+            type='button'
+            onClick={onToggleSelectMode}
+            aria-label={_('Select Books')}
+            className={clsx(ROUND_BUTTON, 'exclude-title-bar-mousedown shrink-0')}
+          >
+            <SquareCheckBig aria-hidden='true' className='h-5 w-5' />
+          </button>
+        )}
       </div>
+      {isSearchOpen && (
+        <div className='exclude-title-bar-mousedown relative mx-4 mb-1 flex items-center'>
+          <Search
+            aria-hidden='true'
+            className='text-neutral-content pointer-events-none absolute start-4 h-4 w-4'
+          />
+          <input
+            type='text'
+            autoFocus
+            value={searchQuery}
+            aria-label={_('Search Books...')}
+            placeholder={
+              currentBooksCount > 1
+                ? _('Search in {{count}} Book(s)...', { count: currentBooksCount })
+                : _('Search Books...')
+            }
+            onChange={handleSearchChange}
+            spellCheck='false'
+            className={clsx(
+              'search-input bg-base-100 h-11 w-full truncate rounded-full border-0 pe-12 ps-11',
+              'font-sans text-sm',
+              'placeholder:text-neutral-content focus:outline-none focus:ring-0',
+            )}
+          />
+          <button
+            type='button'
+            onClick={closeSearch}
+            aria-label={_('Clear Search')}
+            className='text-neutral-content absolute end-1 flex h-11 w-11 items-center justify-center rounded-full'
+          >
+            <X aria-hidden='true' className='h-4 w-4' />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

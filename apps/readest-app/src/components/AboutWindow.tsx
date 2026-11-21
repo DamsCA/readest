@@ -3,11 +3,15 @@ import Image from 'next/image';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
-import { checkForAppUpdates, checkAppReleaseNotes } from '@/helpers/updater';
+import { checkForAppUpdates } from '@/helpers/updater';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
-import SupportLinks from './SupportLinks';
-import LegalLinks from './LegalLinks';
+import {
+  APP_DISPLAY_NAME,
+  UPSTREAM_SOURCE_URL,
+  getModifiedOn,
+  getSourceCodeUrl,
+} from '@/services/constants';
 import Dialog from './Dialog';
 import Link from './Link';
 
@@ -66,15 +70,6 @@ export const AboutWindow = () => {
     }
   };
 
-  const handleShowRecentUpdates = async () => {
-    const hasNotes = await checkAppReleaseNotes(false);
-    if (hasNotes) {
-      handleClose();
-    } else {
-      setUpdateStatus('error');
-    }
-  };
-
   const handleClose = () => {
     setIsOpen(false);
     setUpdateStatus(null);
@@ -84,7 +79,7 @@ export const AboutWindow = () => {
     <Dialog
       id='about_window'
       isOpen={isOpen}
-      title={_('About Readest')}
+      title={_('About {{name}}', { name: APP_DISPLAY_NAME })}
       onClose={handleClose}
       boxClassName='sm:!w-[480px] sm:!max-w-screen-sm sm:h-auto'
     >
@@ -95,16 +90,17 @@ export const AboutWindow = () => {
               <Image src='/icon.png' alt='App Logo' className='h-20 w-20' width={64} height={64} />
             </div>
             <div className='flex select-text flex-col items-center'>
-              <h2 className='mb-2 text-2xl font-bold'>Readest</h2>
+              <h2 className='font-display mb-2 text-2xl font-extrabold'>{APP_DISPLAY_NAME}</h2>
               <p className='text-neutral-content text-center text-sm'>
                 {_('Version {{version}}', { version: getAppVersion() })} {`(${browserInfo})`}
               </p>
             </div>
             <div className='my-1 h-5'>
-              {!updateStatus && (
+              {/* Store builds are updated by the store: no update check of their own. */}
+              {!updateStatus && appService?.hasUpdater && (
                 <button
                   className='btn btn-sm btn-primary cursor-pointer p-1 text-xs'
-                  onClick={appService?.hasUpdater ? handleCheckUpdate : handleShowRecentUpdates}
+                  onClick={handleCheckUpdate}
                 >
                   {_('Check Update')}
                 </button>
@@ -129,6 +125,14 @@ export const AboutWindow = () => {
             className='flex flex-1 flex-col items-center justify-start gap-2 px-4 text-center'
             dir='ltr'
           >
+            <p className='text-base-content text-sm font-semibold'>
+              {_('{{name}} is a modified version of Readest, modified on {{date}}.', {
+                name: APP_DISPLAY_NAME,
+                date: new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(
+                  new Date(getModifiedOn()),
+                ),
+              })}
+            </p>
             <p className='text-neutral-content text-sm'>
               © {new Date().getFullYear()} Bilingify LLC. All rights reserved.
             </p>
@@ -145,16 +149,16 @@ export const AboutWindow = () => {
               AGPL v3 license. Please see the license for more details.
             </p>
             <p className='text-neutral-content text-xs'>
-              Source code is available at{' '}
-              <Link href='https://github.com/readest/readest' className='text-blue-500 underline'>
-                GitHub
+              {_('The complete source code of this version:')}{' '}
+              <Link href={getSourceCodeUrl()} className='text-primary underline'>
+                {_('Source code')}
               </Link>
-              .
+              {' · '}
+              <Link href={UPSTREAM_SOURCE_URL} className='text-primary underline'>
+                Readest
+              </Link>
             </p>
-
-            <LegalLinks />
           </div>
-          <SupportLinks />
         </div>
       )}
     </Dialog>

@@ -11,6 +11,7 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { eventDispatcher } from '@/utils/event';
 import type { FooterBarProps, NavigationHandlers, FooterBarChildProps } from './types';
 import { debounce } from '@/utils/debounce';
+import { consumeListenOnOpen } from '@/utils/listenOnOpen';
 import { RSVPControl } from '../rsvp';
 import MobileFooterBar from './MobileFooterBar';
 import DesktopFooterBar from './DesktopFooterBar';
@@ -48,8 +49,12 @@ const FooterBar: React.FC<FooterBarProps> = ({
   const pointerInDoc = docs.some(({ doc }) => doc?.body?.style.cursor === 'pointer');
 
   const progressInfo = useMemo(
-    () => (FIXED_LAYOUT_FORMATS.has(bookFormat) ? section : pageinfo),
-    [bookFormat, section, pageinfo],
+    // A PDF in text mode paginates like an EPUB.
+    () =>
+      FIXED_LAYOUT_FORMATS.has(bookFormat) && bookData?.isFixedLayout !== false
+        ? section
+        : pageinfo,
+    [bookFormat, bookData?.isFixedLayout, section, pageinfo],
   );
 
   const progressValid = !!progressInfo && progressInfo.total > 0 && progressInfo.current >= 0;
@@ -98,6 +103,16 @@ const FooterBar: React.FC<FooterBarProps> = ({
     const eventType = viewState.ttsEnabled ? 'tts-stop' : 'tts-speak';
     eventDispatcher.dispatch(eventType, { bookKey });
   }, [view, progress, viewState, bookKey]);
+
+  // "Listen" pressed in the library: start the voice once the page is up.
+  const bookHash = bookData?.book?.hash;
+  const pageReady = !!view && !!progress && !!viewState;
+  useEffect(() => {
+    if (!pageReady || viewState?.ttsEnabled || !consumeListenOnOpen(bookHash)) return;
+    const timer = setTimeout(() => eventDispatcher.dispatch('tts-speak', { bookKey }), 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageReady, bookHash, bookKey]);
 
   const handleSetActionTab = useCallback(
     (tab: string) => {

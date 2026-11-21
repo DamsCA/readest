@@ -16,6 +16,7 @@ import { WebSpeechClient } from './WebSpeechClient';
 import { NativeTTSClient } from './NativeTTSClient';
 import { EdgeTTSClient } from './EdgeTTSClient';
 import { FishAudioTTSClient } from './FishAudioTTSClient';
+import { FISH_VOICE_BY_DEFAULT } from '@/services/features';
 import { GoogleTTSClient } from './GoogleTTSClient';
 import { KokoroTTSClient } from './KokoroTTSClient';
 import { TTSUtils } from './TTSUtils';
@@ -254,11 +255,12 @@ export class TTSController extends EventTarget {
     if (await this.ttsKokoroClient.init()) {
       availableClients.push(this.ttsKokoroClient);
     }
-    if (await this.ttsFishClient.init()) {
+    // (ttsFishVoices is read once at the end of init; the duplicate early read
+    // that used to be here only widened the window for a concurrent shutdown
+    // to invalidate it.)
+    const fishAvailable = await this.ttsFishClient.init();
+    if (fishAvailable && FISH_VOICE_BY_DEFAULT) {
       availableClients.push(this.ttsFishClient);
-      // (ttsFishVoices is read once at the end of init; the duplicate early read
-      // that used to be here only widened the window for a concurrent shutdown
-      // to invalidate it.)
     }
     if (await this.ttsEdgeClient.init()) {
       availableClients.push(this.ttsEdgeClient);
@@ -269,6 +271,12 @@ export class TTSController extends EventTarget {
     }
     if (await this.ttsWebClient.init()) {
       availableClients.push(this.ttsWebClient);
+    }
+    // Not the default in this edition (see FISH_VOICE_BY_DEFAULT): still
+    // offered, but after every free voice — Edge, the phone's, the browser's —
+    // so that Edge being unreachable never hands the reading to Fish.
+    if (fishAvailable && !FISH_VOICE_BY_DEFAULT) {
+      availableClients.push(this.ttsFishClient);
     }
     this.ttsClient = availableClients[0] || this.ttsWebClient;
     const preferredClientName = TTSUtils.getPreferredClient();
@@ -1310,8 +1318,12 @@ export class TTSController extends EventTarget {
     const useGoogleTTS = !!this.ttsGoogleVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
+    // Fish answers the "no voice chosen yet" case only when it is this edition's
+    // default (FISH_VOICE_BY_DEFAULT): otherwise it would capture the default
+    // here, and setPreferredClient below would keep it for every next session.
     const useFishTTS = !!this.ttsFishVoices.find(
-      (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
+      (voice) =>
+        ((voiceId === '' && FISH_VOICE_BY_DEFAULT) || voice.id === voiceId) && !voice.disabled,
     );
     const useEdgeTTS = !!this.ttsEdgeVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,

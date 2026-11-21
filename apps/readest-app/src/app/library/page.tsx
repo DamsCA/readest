@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import * as React from 'react';
 import { MdChevronRight } from 'react-icons/md';
-import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { useState, useRef, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { ReadonlyURLSearchParams, useSearchParams } from 'next/navigation';
 
 import { Book } from '@/types/book';
@@ -100,6 +100,9 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
+import LibraryTabBar from './components/LibraryTabBar';
+import { useOpenBook } from './hooks/useOpenBook';
+import { getContinueReadingBook } from './utils/continueReading';
 
 /**
  * Key used to persist the last directory the user imported books from.
@@ -1383,6 +1386,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     handleLibraryNavigation(group);
   };
 
+  const openBook = useOpenBook(handleBookDownload, setLoading);
+  const continueBook = useMemo(() => getContinueReadingBook(libraryBooks), [libraryBooks]);
+
   if (!appService || !insets || checkOpenWithBooks || checkLastOpenBooks) {
     return <div className={clsx('full-height', !appService?.isLinuxApp && 'bg-base-200')} />;
   }
@@ -1515,6 +1521,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             <LibraryEmptyState onImport={handleImportBooksFromFiles} />
           </div>
         ))}
+      {showBookshelf && !isSelectMode && appService.isMobile && (
+        <LibraryTabBar
+          onOpenReading={continueBook ? () => openBook(continueBook) : null}
+          onOpenSettings={() => setSettingsDialogOpen(true)}
+        />
+      )}
       {showDetailsBook && (
         <BookDetailModal
           isOpen={!!showDetailsBook}

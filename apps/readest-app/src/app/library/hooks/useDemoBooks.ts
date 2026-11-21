@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 
 import { useEnv } from '@/context/EnvContext';
 import { Book } from '@/types/book';
@@ -41,7 +42,9 @@ export const useDemoBooks = () => {
     };
 
     const demoBooksFetchedFlag = localStorage.getItem('demoBooksFetched');
-    if (isWebAppPlatform() && !demoBooksFetchedFlag) {
+    // Readest's demo shelf downloads books from its CDN: this edition ships
+    // and fetches no book at all, the reader brings their own.
+    if (READEST_CLOUD_ENABLED && isWebAppPlatform() && !demoBooksFetchedFlag) {
       fetchDemoBooks();
       localStorage.setItem('demoBooksFetched', 'true');
     }

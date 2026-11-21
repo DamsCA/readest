@@ -1,4 +1,5 @@
 import { Book, BooksGroup, ReadingStatus } from '@/types/book';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import {
   LibraryGroupByType,
   LibrarySecondarySortByType,
@@ -687,7 +688,10 @@ export const pickFresherCover = (local: CoverFields, synced: CoverFields): Cover
  * races on the Tauri IPC boundary, so the items land in a non-deterministic
  * order and the menu appears to shuffle on every open (issue #4389).
  */
-export const getBookContextMenuItemIds = (book: Book): BookContextMenuItemId[] => {
+export const getBookContextMenuItemIds = (
+  book: Book,
+  cloudEnabled: boolean = READEST_CLOUD_ENABLED,
+): BookContextMenuItemId[] => {
   const ids: BookContextMenuItemId[] = ['select', 'group'];
   ids.push(book.readingStatus === 'finished' ? 'markUnread' : 'markFinished');
   if (book.readingStatus !== 'abandoned') ids.push('markAbandoned');
@@ -700,11 +704,13 @@ export const getBookContextMenuItemIds = (book: Book): BookContextMenuItemId[] =
     ids.push('clearStatus');
   }
   ids.push('showDetails', 'showInFinder', 'searchGoodreads');
-  if (book.uploadedAt && !book.downloadedAt) ids.push('download');
-  if (!book.uploadedAt && book.downloadedAt) ids.push('upload');
-  // Share is offered for any local-or-uploaded book; the dialog uploads first
-  // if the book hasn't been pushed yet.
-  if (book.downloadedAt || book.uploadedAt) ids.push('share');
+  if (cloudEnabled) {
+    if (book.uploadedAt && !book.downloadedAt) ids.push('download');
+    if (!book.uploadedAt && book.downloadedAt) ids.push('upload');
+    // Share is offered for any local-or-uploaded book; the dialog uploads first
+    // if the book hasn't been pushed yet.
+    if (book.downloadedAt || book.uploadedAt) ids.push('share');
+  }
   ids.push('delete');
   return ids;
 };

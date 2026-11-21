@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import { useEffect, useState } from 'react';
 import { MdCheckCircle, MdCheckCircleOutline } from 'react-icons/md';
 import {
@@ -72,7 +73,8 @@ const BookItem: React.FC<BookItemProps> = ({
       role='none'
       className={clsx(
         'book-item flex',
-        mode === 'grid' && 'h-full flex-col justify-end',
+        // Grid: a soft card around the cover, title and progress.
+        mode === 'grid' && 'bg-base-100 h-full flex-col justify-end rounded-3xl p-2.5',
         mode === 'list' && 'min-h-28 flex-row gap-4 overflow-hidden',
         mode === 'list' ? 'library-list-item' : 'library-grid-item',
         appService?.hasContextMenu ? 'cursor-pointer' : '',
@@ -81,9 +83,10 @@ const BookItem: React.FC<BookItemProps> = ({
     >
       <div
         className={clsx(
-          'bookitem-main relative flex justify-center overflow-hidden rounded',
+          'bookitem-main relative flex justify-center overflow-hidden',
+          mode === 'grid' ? 'rounded-2xl' : 'rounded',
           !fitCoverInGrid && 'aspect-[28/41]',
-          coverFit === 'crop' && 'shadow-md',
+          coverFit === 'crop' && mode === 'list' && 'shadow-md',
           mode === 'grid' && 'items-end',
           mode === 'list' && 'min-w-20 items-center',
         )}
@@ -94,7 +97,7 @@ const BookItem: React.FC<BookItemProps> = ({
           book={book}
           coverFit={coverFit}
           showSpine={false}
-          imageClassName='rounded shadow-md'
+          imageClassName={mode === 'grid' ? 'rounded-2xl' : 'rounded shadow-md'}
           onAspectRatioChange={setCoverAspect}
         />
         {bookSelected && (
@@ -113,7 +116,7 @@ const BookItem: React.FC<BookItemProps> = ({
       <div
         className={clsx(
           'flex w-full flex-col p-0',
-          mode === 'grid' && 'pt-2',
+          mode === 'grid' && 'px-1 pt-2.5',
           mode === 'list' && 'gap-1 py-0',
         )}
       >
@@ -121,17 +124,20 @@ const BookItem: React.FC<BookItemProps> = ({
           <h4
             className={clsx(
               'overflow-hidden text-ellipsis font-semibold',
-              mode === 'grid' && 'block whitespace-nowrap text-[0.6em] text-xs',
+              mode === 'grid' && 'block whitespace-nowrap text-sm leading-5',
               mode === 'list' && 'line-clamp-1 text-base',
             )}
           >
             {book.title}
           </h4>
-          {mode === 'list' && (
-            <p className='text-neutral-content line-clamp-1 text-sm'>
-              {formatAuthors(book.author, book.primaryLanguage) || ''}
-            </p>
-          )}
+          <p
+            className={clsx(
+              'text-neutral-content line-clamp-1',
+              mode === 'grid' ? 'text-xs leading-5' : 'text-sm',
+            )}
+          >
+            {formatAuthors(book.author, book.primaryLanguage) || ''}
+          </p>
         </div>
         {mode === 'list' && seriesText && (
           <p className='text-neutral-content line-clamp-1 text-sm'>{seriesText}</p>
@@ -182,6 +188,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 ></div>
               )
             ) : (
+              READEST_CLOUD_ENABLED &&
               (!book.uploadedAt || (book.uploadedAt && !book.downloadedAt)) && (
                 <button
                   aria-label={!book.uploadedAt ? _('Upload Book') : _('Download Book')}

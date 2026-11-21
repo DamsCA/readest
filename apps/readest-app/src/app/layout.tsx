@@ -5,6 +5,8 @@ import { ViewTransitions } from 'next-view-transitions';
 import { EnvProvider } from '@/context/EnvContext';
 import Providers from '@/components/Providers';
 
+import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/bricolage-grotesque';
 import '../styles/globals.css';
 
 const url = 'https://web.readest.com/';

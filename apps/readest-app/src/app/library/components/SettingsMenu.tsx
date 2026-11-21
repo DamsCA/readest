@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { READEST_CLOUD_ENABLED } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PiUserCircle, PiUserCircleCheck, PiGear } from 'react-icons/pi';
@@ -8,7 +9,7 @@ import { MdCloudSync, MdSync, MdSyncProblem } from 'react-icons/md';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
+import { APP_DISPLAY_NAME, DOWNLOAD_READEST_URL } from '@/services/constants';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { setCacheManagerDialogVisible } from '@/app/library/components/CacheManagerWindow';
 import { useAuth } from '@/context/AuthContext';
@@ -308,7 +309,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
-      {user ? (
+      {READEST_CLOUD_ENABLED && user ? (
         <MenuItem
           label={
             userDisplayName
@@ -366,15 +367,17 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
             <MenuItem label={_('Account')} onClick={handleUserProfile} />
           </ul>
         </MenuItem>
-      ) : (
+      ) : READEST_CLOUD_ENABLED ? (
         <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
-      )}
+      ) : null}
 
-      <MenuItem
-        label={_('Auto Upload Books to Cloud')}
-        toggled={isAutoUpload}
-        onClick={toggleAutoUploadBooks}
-      />
+      {READEST_CLOUD_ENABLED && (
+        <MenuItem
+          label={_('Auto Upload Books to Cloud')}
+          toggled={isAutoUpload}
+          onClick={toggleAutoUploadBooks}
+        />
+      )}
 
       {isTauriAppPlatform() && (
         <MenuItem
@@ -390,7 +393,10 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           onClick={toggleOpenLastBooks}
         />
       )}
-      <hr aria-hidden='true' className='border-base-200 my-1' />
+      {/* A divider only when something stands above it (nothing does on the web). */}
+      {(READEST_CLOUD_ENABLED || isTauriAppPlatform()) && (
+        <hr aria-hidden='true' className='border-base-200 my-1' />
+      )}
       {appService?.hasWindow && (
         <MenuItem
           label={_('Open Book in New Window')}
@@ -430,12 +436,14 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
             <MenuItem label={_('Change Data Location')} onClick={handleSetRootDir} />
           )}
           {user && <MenuItem label={_('Data Sync')} onClick={handleManageSync} />}
-          <MenuItem
-            label={_('Refresh Metadata')}
-            description={refreshMetadataProgress}
-            onClick={handleRefreshMetadata}
-            disabled={isRefreshingMetadata}
-          />
+          {READEST_CLOUD_ENABLED && (
+            <MenuItem
+              label={_('Refresh Metadata')}
+              description={refreshMetadataProgress}
+              onClick={handleRefreshMetadata}
+              disabled={isRefreshingMetadata}
+            />
+          )}
           {appService?.isMobileApp && (
             <MenuItem label={_('Manage Cache')} onClick={handleManageCache} />
           )}
@@ -478,8 +486,13 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       {user && userProfilePlan === 'free' && (
         <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
       )}
-      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
+      {READEST_CLOUD_ENABLED && isWebAppPlatform() && (
+        <MenuItem label={_('Download Readest')} onClick={downloadReadest} />
+      )}
+      <MenuItem
+        label={_('About {{name}}', { name: APP_DISPLAY_NAME })}
+        onClick={showAboutReadest}
+      />
     </Menu>
   );
 };

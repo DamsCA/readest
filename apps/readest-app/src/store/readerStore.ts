@@ -27,6 +27,43 @@ import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 import { clearBookProgress, getBookProgress, setBookProgress } from './readerProgressStore';
 import { uniqueId } from '@/utils/misc';
+import { isPdfTextBook, PdfTextBookDoc } from '@/libs/pdfText/book';
+import { loadPdfHeadings, savePdfHeadings } from '@/libs/pdfText/cache';
+
+/**
+ * Builds the table of contents of a PDF read as text that has no bookmarks:
+ * once the first pages are on screen, every page is read in the background
+ * and its headings listed; the result is remembered for the next opening.
+ */
+const schedulePdfHeadingScan = (
+  id: string,
+  bookHash: string,
+  bookDoc: PdfTextBookDoc,
+  viewSettings: BookConfig['viewSettings'],
+) => {
+  setTimeout(() => {
+    bookDoc
+      .scanHeadings()
+      .then(async (entries) => {
+        savePdfHeadings(bookHash, entries);
+        const isCurrent = () => useBookDataStore.getState().booksData[id]?.bookDoc === bookDoc;
+        if (!entries.length || !isCurrent()) return;
+        bookDoc.toc = bookDoc.headingToc(entries);
+        await updateToc(
+          bookDoc,
+          viewSettings?.sortedTOC ?? false,
+          viewSettings?.convertChineseVariant ?? 'none',
+        );
+        // A new book data object, so the table of contents redraws.
+        useBookDataStore.setState((state) => {
+          const existing = state.booksData[id];
+          if (!existing || existing.bookDoc !== bookDoc) return state;
+          return { booksData: { ...state.booksData, [id]: { ...existing } } };
+        });
+      })
+      .catch((e) => console.warn('PDF text mode: heading scan failed', e));
+  }, 2500);
+};
 
 interface ViewState {
   /* Unique key for each book view */
@@ -176,9 +213,14 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         throw new Error('Book not found');
       }
       const isPseStream = !!book.url && isPseStreamFileName(book.url);
+      // Read first: a PDF opens differently in text mode (see libs/pdfText).
+      const config = await appService.loadBookConfig(book, settings);
+      const pdfTextMode = book.format === 'PDF' && !!config.viewSettings?.pdfTextMode;
       let bookDoc = bookData?.bookDoc;
       let file: File | null = bookData?.file ?? null;
-      if (!bookDoc || (!isPseStream && !file) || reload) {
+      const wrongPdfMode =
+        book.format === 'PDF' && !!bookDoc && !!bookDoc.isPdfText !== pdfTextMode;
+      if (!bookDoc || (!isPseStream && !file) || reload || wrongPdfMode) {
         console.log('Loading book', key);
         if (isPseStream) {
           const data = parsePseStreamFileName(book.url!);
@@ -196,11 +238,11 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           }
           const doc = await new DocumentLoader(file, {
             nativeFilePath: nativeFilePath ?? undefined,
+            pdfTextMode,
           }).open();
           bookDoc = doc.book;
         }
       }
-      const config = await appService.loadBookConfig(book, settings);
       // Import annotations from third-party readers on first open
       if (bookDoc.metadata.identifier) {
         const { getAnnotationProviders } = await import('@/services/annotation');
@@ -235,6 +277,14 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           }
         }
       }
+      // A PDF read as text without bookmarks: its table of contents comes from
+      // its headings, remembered from an earlier opening or found in the background.
+      let scanPdfHeadings = false;
+      if (isPdfTextBook(bookDoc) && !bookDoc.toc?.length) {
+        const saved = loadPdfHeadings(book.hash);
+        if (saved) bookDoc.toc = bookDoc.headingToc(saved);
+        else scanPdfHeadings = true;
+      }
       await updateToc(
         bookDoc,
         config.viewSettings?.sortedTOC ?? false,
@@ -252,7 +302,12 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       }
       // Set the book's language for formerly imported books, newly imported books have this field set
       const primaryLanguage = getPrimaryLanguage(bookDoc.metadata.language);
-      book.primaryLanguage = book.primaryLanguage ?? primaryLanguage;
+      const knownLanguage = book.primaryLanguage && book.primaryLanguage.toLowerCase() !== 'und';
+      // PDFs rarely declare a language; text mode detects it from the text.
+      book.primaryLanguage =
+        bookDoc.isPdfText && !knownLanguage && primaryLanguage
+          ? primaryLanguage
+          : (book.primaryLanguage ?? primaryLanguage);
       book.metadata = book.metadata ?? bookDoc.metadata;
 
       // Update series info from metadata if available and not already set on the book
@@ -272,7 +327,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       book.metaHash = getMetadataHash(bookDoc.metadata);
 
       const isFixedLayout =
-        bookDoc.rendition?.layout === 'pre-paginated' || FIXED_LAYOUT_FORMATS.has(book.format);
+        bookDoc.rendition?.layout === 'pre-paginated' ||
+        (FIXED_LAYOUT_FORMATS.has(book.format) && !bookDoc.isPdfText);
       const newBookData: BookData = { id, book, file, config, bookDoc, isFixedLayout };
       useBookDataStore.setState((state) => ({
         booksData: {
@@ -280,6 +336,9 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           [id]: newBookData,
         },
       }));
+      if (scanPdfHeadings && isPdfTextBook(bookDoc)) {
+        schedulePdfHeadingScan(id, book.hash, bookDoc, config.viewSettings);
+      }
       const configViewSettings = config.viewSettings!;
       const globalViewSettings = settings.globalViewSettings;
       set((state) => ({

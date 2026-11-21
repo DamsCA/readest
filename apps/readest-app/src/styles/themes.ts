@@ -116,13 +116,95 @@ export const generateDarkPalette = ({ bg, fg, primary }: BaseColor) => {
 
 const _ = (stubKey: string) => stubKey;
 
+// The app's own look ("C"): a forest green, a butter yellow, paper-white pages.
+// Hand-tuned instead of generated, so every text/background pair keeps at least
+// a 4.5:1 contrast. The dark side never uses pure black or pure white: a very
+// dark green ground and an off-white text are easier on the eyes at night.
+const signatureLight: Palette = {
+  'base-100': '#FFFDF8', // the page
+  'base-200': '#EEF4F0', // panels, the library ground
+  'base-300': '#DCE8E0', // borders, pressed states
+  'base-content': '#15201B',
+  neutral: '#CFE6DC',
+  'neutral-content': '#4E6159', // secondary text
+  primary: '#1E6B57',
+  secondary: '#F2C14E',
+  accent: '#F2C14E',
+};
+
+const signatureDark: Palette = {
+  'base-100': '#101614',
+  'base-200': '#17231F',
+  'base-300': '#23302B',
+  'base-content': '#DCE5DF',
+  neutral: '#24443A',
+  'neutral-content': '#9DB3A9',
+  primary: '#5CC2A0',
+  secondary: '#F2C14E',
+  accent: '#F2C14E',
+};
+
+// Warm paper by day, a warm brown-black by night.
+const sepiaLight: Palette = {
+  'base-100': '#F4ECDD',
+  'base-200': '#EBE0CC',
+  'base-300': '#DDCFB6',
+  'base-content': '#3B2F22',
+  neutral: '#E0D2B8',
+  'neutral-content': '#5C4D3B',
+  primary: '#185A49',
+  secondary: '#B8862B',
+  accent: '#B8862B',
+};
+
+const sepiaDark: Palette = {
+  'base-100': '#1A1611',
+  'base-200': '#231E17',
+  'base-300': '#30291F',
+  'base-content': '#E6DCCB',
+  neutral: '#3A3125',
+  'neutral-content': '#B3A58E',
+  primary: '#E0B45C',
+  secondary: '#E0B45C',
+  accent: '#E0B45C',
+};
+
+// True black for OLED screens: the pixels switch off, the text stays soft.
+const blackDark: Palette = {
+  'base-100': '#000000',
+  'base-200': '#0C0F0E',
+  'base-300': '#18201D',
+  'base-content': '#C9D2CD',
+  neutral: '#1B2925',
+  'neutral-content': '#8FA39A',
+  primary: '#5CC2A0',
+  secondary: '#F2C14E',
+  accent: '#F2C14E',
+};
+
 export const themes = [
   {
     name: 'default',
     label: _('Default'),
     colors: {
-      light: generateLightPalette({ fg: '#171717', bg: '#ffffff', primary: '#0066cc' }),
-      dark: generateDarkPalette({ fg: '#e0e0e0', bg: '#222222', primary: '#77bbee' }),
+      light: signatureLight,
+      dark: signatureDark,
+    },
+  },
+  {
+    name: 'sepia',
+    label: _('Sepia'),
+    colors: {
+      light: sepiaLight,
+      dark: sepiaDark,
+    },
+  },
+  {
+    name: 'black',
+    label: _('Black'),
+    colors: {
+      light: signatureLight,
+      dark: blackDark,
     },
   },
   {
@@ -131,14 +213,6 @@ export const themes = [
     colors: {
       light: generateLightPalette({ fg: '#222222', bg: '#e0e0e0', primary: '#4488cc' }),
       dark: generateDarkPalette({ fg: '#c6c6c6', bg: '#444444', primary: '#88ccee' }),
-    },
-  },
-  {
-    name: 'sepia',
-    label: _('Sepia'),
-    colors: {
-      light: generateLightPalette({ fg: '#5b4636', bg: '#f1e8d0', primary: '#008b8b' }),
-      dark: generateDarkPalette({ fg: '#ffd595', bg: '#342e25', primary: '#48d1cc' }),
     },
   },
   {

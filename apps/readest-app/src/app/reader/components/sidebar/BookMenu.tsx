@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { APP_DISPLAY_NAME } from '@/services/constants';
 import React from 'react';
 
 import { MdCheck } from 'react-icons/md';
@@ -213,7 +214,10 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
       <MenuItem label={_('Reload Page')} shortcut='Shift+R' onClick={handleReloadPage} />
       <hr aria-hidden='true' className='border-base-200 my-1' />
       {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
+      <MenuItem
+        label={_('About {{name}}', { name: APP_DISPLAY_NAME })}
+        onClick={showAboutReadest}
+      />
     </Menu>
   );
 };

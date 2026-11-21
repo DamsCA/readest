@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type TTSIconProps = {
   isPlaying: boolean;
@@ -8,10 +9,13 @@ type TTSIconProps = {
 };
 
 const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
+  const _ = useTranslation();
   const bars = [1, 2, 3, 4];
 
   return (
     <button
+      type='button'
+      aria-label={_('Read Aloud')}
       className={clsx(
         'relative h-full w-full rounded-full',
         ttsInited ? 'cursor-pointer' : 'cursor-not-allowed',
@@ -22,20 +26,19 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
       }}
       onClick={onClick}
     >
-      <div className='absolute inset-0 overflow-hidden rounded-full bg-gradient-to-r from-blue-500 via-emerald-500 to-violet-500'>
-        <div
-          className='absolute -inset-full rounded-full bg-gradient-to-r from-blue-500 via-emerald-500 to-violet-500'
-          style={{
-            animation: isPlaying && ttsInited ? 'moveGradient 2s alternate infinite' : 'none',
-          }}
-        />
-      </div>
+      {/* The app's green, with a soft ring that breathes while the voice reads. */}
+      <div
+        className='bg-primary absolute inset-0 overflow-hidden rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.25)]'
+        style={{
+          animation: isPlaying && ttsInited ? 'ttsBreathe 2.4s ease-in-out infinite' : 'none',
+        }}
+      />
 
       <div className='absolute inset-0 flex items-center justify-center'>
         <style>{`
-          @keyframes moveGradient {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(25%, 25%); }
+          @keyframes ttsBreathe {
+            0%, 100% { box-shadow: 0 8px 20px rgba(0,0,0,0.25), 0 0 0 0 rgba(242,193,78,0.55); }
+            50% { box-shadow: 0 8px 20px rgba(0,0,0,0.25), 0 0 0 8px rgba(242,193,78,0); }
           }
           @keyframes bounce {
             0%, 100% { transform: scaleY(1); }
@@ -46,7 +49,7 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
           {bars.map((bar) => (
             <div
               key={bar}
-              className='w-1 rounded-t bg-white'
+              className='bg-primary-content w-1 rounded-full'
               style={{
                 height: '16px',
                 animationName: isPlaying ? 'bounce' : 'none',

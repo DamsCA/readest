@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vitest';
+import { DEFAULT_TTS_HIGHLIGHT_COLOR } from '@/services/constants';
 import {
   computeParagraphHighlightOffsets,
   decideParagraphTtsHighlight,
@@ -98,7 +99,7 @@ describe('buildTtsHighlightCssText (#3235)', () => {
   test('defaults to a translucent background using the default color', () => {
     const css = buildTtsHighlightCssText(undefined);
     expect(css).toContain('background-color');
-    expect(css).toContain('#808080');
+    expect(css).toContain(DEFAULT_TTS_HIGHLIGHT_COLOR);
   });
 
   test('highlight style uses a translucent background of the configured color', () => {

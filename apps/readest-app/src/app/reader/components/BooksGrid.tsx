@@ -253,7 +253,8 @@ const BookCellInner: React.FC<BookCellProps> = ({
           position={viewSettings.readingRulerPosition}
           opacity={viewSettings.readingRulerOpacity}
           color={viewSettings.readingRulerColor}
-          bookFormat={book.format}
+          // A PDF in text mode flows like an EPUB, lines and all.
+          bookFormat={bookDoc?.isPdfText ? 'EPUB' : book.format}
           viewSettings={viewSettings}
           gridInsets={gridInsets}
         />

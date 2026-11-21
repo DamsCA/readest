@@ -242,6 +242,8 @@ export interface BookStyle {
   invertImgColorInDark: boolean;
   applyThemeToPDF: boolean;
   contrast: number;
+  /** PDF only: read the text rebuilt as flowing chapters, like an EPUB. */
+  pdfTextMode?: boolean;
 }
 
 export interface BookFont {
