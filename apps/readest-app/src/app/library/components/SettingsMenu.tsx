@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { READEST_CLOUD_ENABLED } from '@/services/features';
+import { READEST_CLOUD_ENABLED, READEST_PREMIUM_ENABLED } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PiUserCircle, PiUserCircleCheck, PiGear } from 'react-icons/pi';
@@ -483,10 +483,10 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         </ul>
       </MenuItem>
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {user && userProfilePlan === 'free' && (
+      {READEST_PREMIUM_ENABLED && user && userProfilePlan === 'free' && (
         <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
       )}
-      {READEST_CLOUD_ENABLED && isWebAppPlatform() && (
+      {READEST_PREMIUM_ENABLED && READEST_CLOUD_ENABLED && isWebAppPlatform() && (
         <MenuItem label={_('Download Readest')} onClick={downloadReadest} />
       )}
       <MenuItem

@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://ouiread.damien-aure99c.workers.dev",
+          "http://localhost:3017",
+          "tauri://localhost",
+          "http://tauri.localhost",
+          "https://tauri.localhost"
+        ],
+        "methods": ["GET", "PUT", "HEAD"],
+        "headers": ["*"]
+      },
+      "exposeHeaders": ["ETag", "Content-Length", "Content-Type"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

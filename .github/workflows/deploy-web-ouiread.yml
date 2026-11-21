@@ -1,0 +1,73 @@
+# Ouiread : construit la version web sous Linux (OpenNext pour Cloudflare Workers).
+#
+# OpenNext n'est pas fiable sous Windows : la construction se fait ici, sur ubuntu-latest,
+# et le résultat (.open-next) est publié comme pièce jointe du workflow, « ouiread-web ».
+# La mise en ligne se fait ensuite depuis le PC, avec la connexion Cloudflare déjà ouverte :
+#   bash apps/readest-app/scripts/deploy-ouiread-from-ci.sh
+# Aucun jeton Cloudflare n'est donc rangé dans GitHub.
+#
+# Variable facultative du dépôt : OUIREAD_AUTH_PROVIDERS (par exemple « google »), les
+# boutons de connexion à afficher en plus de l'e-mail et du mot de passe.
+name: Build Ouiread web
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - play-release
+    paths:
+      - 'apps/readest-app/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-web-ouiread.yml'
+
+concurrency:
+  group: build-web-ouiread
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: initialize git submodules
+        run: git submodule update --init --recursive
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: setup node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: copy pdfjs-dist and simplecc-dist to public directory
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: build for Cloudflare Workers (web platform, accounts on)
+        working-directory: apps/readest-app
+        env:
+          NEXT_PUBLIC_APP_PLATFORM: web
+          NEXT_PUBLIC_CLOUD_ENABLED: 'true'
+          NEXT_PUBLIC_AUTH_PROVIDERS: ${{ vars.OUIREAD_AUTH_PROVIDERS }}
+        run: |
+          sed -i 's/next build"/next build --webpack"/' package.json
+          npx opennextjs-cloudflare build
+          sed -i 's/next build --webpack"/next build"/' package.json
+
+      - name: publish the build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ouiread-web
+          path: apps/readest-app/.open-next
+          include-hidden-files: true
+          retention-days: 7

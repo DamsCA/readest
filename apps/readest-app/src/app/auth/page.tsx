@@ -24,6 +24,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
 import { handleAuthCallback } from '@/helpers/auth';
 import { getUserProfilePlan } from '@/utils/access';
+import { AUTH_EMAILS_ENABLED, AUTH_OAUTH_PROVIDERS } from '@/services/features';
 import { getAppleIdAuth, Scope } from './utils/appleIdAuth';
 import { authWithCustomTab, authWithSafari } from './utils/nativeAuth';
 import WindowButtons from '@/components/WindowButtons';
@@ -296,7 +297,9 @@ export default function AuthPage() {
           email_input_placeholder: _('Your email address'),
           button_label: _('Send reset password instructions'),
           loading_button_label: _('Sending reset instructions ...'),
-          link_text: _('Forgot your password?'),
+          // No e-mail sender yet: an empty label hides the link instead of
+          // leading to an e-mail that cannot be sent (see AUTH_EMAILS_ENABLED).
+          link_text: AUTH_EMAILS_ENABLED ? _('Forgot your password?') : '',
           confirmation_text: _('Check your email for the password reset link'),
         },
         verify_otp: {
@@ -462,8 +465,8 @@ export default function AuthPage() {
         supabaseClient={supabase}
         appearance={{ theme: ThemeSupa }}
         theme={isDarkMode ? 'dark' : 'light'}
-        magicLink={true}
-        providers={['google', 'apple', 'github', 'discord']}
+        magicLink={AUTH_EMAILS_ENABLED}
+        providers={AUTH_OAUTH_PROVIDERS}
         redirectTo={getWebRedirectTo()}
         localization={getAuthLocalization()}
       />

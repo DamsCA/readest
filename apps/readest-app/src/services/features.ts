@@ -1,18 +1,45 @@
 /**
  * What this edition of the app offers.
  *
- * It stands on its own: there is no Readest account, so everything that needs
- * Readest's servers is off — sign-in, cloud sync and storage, shared links,
- * "Send to Readest" by e-mail, the online metadata search, Readest's
- * purchases and its usage statistics. The reader, the local library,
- * translation and the voice do not need them and stay.
- *
- * One switch, so a backend of our own can bring these back in one place.
+ * Accounts, cloud sync and cloud storage run on Ouiread's own backend
+ * (Supabase for accounts and data, Cloudflare R2 for book files). They are
+ * switched on per build with NEXT_PUBLIC_CLOUD_ENABLED=true: the web deploy
+ * sets it, and the Google Play build leaves it off until the app ships with
+ * accounts. Readest's own services stay off in every build: its purchases,
+ * its usage statistics, its demo shelf, shared links and "Send to Readest".
  */
-export const READEST_CLOUD_ENABLED = false;
+export const READEST_CLOUD_ENABLED = process.env['NEXT_PUBLIC_CLOUD_ENABLED'] === 'true';
 
-/** Usage statistics go to Readest's PostHog only when the cloud is on. */
-export const TELEMETRY_ENABLED = READEST_CLOUD_ENABLED;
+/** Usage statistics never go to Readest's PostHog in this edition. */
+export const TELEMETRY_ENABLED = false;
+
+/** Readest's demo shelf (six books from cdn.readest.com) stays off. */
+export const DEMO_BOOKS_ENABLED = false;
+
+/** Readest's premium plans are not sold here: the upgrade entry stays hidden. */
+export const READEST_PREMIUM_ENABLED = false;
+
+/**
+ * Sign-in by e-mail link and the "forgot password" e-mail need an e-mail
+ * sender of our own (custom SMTP on Supabase, which needs a domain). Until
+ * then the sign-in page offers e-mail and password only. Turn on with
+ * NEXT_PUBLIC_AUTH_EMAILS_ENABLED=true once SMTP is set up.
+ */
+export const AUTH_EMAILS_ENABLED = process.env['NEXT_PUBLIC_AUTH_EMAILS_ENABLED'] === 'true';
+
+type OAuthProvider = 'google' | 'apple' | 'facebook' | 'github' | 'discord';
+const OAUTH_PROVIDERS: OAuthProvider[] = ['google', 'apple', 'facebook', 'github', 'discord'];
+
+/**
+ * Sign-in providers configured on Ouiread's Supabase, as a comma-separated
+ * list in NEXT_PUBLIC_AUTH_PROVIDERS (for example "google"). None yet.
+ */
+export const AUTH_OAUTH_PROVIDERS: OAuthProvider[] = (
+  process.env['NEXT_PUBLIC_AUTH_PROVIDERS'] || ''
+)
+  .split(',')
+  .map((p) => p.trim())
+  .filter((p): p is OAuthProvider => OAUTH_PROVIDERS.includes(p as OAuthProvider));
 
 /**
  * The voice that reads first. Fish Audio's free model is meant for personal

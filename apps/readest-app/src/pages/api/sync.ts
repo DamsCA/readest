@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { NextRequest, NextResponse } from 'next/server';
 import { PostgrestError } from '@supabase/supabase-js';
 import { createSupabaseClient } from '@/utils/supabase';
+import { giveWelcomeGift } from '@/libs/ouiread/welcomeGift';
 import { BookDataRecord } from '@/types/book';
 import { transformBookConfigToDB } from '@/utils/transform';
 import { transformBookNoteToDB } from '@/utils/transform';
@@ -235,6 +236,13 @@ export async function GET(req: NextRequest) {
 
     if (!typeParam || typeParam === 'books') {
       await queryTables('books').catch((err) => (errors['books'] = err));
+      // Ouiread: an empty library on a first pull gets the welcome book, once
+      // per account (see libs/ouiread/welcomeGift.ts).
+      if (!errors['books'] && results.books?.length === 0 && since.getTime() < 1000) {
+        if (await giveWelcomeGift(user.id)) {
+          await queryTables('books').catch((err) => (errors['books'] = err));
+        }
+      }
       // TODO: Remove this hotfix for the initial race condition for books sync
       if (results.books?.length === 0 && since.getTime() < 1000) {
         const dummyHash = '00000000000000000000000000000000';
