@@ -56,6 +56,9 @@ export async function POST(request: NextRequest) {
       customer: customerId,
       mode: planType === 'subscription' ? 'subscription' : 'payment',
       allow_promotion_codes: true,
+      // A 100 % promotion code makes the first payment 0 €: no card is asked for
+      // then (Stripe's default asks for one anyway). Paid checkouts still take one.
+      ...(planType === 'subscription' ? { payment_method_collection: 'if_required' as const } : {}),
       // The Stripe account also sells for another business: the page shows
       // Lis et Lead at the top, in its colours (receipts still carry the
       // account's name until Lis et Lead has its own account).

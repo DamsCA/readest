@@ -3,6 +3,7 @@ import { corsAllMethods, runMiddleware } from '@/utils/cors';
 import { createSupabaseAdminClient } from '@/utils/supabase';
 import { validateUserAndToken } from '@/utils/access';
 import { deleteObject } from '@/utils/object';
+import { getStripe } from '@/libs/payment/stripe/server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await runMiddleware(req, res, corsAllMethods);
@@ -40,6 +41,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       if (!files || files.length < PAGE) break;
+    }
+
+    // A paid subscription must not outlive the account (Stripe would keep
+    // charging a reader who can no longer sign in): cancel it now.
+    try {
+      const { data: customer } = await supabaseAdmin
+        .from('customers')
+        .select('stripe_customer_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (customer?.stripe_customer_id) {
+        const stripe = getStripe();
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customer.stripe_customer_id,
+          status: 'all',
+          limit: 20,
+        });
+        for (const subscription of subscriptions.data) {
+          if (
+            ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(subscription.status)
+          ) {
+            await stripe.subscriptions.cancel(subscription.id);
+          }
+        }
+      }
+    } catch (stripeError) {
+      console.error('Account deletion: could not cancel the subscription', stripeError);
+      return res.status(500).json({ error: 'Could not cancel the subscription' });
     }
 
     // The public avatar (api/profile/avatar) is not in the files table.
