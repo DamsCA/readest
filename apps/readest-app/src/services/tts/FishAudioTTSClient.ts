@@ -14,6 +14,7 @@ import {
   parseFishTimestampStream,
 } from './fishTimestamps';
 import { getAPIBaseUrl, isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
+import { getAccessToken } from '@/utils/access';
 
 // Fish Audio's most advanced model, currently free for developers
 // (s2.1-pro-free, $0.00 / M UTF-8 bytes — no API credit required).
@@ -38,16 +39,16 @@ const FISH_AUDIO_CACHE_MAX = 128;
 const FISH_AUDIO_VOICES: TTSVoice[] = [
   {
     id: 'da05ae30d8c0428eb47498df524e448c',
-    name: 'Claire (Fish Audio)',
+    name: 'Claire (voix premium)',
     lang: 'fr-FR',
   },
-  { id: '933563129e564b19a115bedd57b7406a', name: 'Sarah (Fish Audio)', lang: 'en-US' },
-  { id: 'b347db033a6549378b48d00acb0d06cd', name: 'Selene (Fish Audio)', lang: 'en-US' },
-  { id: 'e3cd384158934cc9a01029cd7d278634', name: 'Laura (Fish Audio)', lang: 'en-US' },
-  { id: 'f6a19fe5ab494e1fa51bb1476d583a44', name: 'Abby (Fish Audio)', lang: 'en-US' },
+  { id: '933563129e564b19a115bedd57b7406a', name: 'Sarah (voix premium)', lang: 'en-US' },
+  { id: 'b347db033a6549378b48d00acb0d06cd', name: 'Selene (voix premium)', lang: 'en-US' },
+  { id: 'e3cd384158934cc9a01029cd7d278634', name: 'Laura (voix premium)', lang: 'en-US' },
+  { id: 'f6a19fe5ab494e1fa51bb1476d583a44', name: 'Abby (voix premium)', lang: 'en-US' },
   {
     id: '8906b5268cae414fb9b8d3da6e84413d',
-    name: 'Measured Storyteller (Fish Audio)',
+    name: 'Measured Storyteller (voix premium)',
     lang: 'en-US',
   },
 ];
@@ -686,11 +687,17 @@ export class FishAudioTTSClient implements TTSClient {
             priority === 'high' ? 20000 : 45000,
           );
         } else {
+          // The server meters premium voices per reader (Plus, or a short
+          // monthly taste on the free plan), so it needs to know who asks.
+          const accessToken = await getAccessToken();
           response = await fetch(
             `${getAPIBaseUrl()}/fishaudio/tts${timed ? '?timestamps=1' : ''}`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+              },
               body: payload,
               signal,
             },

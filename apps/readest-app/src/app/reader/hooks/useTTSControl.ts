@@ -220,6 +220,25 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     // reader's place — which reads as a broken app rather than a dead engine.
     const handleEngineDown = (e: Event) => {
       const { engine, status } = (e as CustomEvent).detail || {};
+      // Premium voices (Fish Audio) are a Plus feature on the web: the server
+      // answers 402 once a free reader's monthly taste is used, 429 once a
+      // subscriber's monthly hours are, and 401 to a reader not signed in.
+      if (engine === 'Fish Audio' && (status === 402 || status === 429 || status === 401)) {
+        eventDispatcher.dispatch('toast', {
+          message:
+            status === 402
+              ? _(
+                  'Premium voices are for Plus subscribers: your free taste this month is used. Choose a standard voice, or go Plus.',
+                )
+              : status === 429
+                ? _('Your premium voice hours for this month are used. Choose a standard voice.')
+                : _('Sign in to listen with a premium voice.'),
+          type: 'info',
+          timeout: 10000,
+        });
+        eventDispatcher.dispatch('tts-stop', { bookKey });
+        return;
+      }
       const reason =
         status === 0
           ? _('connection lost')

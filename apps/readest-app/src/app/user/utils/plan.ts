@@ -126,7 +126,9 @@ export function getPlanDetails(
           },
           {
             label: _('Voix standard'),
-            description: _('Des voix de synthèse classiques pour écouter vos livres.'),
+            description: _(
+              'Des voix de synthèse classiques pour écouter vos livres. Pour goûter les voix premium : 2 minutes par mois.',
+            ),
           },
           {
             label: _('Un livre offert'),
@@ -161,7 +163,9 @@ export function getPlanDetails(
           },
           {
             label: _('Voix naturelles premium'),
-            description: _('Bientôt : des voix expressives, proches d’un vrai lecteur.'),
+            description: _(
+              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres : 1 heure par mois.',
+            ),
           },
           {
             label: _('Stockage en ligne'),
