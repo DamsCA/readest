@@ -237,6 +237,9 @@ importers:
       '@zip.js/zip.js':
         specifier: ^2.8.16
         version: 2.8.26
+      '@zumer/snapdom':
+        specifier: 3.8.2
+        version: 3.8.2
       abortcontroller-polyfill:
         specifier: ^1.7.8
         version: 1.7.8
@@ -4019,6 +4022,9 @@ packages:
   '@zip.js/zip.js@2.8.26':
     resolution: {integrity: sha512-RQ4h9F6DOiHxpdocUDrOl6xBM+yOtz+LkUol47AVWcfebGBDpZ7w7Xvz9PS24JgXvLGiXXzSAfdCdVy1tPlaFA==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
+
+  '@zumer/snapdom@3.8.2':
+    resolution: {integrity: sha512-TONdpVPmzkaK/GOQe6NsH3GWog74oRxenePZKv0AeL6s5o0GPuOZT2UzA0W9Hgnaq/96XjkzOr5VjB5gJz1tCA==}
 
   a-sync-waterfall@1.0.1:
     resolution: {integrity: sha512-RYTOHHdWipFUliRFMCS4X2Yn2X8M87V/OpSqWzKKOGhzqyUxzyVmhHDH9sAvG+ZuQf/TAOFsLCpMw09I1ufUnA==}
@@ -12598,6 +12604,8 @@ snapshots:
   '@xtuc/long@4.2.2': {}
 
   '@zip.js/zip.js@2.8.26': {}
+
+  '@zumer/snapdom@3.8.2': {}
 
   a-sync-waterfall@1.0.1: {}
 

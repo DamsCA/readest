@@ -78,7 +78,7 @@ import { isMetered } from '@/utils/network';
 import { eventDispatcher } from '@/utils/event';
 import { isFontType } from '@/utils/font';
 import { getScrollGapAttr } from '@/utils/webtoon';
-import { applyPaginatorSwipe } from '@/utils/pageTurn';
+import { applyPaginatorSwipe, bookTurnActive, preparePageTurn } from '@/utils/pageTurn';
 import { ParagraphControl } from './paragraph';
 import AIProofreadBar from './AIProofreadBar';
 import Spinner from '@/components/Spinner';
@@ -209,7 +209,12 @@ const FoliateViewer: React.FC<{
       detail.range,
       detail.fraction,
     );
-  }, [bookKey, bookDoc, setProgress]);
+    // The book turn photographs the page now shown, for the next turn.
+    const view = viewRef.current;
+    if (view && bookTurnActive(getViewSettings(bookKey), view.isFixedLayout)) {
+      preparePageTurn(view);
+    }
+  }, [bookKey, bookDoc, setProgress, getViewSettings]);
 
   const progressRelocateHandler = (event: Event) => {
     // Always stash the latest detail; if another rAF is already pending
