@@ -1908,5 +1908,7 @@
   "Reflow the text like an ebook: translation, voice and text size": "Le texte s'affiche comme dans un livre numérique : traduction, voix et taille du texte",
   "Legal Notice": "Mentions légales",
   "By creating an account, you confirm that you have read our": "En créant un compte, vous confirmez avoir lu notre",
-  "privacy policy": "politique de confidentialité"
+  "privacy policy": "politique de confidentialité",
+  "Your free AI translations for today are used up: the rest is in standard translation. Go Plus for unlimited AI translation.": "Vos traductions IA gratuites du jour sont utilisées : la suite passe en traduction standard. Passez à Plus pour la traduction IA illimitée.",
+  "AI translation limit reached for today: the rest is in standard translation.": "Limite de traduction IA atteinte pour aujourd'hui : la suite passe en traduction standard."
 }

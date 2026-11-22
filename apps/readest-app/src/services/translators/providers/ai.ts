@@ -8,6 +8,56 @@ import {
 } from '@/services/ai/relay';
 import { TranslationProvider } from '../types';
 import { googleProvider } from './google';
+import { getAPIBaseUrl } from '@/services/environment';
+import { eventDispatcher } from '@/utils/event';
+import i18n from '@/i18n/i18n';
+
+// Without the relay (the web app), the AI translation goes through the app's
+// own server (/api/ai/translate), which knows the reader's plan: subscribers
+// translate freely, a free reader gets a daily taste and is then sent back to
+// the standard translation with an invitation to go Plus. Locked until the
+// next 00:00 UTC, when the daily taste comes back.
+let lockedUntil = 0;
+const nextUtcMidnightFrom = (now: number) => {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+};
+class PlusRequiredError extends Error {}
+const lockUntilMidnight = (plusRequired: boolean) => {
+  if (Date.now() < lockedUntil) return;
+  lockedUntil = nextUtcMidnightFrom(Date.now());
+  eventDispatcher.dispatch('toast', {
+    timeout: 9000,
+    type: 'info',
+    message: plusRequired
+      ? i18n.t(
+          'Your free AI translations for today are used up: the rest is in standard translation. Go Plus for unlimited AI translation.',
+        )
+      : i18n.t('AI translation limit reached for today: the rest is in standard translation.'),
+  });
+};
+const translateViaServer = async (
+  text: string,
+  sourceLang: string,
+  targetLang: string,
+  token: string,
+) => {
+  const response = await fetch(`${getAPIBaseUrl()}/ai/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text, source: sourceLang, target: targetLang }),
+  });
+  if (response.status === 402 || response.status === 429) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    lockUntilMidnight(data?.error === 'PLUS_REQUIRED');
+    throw new PlusRequiredError(`AI translation refused (${response.status})`);
+  }
+  if (!response.ok) throw new Error(`AI translation failed (${response.status})`);
+  const data = (await response.json()) as { translation?: unknown };
+  const translation = typeof data.translation === 'string' ? data.translation.trim() : '';
+  if (!translation) throw new Error('AI translation came back empty');
+  return translation;
+};
 
 // Natural (idiomatic) translation by a language model, through the same
 // Cloudflare relay as the Fish voice (relay/fish-audio, route /v1/translate:
@@ -32,7 +82,17 @@ const TIMEOUT_MS = 30_000;
 const MIN_WORDS_FOR_AI = 4;
 const wordCount = (text: string) => text.trim().split(/\s+/).length;
 
-const translateOne = async (text: string, sourceLang: string, targetLang: string) => {
+const translateOne = async (
+  text: string,
+  sourceLang: string,
+  targetLang: string,
+  token?: string | null,
+) => {
+  if (!getRelayUrl()) {
+    if (!token) throw new Error('AI translation needs an account');
+    if (Date.now() < lockedUntil) throw new PlusRequiredError('AI translation locked for today');
+    return translateViaServer(text, sourceLang, targetLang, token);
+  }
   if (isAIPaused()) throw new Error('AI translation paused until 00:00 UTC');
   const response = await postToRelay(
     '/v1/translate',
@@ -51,11 +111,16 @@ const translateOne = async (text: string, sourceLang: string, targetLang: string
 // cached): 10 AI requests for 5 paragraphs in the 12 Oct 2026 test, which
 // halves the free daily allocation. Concurrent asks share one request.
 const inFlight = new Map<string, Promise<string>>();
-const translateShared = (text: string, sourceLang: string, targetLang: string) => {
+const translateShared = (
+  text: string,
+  sourceLang: string,
+  targetLang: string,
+  token?: string | null,
+) => {
   const key = `${sourceLang}\u0000${targetLang}\u0000${text}`;
   let pending = inFlight.get(key);
   if (!pending) {
-    pending = translateOne(text, sourceLang, targetLang);
+    pending = translateOne(text, sourceLang, targetLang, token);
     inFlight.set(key, pending);
     const forget = () => inFlight.delete(key);
     pending.then(forget, forget);
@@ -66,9 +131,17 @@ const translateShared = (text: string, sourceLang: string, targetLang: string) =
 export const aiProvider: TranslationProvider = {
   name: 'ai',
   label: _('AI (natural)'),
-  // Needs the relay; builds without it never offer this provider.
-  disabled: !getRelayUrl(),
-  translate: async (texts: string[], sourceLang: string, targetLang: string) => {
+  // Through the relay (apps) or the app's server (web, account needed).
+  authRequired: !getRelayUrl(),
+  get quotaExceeded() {
+    return !getRelayUrl() && Date.now() < lockedUntil;
+  },
+  translate: async (
+    texts: string[],
+    sourceLang: string,
+    targetLang: string,
+    token?: string | null,
+  ) => {
     const results: string[] = texts.map(() => '');
     const viaGoogle: number[] = [];
     let next = 0;
@@ -85,7 +158,7 @@ export const aiProvider: TranslationProvider = {
           continue;
         }
         try {
-          results[i] = await translateShared(text, sourceLang, targetLang);
+          results[i] = await translateShared(text, sourceLang, targetLang, token);
         } catch (err) {
           console.warn('AI translation failed, using Google for this paragraph:', err);
           viaGoogle.push(i);
