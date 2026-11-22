@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AvailablePlan, PlanType, UserPlan } from '@/types/quota';
+import { AvailablePlan, PlanInterval, PlanType, UserPlan } from '@/types/quota';
 import { useEnv } from '@/context/EnvContext';
 import { debounce } from '@/utils/debounce';
 import { getPlanDetails } from '../utils/plan';
@@ -23,10 +23,13 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const [userPlanIndex, setUserPlanIndex] = useState(0);
   const plansScrollRef = useRef<HTMLDivElement>(null);
 
-  const userPlans: UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
+  // Lis et Lead sells one subscription: Plus (monthly or yearly).
+  const userPlans: UserPlan[] = ['free', 'plus'];
 
+  // Plus is sold by the month or, cheaper, by the year.
+  const [interval, setBillingInterval] = useState<PlanInterval>('year');
   const allPlans = userPlans.map((plan) => ({
-    ...getPlanDetails(plan, availablePlans),
+    ...getPlanDetails(plan, availablePlans, interval),
   }));
 
   useEffect(() => {
@@ -133,6 +136,23 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
 
   return (
     <div className='bg-base-100 border-base-200 overflow-hidden rounded-xl border shadow-sm'>
+      <div className='flex justify-center pt-4'>
+        <div className='bg-base-200 flex rounded-full p-1 text-sm' role='group'>
+          {(['month', 'year'] as PlanInterval[]).map((value) => (
+            <button
+              key={value}
+              type='button'
+              aria-pressed={interval === value}
+              className={`rounded-full px-4 py-1.5 ${
+                interval === value ? 'bg-base-100 font-semibold shadow-sm' : 'text-base-content/70'
+              }`}
+              onClick={() => setBillingInterval(value)}
+            >
+              {value === 'month' ? 'Mensuel' : 'Annuel · 4 mois offerts'}
+            </button>
+          ))}
+        </div>
+      </div>
       <PlanNavigation
         allPlans={allPlans.filter((plan) => plan.plan !== 'free')}
         currentPlan={userPlans[currentPlanIndex]!}

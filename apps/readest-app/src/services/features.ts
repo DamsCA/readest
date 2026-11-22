@@ -55,3 +55,9 @@ export const AUTH_OAUTH_PROVIDERS: OAuthProvider[] = (
  * plan behind the subscription.
  */
 export const FISH_VOICE_BY_DEFAULT = false;
+
+/**
+ * Paid plans (Stripe on the web): on once the Stripe account, its prices and
+ * the server secrets are in place (GitHub variable OUIREAD_PAYMENTS_ENABLED).
+ */
+export const PAYMENTS_ENABLED = process.env['NEXT_PUBLIC_PAYMENTS_ENABLED'] === 'true';

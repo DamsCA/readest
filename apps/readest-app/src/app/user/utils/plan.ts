@@ -98,9 +98,11 @@ export function getPlanDetails(
         products: purchasableProducts,
       };
     }
+    // Lis et Lead's two plans (22 Nov 2026): the free plan shows what it lacks,
+    // so the difference with Plus is felt in reading, not just read about.
     case 'free':
       return {
-        name: _('Free Plan'),
+        name: _('Gratuit'),
         plan: planCode,
         type: 'subscription',
         color: 'bg-gray-200 text-gray-800',
@@ -111,44 +113,34 @@ export function getPlanDetails(
         interval: interval === 'month' ? _('month') : _('year'),
         features: [
           {
-            label: _('Cross-Platform Sync'),
+            label: _('Votre bibliothèque partout'),
             description: _(
-              'Seamlessly sync your library, progress, highlights, and notes across all your devices—never lose your place again.',
+              'Vos livres, votre progression, vos surlignages et vos notes sur tous vos appareils.',
             ),
           },
           {
-            label: _('Customizable Reading'),
+            label: _('Traduction standard'),
             description: _(
-              'Personalize every detail with adjustable fonts, layouts, themes, and advanced display settings for the perfect reading experience.',
+              'Une traduction automatique classique, souvent mot à mot. Pour goûter la traduction IA : 20 paragraphes par jour.',
             ),
           },
           {
-            label: _('AI Read Aloud'),
-            description: _(
-              'Enjoy hands-free reading with natural-sounding AI voices that bring your books to life.',
-            ),
+            label: _('Voix standard'),
+            description: _('Des voix de synthèse classiques pour écouter vos livres.'),
           },
           {
-            label: _('AI Translations'),
-            description: _(
-              'Translate any text instantly with the power of Google, Azure, or DeepL—understand content in any language.',
-            ),
-          },
-          {
-            label: _('Community Support'),
-            description: _(
-              'Connect with fellow readers and get help fast in our friendly community channels.',
-            ),
+            label: _('Un livre offert'),
+            description: _('« Ça marche », dans votre bibliothèque dès l’inscription.'),
           },
         ],
         limits: {
-          [_('Cloud Sync Storage')]: '500 MB',
-          [_('AI Translations (per day)')]: '10K',
+          [_('Stockage en ligne')]: '500 Mo',
+          [_('Traduction IA')]: _('20 paragraphes par jour'),
         },
       };
     case 'plus':
       return {
-        name: _('Plus Plan'),
+        name: _('Plus'),
         plan: planCode,
         type: 'subscription',
         color: 'bg-blue-200 text-blue-800',
@@ -159,42 +151,26 @@ export function getPlanDetails(
         interval: interval === 'month' ? _('month') : _('year'),
         features: [
           {
-            label: _('Includes All Free Plan Benefits'),
+            label: _('Tout le gratuit, et en plus :'),
           },
           {
-            label: _('Unlimited AI Read Aloud Hours'),
+            label: _('Traduction IA naturelle'),
             description: _(
-              'Listen without limits—convert as much text as you like into immersive audio.',
+              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ». Jusqu’à 300 000 caractères par jour.',
             ),
           },
           {
-            label: _('More AI Translations'),
-            description: _(
-              'Unlock enhanced translation capabilities with more daily usage and advanced options.',
-            ),
+            label: _('Voix naturelles premium'),
+            description: _('Bientôt : des voix expressives, proches d’un vrai lecteur.'),
           },
           {
-            label: _('DeepL Pro Access'),
-            description: _(
-              'Translate up to 100,000 characters daily with the most accurate translation engine available.',
-            ),
-          },
-          {
-            label: _('Cloud Sync Storage'),
-            description: _(
-              'Securely store and access your entire reading collection with up to 5 GB of cloud storage.',
-            ),
-          },
-          {
-            label: _('Priority Support'),
-            description: _(
-              'Enjoy faster responses and dedicated assistance whenever you need help.',
-            ),
+            label: _('Stockage en ligne'),
+            description: _('Jusqu’à 5 Go pour toute votre bibliothèque.'),
           },
         ],
         limits: {
-          [_('Cloud Sync Storage')]: '5 GB',
-          [_('AI Translations (per day)')]: '100K',
+          [_('Stockage en ligne')]: '5 Go',
+          [_('Traduction IA')]: _('300 000 caractères par jour'),
         },
       };
     case 'pro':

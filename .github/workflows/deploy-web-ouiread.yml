@@ -59,6 +59,8 @@ jobs:
           NEXT_PUBLIC_APP_PLATFORM: web
           NEXT_PUBLIC_CLOUD_ENABLED: 'true'
           NEXT_PUBLIC_AUTH_PROVIDERS: ${{ vars.OUIREAD_AUTH_PROVIDERS }}
+          NEXT_PUBLIC_PAYMENTS_ENABLED: ${{ vars.OUIREAD_PAYMENTS_ENABLED }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_BASE64: ${{ vars.OUIREAD_STRIPE_PUBLISHABLE_KEY_BASE64 }}
           # The app's own address, baked in so that no request ever falls back to
           # Readest's servers before /runtime-config.js has loaded. Change the
           # repository variable OUIREAD_WEB_ORIGIN when Ouiread gets its own domain.
