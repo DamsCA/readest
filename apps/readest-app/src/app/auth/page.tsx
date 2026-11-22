@@ -24,8 +24,13 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
 import { handleAuthCallback } from '@/helpers/auth';
 import { getUserProfilePlan } from '@/utils/access';
-import { AUTH_EMAILS_ENABLED, AUTH_OAUTH_PROVIDERS } from '@/services/features';
+import {
+  AUTH_EMAILS_ENABLED,
+  AUTH_OAUTH_PROVIDERS,
+  GOOGLE_WEB_CLIENT_ID,
+} from '@/services/features';
 import { getAppleIdAuth, Scope } from './utils/appleIdAuth';
+import { startGoogleSignIn } from './utils/googleWeb';
 import { authWithCustomTab, authWithSafari } from './utils/nativeAuth';
 import WindowButtons from '@/components/WindowButtons';
 
@@ -46,6 +51,12 @@ interface ProviderLoginProp {
 const WEB_AUTH_CALLBACK = `${getBaseUrl()}/auth/callback`;
 const DEEPLINK_CALLBACK = 'readest://auth-callback';
 const USE_APPLE_SIGN_IN = process.env['NEXT_PUBLIC_USE_APPLE_SIGN_IN'] === 'true';
+// On the web, Google sign-in goes through our own domain when the client ID is
+// known (see utils/googleWeb.ts); Supabase's form keeps the other providers.
+const GOOGLE_ON_OUR_DOMAIN = !!GOOGLE_WEB_CLIENT_ID && AUTH_OAUTH_PROVIDERS.includes('google');
+const WEB_FORM_PROVIDERS = GOOGLE_ON_OUR_DOMAIN
+  ? AUTH_OAUTH_PROVIDERS.filter((provider) => provider !== 'google')
+  : AUTH_OAUTH_PROVIDERS;
 
 const ProviderLogin: React.FC<ProviderLoginProp> = ({ provider, handleSignIn, Icon, label }) => {
   return (
@@ -466,6 +477,24 @@ export default function AuthPage() {
       >
         <IoArrowBack className='text-base-content' />
       </button>
+      {GOOGLE_ON_OUR_DOMAIN && (
+        <>
+          <button
+            type='button'
+            onClick={() =>
+              startGoogleSignIn(new URLSearchParams(window.location.search).get('redirect'))
+            }
+            className={clsx(
+              'flex w-full items-center justify-center gap-2 rounded border px-4 py-2.5',
+              'bg-base-100 border-base-300 hover:bg-base-200 text-base-content text-sm shadow-sm transition',
+            )}
+          >
+            <FcGoogle className='h-5 w-5' />
+            <span>{_('Sign in with {{provider}}', { provider: 'Google' })}</span>
+          </button>
+          <div className='divider text-base-content/60 my-4 text-xs'>{_('or')}</div>
+        </>
+      )}
       <Auth
         key={authView}
         view={authView}
@@ -475,7 +504,7 @@ export default function AuthPage() {
         // E-mails serve the forgotten password only (22 Nov 2026): sign-in stays
         // Google or e-mail + password, without a one-time link.
         magicLink={false}
-        providers={AUTH_OAUTH_PROVIDERS}
+        providers={WEB_FORM_PROVIDERS}
         redirectTo={getWebRedirectTo()}
         localization={getAuthLocalization()}
       />

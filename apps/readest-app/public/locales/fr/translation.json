@@ -1920,5 +1920,10 @@
   "The premium voice is unavailable right now: reading goes on with the standard voice.": "La voix premium est indisponible pour le moment : la lecture continue avec la voix standard.",
   "By creating an account, you accept our": "En créant un compte, vous acceptez nos",
   "terms of use": "conditions d’utilisation",
-  "and confirm that you have read our": "et confirmez avoir lu notre"
+  "and confirm that you have read our": "et confirmez avoir lu notre",
+  "or": "ou",
+  "Google sign-in did not work. Please try again.": "La connexion avec Google n’a pas abouti. Réessayez.",
+  "Back to sign-in": "Retour à la connexion",
+  "You will be redirected to the login page shortly...": "Vous allez revenir à la page de connexion…",
+  "Go to Login": "Aller à la connexion"
 }

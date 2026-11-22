@@ -48,6 +48,16 @@ export const AUTH_OAUTH_PROVIDERS: OAuthProvider[] = (
   .filter((p): p is OAuthProvider => OAUTH_PROVIDERS.includes(p as OAuthProvider));
 
 /**
+ * Public ID of the Google OAuth client, in NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID.
+ * When set, the web sign-in page sends readers to Google and back to
+ * <our domain>/auth/google itself, so Google's screen names our domain
+ * instead of <project>.supabase.co (app/auth/utils/googleWeb.ts). Empty keeps
+ * Supabase's own redirect. The client must list <origin>/auth/google among
+ * its authorized redirect URIs.
+ */
+export const GOOGLE_WEB_CLIENT_ID = process.env['NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID'] || '';
+
+/**
  * The voice that reads first. Fish Audio's free model is meant for personal
  * use, so a voice sold on the stores cannot lean on it: the apps read with
  * Edge's voices (or the phone's own) by default, and Fish stays one tap away in

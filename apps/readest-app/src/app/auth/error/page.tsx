@@ -3,8 +3,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/hooks/useTheme';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function AuthErrorPage() {
+  const _ = useTranslation();
   const router = useRouter();
   useTheme({ systemUIVisible: false });
 
@@ -20,9 +22,9 @@ export default function AuthErrorPage() {
     <div className='bg-base-200/50 text-base-content hero h-screen items-center justify-center'>
       <div className='hero-content text-neutral-content text-center'>
         <div className='max-w-md'>
-          <p className='mb-5'>You will be redirected to the login page shortly...</p>
+          <p className='mb-5'>{_('You will be redirected to the login page shortly...')}</p>
           <button className='btn btn-primary rounded-xl' onClick={() => router.push('/auth')}>
-            Go to Login
+            {_('Go to Login')}
           </button>
         </div>
       </div>
