@@ -12,9 +12,11 @@ export async function GET() {
     });
 
     const plans = prices.data
+      // The Stripe account also sells other products (another business):
+      // only those tagged with a plan (metadata plan=plus) belong to the app.
       .filter((price) => {
         const product = price.product as Stripe.Product;
-        return product.active === true;
+        return product.active === true && !!product.metadata?.['plan'];
       })
       .map((price) => {
         const product = price.product as Stripe.Product & {
