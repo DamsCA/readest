@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getSubscriptionPlan, validateUserAndToken } from '@/utils/access';
 import { UsageStatsManager } from '@/utils/usage';
 
@@ -28,6 +29,32 @@ export const dynamic = 'force-dynamic';
 
 const refuse = (status: number, error: string) => Response.json({ error }, { status });
 
+// Shared memory of the premium voice: the same sentence, read by the same
+// voice with the same settings, is synthesized (and paid) once for everyone,
+// then served from R2 (prefix voix/). Every reader of the welcome book, every
+// second listening, every other device: free. A hit does not count against
+// the reader's monthly allowance, since it costs nothing.
+interface VoiceBucket {
+  get: (key: string) => Promise<{ arrayBuffer: () => Promise<ArrayBuffer> } | null>;
+  put: (
+    key: string,
+    value: ArrayBuffer,
+    options?: { httpMetadata?: { contentType?: string } },
+  ) => Promise<unknown>;
+}
+const getVoiceBucket = (): VoiceBucket | undefined => {
+  try {
+    return (getCloudflareContext().env as { VOICE_CACHE?: VoiceBucket }).VOICE_CACHE;
+  } catch {
+    return undefined;
+  }
+};
+const cacheKeyFor = async (body: string, timed: boolean) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `voix/${FISH_AUDIO_MODEL}/${timed ? 'timed' : 'mp3'}/${hex}`;
+};
+
 export async function POST(req: NextRequest) {
   const { user, token } = await validateUserAndToken(req.headers.get('authorization'));
   if (!user || !token) return refuse(401, 'NOT_AUTHENTICATED');
@@ -46,6 +73,24 @@ export async function POST(req: NextRequest) {
   if (!text.trim()) return refuse(400, 'text required');
   if (text.length > MAX_CHARS_PER_REQUEST) return refuse(413, 'text too long');
 
+  const timed = req.nextUrl.searchParams.get('timestamps') === '1';
+  const contentType = timed ? 'text/event-stream' : 'audio/mpeg';
+  const bucket = getVoiceBucket();
+  const cacheKey = await cacheKeyFor(body, timed);
+  if (bucket) {
+    const hit = await bucket.get(cacheKey).catch(() => null);
+    if (hit) {
+      return new Response(await hit.arrayBuffer(), {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'no-store',
+          'X-Voice-Cache': 'hit',
+        },
+      });
+    }
+  }
+
   const plan = getSubscriptionPlan(token);
   const paid = plan !== 'free';
   const used = await UsageStatsManager.getCurrentUsage(user.id, USAGE_TYPE, 'monthly');
@@ -54,7 +99,6 @@ export async function POST(req: NextRequest) {
     return refuse(paid ? 429 : 402, paid ? 'VOICE_QUOTA_EXCEEDED' : 'PLUS_REQUIRED');
   }
 
-  const timed = req.nextUrl.searchParams.get('timestamps') === '1';
   let upstream: Response;
   try {
     upstream = await fetch(timed ? FISH_AUDIO_TIMED_URL : FISH_AUDIO_TTS_URL, {
@@ -79,16 +123,22 @@ export async function POST(req: NextRequest) {
     return new Response(detail || `Fish Audio TTS failed (${upstream.status})`, { status });
   }
 
+  // Read whole (the app reads the whole answer anyway) to keep a copy.
+  const audio = await upstream.arrayBuffer();
+  if (!audio.byteLength) return new Response('No audio data received.', { status: 502 });
+  if (bucket) {
+    await bucket
+      .put(cacheKey, audio, { httpMetadata: { contentType } })
+      .catch((err) => console.error('Voice cache write failed:', err));
+  }
+
   await UsageStatsManager.trackUsage(user.id, USAGE_TYPE, text.length, {
     plan_type: plan,
     source: 'fish_audio',
   });
 
-  return new Response(upstream.body, {
+  return new Response(audio, {
     status: 200,
-    headers: {
-      'Content-Type': timed ? 'text/event-stream' : 'audio/mpeg',
-      'Cache-Control': 'no-store',
-    },
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'X-Voice-Cache': 'miss' },
   });
 }

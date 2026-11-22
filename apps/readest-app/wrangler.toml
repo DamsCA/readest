@@ -33,3 +33,8 @@ binding = "ASSETS"
 # Traduction IA des abonnés (Workers AI), route /api/ai/translate.
 [ai]
 binding = "AI"
+
+# Mémoire partagée des voix premium (une phrase déjà lue avec la même voix ne se repaie pas).
+[[r2_buckets]]
+binding = "VOICE_CACHE"
+bucket_name = "ouiread-livres"

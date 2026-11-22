@@ -60,7 +60,9 @@ export default function ConfidentialitePage() {
         les réglages : Google Traduction ou Microsoft Translator. Quand vous écoutez un livre avec
         une voix en ligne, le texte lu est envoyé au service de voix de Microsoft. Ces services
         reçoivent le texte et l’adresse IP de votre appareil, jamais votre compte, et appliquent
-        leurs propres règles de confidentialité. Les voix intégrées à votre appareil fonctionnent
+        leurs propres règles de confidentialité. Les voix premium passent par notre serveur, qui
+        envoie le texte lu à Fish Audio et garde l’audio obtenu, sans aucun lien avec votre compte,
+        pour ne pas le refaire la prochaine fois. Les voix intégrées à votre appareil fonctionnent
         sans rien envoyer.
       </p>
 
