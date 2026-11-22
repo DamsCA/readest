@@ -10,7 +10,12 @@ export default function MentionsLegalesPage() {
       <p>
         Damien Aure
         <br />
-        Téléphone : 06 92 03 99 30
+        Téléphone : 06 67 90 72 53
+        <br />
+        E-mail :{' '}
+        <a href='mailto:genie.endormi@gmail.com' className='underline'>
+          genie.endormi@gmail.com
+        </a>
       </p>
 
       <h2>Hébergeur</h2>

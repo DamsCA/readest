@@ -9,7 +9,11 @@ export default function ConfidentialitePage() {
       <h2>Qui est responsable de vos données ?</h2>
       <p>
         Ouiread est édité par Damien Aure, responsable du traitement de vos données. Pour toute
-        question, ou pour exercer vos droits : 06 92 03 99 30.
+        question, ou pour exercer vos droits, écrivez à{' '}
+        <a href='mailto:genie.endormi@gmail.com' className='underline'>
+          genie.endormi@gmail.com
+        </a>
+        .
       </p>
 
       <h2>Ce que nous enregistrons</h2>
@@ -86,7 +90,7 @@ export default function ConfidentialitePage() {
       <p>
         Vous pouvez accéder à vos données, les corriger, les effacer, les récupérer ou vous opposer
         à un traitement. La suppression se fait directement dans l’application. Pour le reste,
-        appelez le 06 92 03 99 30. Vous pouvez aussi adresser une réclamation à la CNIL
+        écrivez à genie.endormi@gmail.com. Vous pouvez aussi adresser une réclamation à la CNIL
         (www.cnil.fr).
       </p>
 
