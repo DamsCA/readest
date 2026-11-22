@@ -1,5 +1,5 @@
 # Ouiread : la version web (Next.js via OpenNext) sur le compte Cloudflare de Damien.
-# Adresse : https://ouiread.damien-aure99c.workers.dev
+# Adresse : https://lisetlead.com (www et lisetlead.app y renvoient ; ouiread.damien-aure99c.workers.dev aussi, pour les pages)
 # Mise en ligne : bash scripts/deploy-ouiread.sh (Git Bash sous Windows, ou Linux).
 name = "ouiread"
 main = ".open-next/worker.js"
@@ -8,6 +8,14 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = false
 
+# Les domaines achetés le 22/11/2026 chez Cloudflare (même compte).
+routes = [
+  { pattern = "lisetlead.com", custom_domain = true },
+  { pattern = "www.lisetlead.com", custom_domain = true },
+  { pattern = "lisetlead.app", custom_domain = true },
+  { pattern = "www.lisetlead.app", custom_domain = true },
+]
+
 # Réglages publics lus par le serveur à chaque requête.
 # Les trois secrets sont rangés à part (wrangler secret put) :
 #   SUPABASE_ADMIN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
@@ -15,7 +23,7 @@ preview_urls = false
 PNPM_VERSION = "10.28.1"
 SUPABASE_URL = "https://wwpqbnjktkpdpdaekfdu.supabase.co"
 SUPABASE_ANON_KEY = "sb_publishable_qzt_yL80wNJMJc__dfLbsA_JFXnmgR4"
-API_BASE_URL = "https://ouiread.damien-aure99c.workers.dev"
+API_BASE_URL = "https://lisetlead.com"
 OBJECT_STORAGE_TYPE = "r2"
 R2_ACCOUNT_ID = "d08208e6c22ecafb1e5b6c55e10fb436"
 R2_BUCKET_NAME = "ouiread-livres"

@@ -15,8 +15,28 @@ const corsOptions = {
   'Access-Control-Max-Age': '86400',
 };
 
+// Lis et Lead lives at lisetlead.com: www and the .app domain lead there, and
+// so does the first address (workers.dev) for pages, so that links already
+// shared keep working while every reader ends up on one origin (one login,
+// one local library). The API answers on every address.
+const CANONICAL_HOST = 'lisetlead.com';
+const REDIRECTED_HOSTS = [
+  'www.lisetlead.com',
+  'lisetlead.app',
+  'www.lisetlead.app',
+  'ouiread.damien-aure99c.workers.dev',
+];
+
 export function middleware(request: NextRequest) {
   const isApi = request.nextUrl.pathname.startsWith('/api/');
+  const host = (request.headers.get('host') || '').toLowerCase();
+  if (!isApi && REDIRECTED_HOSTS.includes(host)) {
+    const target = new URL(
+      request.nextUrl.pathname + request.nextUrl.search,
+      `https://${CANONICAL_HOST}`,
+    );
+    return NextResponse.redirect(target, 301);
+  }
 
   if (isApi) {
     const origin = request.headers.get('origin') ?? '';
