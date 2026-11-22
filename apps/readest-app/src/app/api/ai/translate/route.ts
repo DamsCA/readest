@@ -1,7 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getSubscriptionPlan, validateUserAndToken } from '@/utils/access';
 import { UsageStatsManager } from '@/utils/usage';
-import { sayingsInstruction } from './proverbs';
+import { preparePassage } from './proverbs';
 
 // AI translation (Workers AI, Mistral Small 3.1) for the web app, the paid
 // feature of Lis et Lead: subscribers translate freely (up to a fair-use daily
@@ -127,14 +127,16 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!ai) return json(503, { error: 'AI translation unavailable' });
 
+  // Whole English sayings go in already in French (see ./proverbs.ts).
+  const prepared = preparePassage(text, target);
   try {
     const out = await ai.run(MODEL, {
       messages: [
         {
           role: 'system',
-          content: systemPrompt(langName(body.source), target) + sayingsInstruction(text, target),
+          content: systemPrompt(langName(body.source), target) + prepared.instruction,
         },
-        { role: 'user', content: text },
+        { role: 'user', content: prepared.text },
       ],
       max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
       temperature: 0.2,
