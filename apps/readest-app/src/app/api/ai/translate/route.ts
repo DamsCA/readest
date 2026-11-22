@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getSubscriptionPlan, validateUserAndToken } from '@/utils/access';
 import { UsageStatsManager } from '@/utils/usage';
+import { sayingsInstruction } from './proverbs';
 
 // AI translation (Workers AI, Mistral Small 3.1) for the web app, the paid
 // feature of Lis et Lead: subscribers translate freely (up to a fair-use daily
@@ -129,7 +130,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const out = await ai.run(MODEL, {
       messages: [
-        { role: 'system', content: systemPrompt(langName(body.source), target) },
+        {
+          role: 'system',
+          content: systemPrompt(langName(body.source), target) + sayingsInstruction(text, target),
+        },
         { role: 'user', content: text },
       ],
       max_tokens: Math.min(4096, Math.ceil(text.length * 0.6) + 48),
