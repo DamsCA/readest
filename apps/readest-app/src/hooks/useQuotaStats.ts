@@ -42,7 +42,10 @@ export const useQuotaStats = (briefName = false) => {
       resetAt: translationResetAt,
     };
     setUserProfilePlan(getUserProfilePlan(token));
-    setQuotas([storageQuota, translationQuota]);
+    // Lis et Lead meters its AI translation on its own server (api/ai/translate),
+    // not with this daily character quota: showing it ("0 / 10 K") only confused.
+    void translationQuota;
+    setQuotas([storageQuota]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 

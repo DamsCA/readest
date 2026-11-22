@@ -46,7 +46,10 @@ const PlanCard: React.FC<PlanCardProps> = ({
         <div className='mb-6 text-center'>
           <h4 className='mb-2 text-2xl font-bold'>{_(plan.name)}</h4>
           <div className='text-3xl font-bold'>
-            {plan.plan !== 'purchase' ? (
+            {plan.plan !== 'purchase' && price === 0 ? (
+              // The free plan has no billing period: "0,00 €/année" read oddly.
+              <>0 €</>
+            ) : plan.plan !== 'purchase' ? (
               <>
                 {formattedPrice}
                 <span className='text-lg font-normal'>/{_(plan.interval)}</span>
