@@ -472,7 +472,9 @@ export default function AuthPage() {
         supabaseClient={supabase}
         appearance={{ theme: ThemeSupa }}
         theme={isDarkMode ? 'dark' : 'light'}
-        magicLink={AUTH_EMAILS_ENABLED}
+        // E-mails serve the forgotten password only (22 Nov 2026): sign-in stays
+        // Google or e-mail + password, without a one-time link.
+        magicLink={false}
         providers={AUTH_OAUTH_PROVIDERS}
         redirectTo={getWebRedirectTo()}
         localization={getAuthLocalization()}
