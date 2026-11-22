@@ -148,7 +148,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
               }`}
               onClick={() => setBillingInterval(value)}
             >
-              {value === 'month' ? 'Mensuel' : 'Annuel · 4 mois offerts'}
+              {value === 'month' ? 'Mensuel' : 'Annuel · 5 € par mois'}
             </button>
           ))}
         </div>

@@ -72,6 +72,11 @@ export default function AuthPage() {
   const { settings, setSettings, saveSettings } = useSettingsStore();
   const [port, setPort] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  // The welcome page's buttons open the sign-up form directly (?inscription=1).
+  const [authView, setAuthView] = useState<'sign_in' | 'sign_up'>('sign_in');
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('inscription')) setAuthView('sign_up');
+  }, []);
   const isOAuthServerRunning = useRef(false);
   const useCustomeOAuth = useRef(false);
 
@@ -462,6 +467,8 @@ export default function AuthPage() {
         <IoArrowBack className='text-base-content' />
       </button>
       <Auth
+        key={authView}
+        view={authView}
         supabaseClient={supabase}
         appearance={{ theme: ThemeSupa }}
         theme={isDarkMode ? 'dark' : 'light'}

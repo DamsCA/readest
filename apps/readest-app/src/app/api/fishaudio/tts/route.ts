@@ -19,7 +19,7 @@ const FISH_AUDIO_TIMED_URL = 'https://api.fish.audio/v1/tts/stream/with-timestam
 // The paid model: the free one (s2.1-pro-free) is meant for personal use.
 const FISH_AUDIO_MODEL = 's2.1-pro';
 // About 1,250 characters of French per minute of speech.
-const PAID_VOICE_CHARS_PER_MONTH = 75_000; // ~1 hour
+const PAID_VOICE_CHARS_PER_MONTH = 150_000; // ~2 hours
 const FREE_VOICE_CHARS_PER_MONTH = 2_500; // ~2 minutes
 const USAGE_TYPE = 'premium_voice_chars';
 const MAX_CHARS_PER_REQUEST = 2_000;

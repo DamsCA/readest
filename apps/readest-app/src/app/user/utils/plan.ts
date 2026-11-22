@@ -147,7 +147,7 @@ export function getPlanDetails(
         type: 'subscription',
         color: 'bg-blue-200 text-blue-800',
         hintColor: 'text-blue-800/75',
-        price: availablePlan?.price || 499,
+        price: availablePlan?.price || 699,
         currency,
         productId: availablePlan?.productId,
         interval: interval === 'month' ? _('month') : _('year'),
@@ -158,13 +158,13 @@ export function getPlanDetails(
           {
             label: _('Traduction IA naturelle'),
             description: _(
-              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ». Jusqu’à 300 000 caractères par jour.',
+              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ». Jusqu’à 100 000 caractères par jour, environ un livre tous les 4 jours.',
             ),
           },
           {
             label: _('Voix naturelles premium'),
             description: _(
-              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres : 1 heure par mois.',
+              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres : 2 heures par mois.',
             ),
           },
           {
@@ -174,7 +174,8 @@ export function getPlanDetails(
         ],
         limits: {
           [_('Stockage en ligne')]: '5 Go',
-          [_('Traduction IA')]: _('300 000 caractères par jour'),
+          [_('Traduction IA')]: _('100 000 caractères par jour'),
+          [_('Voix premium')]: _('2 heures par mois'),
         },
       };
     case 'pro':

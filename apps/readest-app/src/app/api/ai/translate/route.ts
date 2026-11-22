@@ -13,7 +13,9 @@ import { UsageStatsManager } from '@/utils/usage';
 const MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 const MAX_CHARS = 6000;
 const FREE_AI_PARAGRAPHS_PER_DAY = 20;
-const PAID_AI_CHARS_PER_DAY = 300_000;
+// Plus at 6,99 € a month or 59,99 € a year (22 Nov 2026): about a book every
+// four days, so that even a yearly subscriber who uses it all stays profitable.
+const PAID_AI_CHARS_PER_DAY = 100_000;
 const FREE_USAGE = 'ai_translation_free_paragraphs';
 const PAID_USAGE = 'ai_translation_chars';
 
