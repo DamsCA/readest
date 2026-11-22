@@ -4,9 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 // under avatars/<user_id>, and are served from the app's own origin: the pages
 // are cross-origin isolated (COEP), which would block an image from R2 itself.
 export interface AvatarBucket {
-  get: (
-    key: string,
-  ) => Promise<{
+  get: (key: string) => Promise<{
     arrayBuffer: () => Promise<ArrayBuffer>;
     httpMetadata?: { contentType?: string };
   } | null>;
