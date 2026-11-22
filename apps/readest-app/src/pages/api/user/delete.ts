@@ -3,7 +3,6 @@ import { corsAllMethods, runMiddleware } from '@/utils/cors';
 import { createSupabaseAdminClient } from '@/utils/supabase';
 import { validateUserAndToken } from '@/utils/access';
 import { deleteObject } from '@/utils/object';
-import { getStripe } from '@/libs/payment/stripe/server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await runMiddleware(req, res, corsAllMethods);
@@ -52,17 +51,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('user_id', user.id)
         .maybeSingle();
       if (customer?.stripe_customer_id) {
-        const stripe = getStripe();
-        const subscriptions = await stripe.subscriptions.list({
-          customer: customer.stripe_customer_id,
-          status: 'all',
-          limit: 20,
-        });
-        for (const subscription of subscriptions.data) {
+        // Plain Stripe REST calls: the stripe package is not bundled for the
+        // pages router on Cloudflare Workers.
+        const key = process.env['STRIPE_SECRET_KEY'];
+        const auth = { Authorization: `Bearer ${key}` };
+        const list = await fetch(
+          `https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customer.stripe_customer_id)}&status=all&limit=20`,
+          { headers: auth },
+        );
+        if (!list.ok) throw new Error(`Stripe list failed (${list.status})`);
+        const { data } = (await list.json()) as { data: { id: string; status: string }[] };
+        for (const subscription of data) {
           if (
             ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(subscription.status)
           ) {
-            await stripe.subscriptions.cancel(subscription.id);
+            const cancel = await fetch(
+              `https://api.stripe.com/v1/subscriptions/${subscription.id}`,
+              {
+                method: 'DELETE',
+                headers: auth,
+              },
+            );
+            if (!cancel.ok) throw new Error(`Stripe cancel failed (${cancel.status})`);
           }
         }
       }
