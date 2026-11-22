@@ -472,7 +472,7 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
                     <div className='flex items-start justify-between gap-2'>
                       <h4 className='flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold'>
                         {catalog.icon && <span className='flex-shrink-0'>{catalog.icon}</span>}
-                        <span className='truncate'>{catalog.name}</span>
+                        <span className='break-words'>{catalog.name}</span>
                       </h4>
                       {/* stopPropagation on the trigger wrapper so opening
                           the menu doesn't also browse the catalog.
@@ -513,13 +513,13 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
                         to keep cards compact and consistent in height
                         regardless of description length. */}
                     {catalog.description && (
-                      <p className='text-base-content/70 line-clamp-1 text-xs leading-relaxed'>
+                      <p className='text-base-content/70 text-xs leading-relaxed'>
                         {catalog.description}
                       </p>
                     )}
 
                     {/* URL — quieter, mono-ish */}
-                    <p className='text-base-content/55 truncate text-[11px]' title={catalog.url}>
+                    <p className='text-base-content/55 break-all text-[11px]' title={catalog.url}>
                       {catalog.url}
                     </p>
 
@@ -552,7 +552,7 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
                           onChange={() => handleToggleAutoDownload(catalog.id)}
                         />
                       </label>
-                      <span className='text-base-content/55 truncate text-[11px] leading-tight'>
+                      <span className='text-base-content/55 break-words text-[11px] leading-tight'>
                         {showSubscriptionStatus ? (
                           <>
                             {lastCheckedAt > 0 && (
@@ -610,11 +610,11 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
                     className='flex w-full min-w-0 items-center gap-1.5 rounded-sm text-start text-sm font-semibold transition-colors duration-150 hover:underline focus-visible:underline focus-visible:outline-none'
                   >
                     {catalog.icon && <span className='flex-shrink-0'>{catalog.icon}</span>}
-                    <span className='truncate'>{catalog.name}</span>
+                    <span className='break-words'>{catalog.name}</span>
                   </button>
                 </h4>
                 {catalog.description && (
-                  <p className='text-base-content/70 line-clamp-2 text-xs leading-relaxed'>
+                  <p className='text-base-content/70 text-xs leading-relaxed'>
                     {catalog.description}
                   </p>
                 )}
