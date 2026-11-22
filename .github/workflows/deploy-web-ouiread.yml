@@ -60,6 +60,8 @@ jobs:
           NEXT_PUBLIC_CLOUD_ENABLED: 'true'
           NEXT_PUBLIC_AUTH_PROVIDERS: ${{ vars.OUIREAD_AUTH_PROVIDERS }}
           NEXT_PUBLIC_PAYMENTS_ENABLED: ${{ vars.OUIREAD_PAYMENTS_ENABLED }}
+          # « Mot de passe oublié » : true une fois l'envoi d'e-mails réglé dans Supabase (SMTP).
+          NEXT_PUBLIC_AUTH_EMAILS_ENABLED: ${{ vars.OUIREAD_AUTH_EMAILS_ENABLED }}
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_BASE64: ${{ vars.OUIREAD_STRIPE_PUBLISHABLE_KEY_BASE64 }}
           # The app's own address, baked in so that no request ever falls back to
           # Readest's servers before /runtime-config.js has loaded. Change the

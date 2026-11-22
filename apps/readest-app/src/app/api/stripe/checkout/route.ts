@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe();
+    const origin = request.headers.get('origin') || '';
     const successUrl = `${request.headers.get('origin')}/user/subscription/success?payment=stripe&session_id={CHECKOUT_SESSION_ID}`;
     const returnUrl = `${request.headers.get('origin')}/user`;
     const session = await stripe.checkout.sessions.create({
@@ -55,6 +56,21 @@ export async function POST(request: NextRequest) {
       customer: customerId,
       mode: planType === 'subscription' ? 'subscription' : 'payment',
       allow_promotion_codes: true,
+      // The Stripe account also sells for another business: the page shows
+      // Lis et Lead at the top, in its colours (receipts still carry the
+      // account's name until Lis et Lead has its own account).
+      branding_settings: {
+        display_name: 'Lis et Lead',
+        button_color: '#16241f',
+        border_style: 'rounded',
+      },
+      // The terms of sale, accepted with the subscription (shown above the
+      // button), and the request to start Plus at once (withdrawal right, CGV §5).
+      custom_text: {
+        submit: {
+          message: `En vous abonnant, vous acceptez nos [conditions générales de vente](${origin}/cgv) et demandez à profiter de Plus tout de suite. Vous pouvez résilier à tout moment depuis votre compte.`,
+        },
+      },
       line_items: [
         {
           price: priceId,

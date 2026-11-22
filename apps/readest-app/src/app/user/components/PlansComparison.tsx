@@ -189,6 +189,14 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         currentPlanIndex={currentPlanIndex}
         onSelectPlan={setCurrentPlanIndex}
       />
+      <p className='text-base-content/70 px-6 pb-5 text-center text-xs leading-relaxed'>
+        Sans engagement : vous résiliez quand vous voulez depuis cette page. En vous abonnant, vous
+        acceptez nos{' '}
+        <a href='/cgv' className='underline'>
+          conditions générales de vente
+        </a>
+        .
+      </p>
     </div>
   );
 };

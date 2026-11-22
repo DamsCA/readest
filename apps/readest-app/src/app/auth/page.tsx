@@ -478,7 +478,11 @@ export default function AuthPage() {
         localization={getAuthLocalization()}
       />
       <p className='text-base-content/70 mt-6 text-center text-xs leading-relaxed'>
-        {_('By creating an account, you confirm that you have read our')}{' '}
+        {_('By creating an account, you accept our')}{' '}
+        <a href='/cgu' className='underline'>
+          {_('terms of use')}
+        </a>{' '}
+        {_('and confirm that you have read our')}{' '}
         <a href='/confidentialite' className='underline'>
           {_('privacy policy')}
         </a>

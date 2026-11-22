@@ -309,12 +309,18 @@ export default function BienvenuePage() {
 
       <footer className='mx-auto flex max-w-5xl flex-col gap-3 px-5 py-8 text-sm text-[#16241f]/60 sm:flex-row sm:justify-between sm:px-8'>
         <p>© 2026 Lis et Lead</p>
-        <nav className='flex gap-5'>
+        <nav className='flex flex-wrap gap-x-5 gap-y-2'>
           <a href='/mentions-legales' className='underline'>
             Mentions légales
           </a>
           <a href='/confidentialite' className='underline'>
             Confidentialité
+          </a>
+          <a href='/cgv' className='underline'>
+            CGV
+          </a>
+          <a href='/cgu' className='underline'>
+            CGU
           </a>
           <LienBibliotheque href='/library' className='underline'>
             Ouvrir la bibliothèque
