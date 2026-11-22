@@ -53,7 +53,7 @@ const KOSyncForm: React.FC<KOSyncFormProps> = ({ onBack }) => {
   }, [appService]);
 
   useEffect(() => {
-    const defaultName = osName ? `Readest (${osName})` : 'Readest';
+    const defaultName = osName ? `Lis et Lead (${osName})` : 'Lis et Lead';
     setDeviceName(settings.kosync.deviceName || defaultName);
   }, [settings.kosync.deviceName, osName]);
 
@@ -200,7 +200,7 @@ const KOSyncForm: React.FC<KOSyncFormProps> = ({ onBack }) => {
                 <SettingLabel>{_('Device Name')}</SettingLabel>
                 <input
                   type='text'
-                  placeholder={osName ? `Readest (${osName})` : 'Readest'}
+                  placeholder={osName ? `Lis et Lead (${osName})` : 'Lis et Lead'}
                   className='input h-9 max-w-[60%] rounded-md !border-0 !bg-transparent !pe-3 !ps-2 text-end text-sm hover:!bg-transparent focus:!border-0 focus:!bg-transparent focus:!shadow-none focus:!outline-none focus:!ring-0'
                   value={deviceName}
                   onChange={handleDeviceNameChange}

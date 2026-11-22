@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Account & Sign In',
   description:
-    'Sign in to your Readest account or manage your subscription, cloud library storage, and account settings.',
+    'Connectez-vous à votre compte Lis et Lead pour retrouver votre bibliothèque sur tous vos appareils.',
 };
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
