@@ -8,7 +8,7 @@ export default function ConfidentialitePage() {
     <LegalPage title='Politique de confidentialité' updated='22 novembre 2026'>
       <h2>Qui est responsable de vos données ?</h2>
       <p>
-        Ouiread est édité par Damien Aure, responsable du traitement de vos données. Pour toute
+        VoilaRead est édité par Damien Aure, responsable du traitement de vos données. Pour toute
         question, ou pour exercer vos droits, écrivez à{' '}
         <a href='mailto:genie.endormi@gmail.com' className='underline'>
           genie.endormi@gmail.com
@@ -96,7 +96,7 @@ export default function ConfidentialitePage() {
 
       <h2>Ce qui reste sur votre appareil</h2>
       <p>
-        Ouiread enregistre sur votre appareil ce dont il a besoin pour fonctionner : votre session
+        VoilaRead enregistre sur votre appareil ce dont il a besoin pour fonctionner : votre session
         de connexion, vos réglages et les livres que vous lisez. Rien de tout cela ne sert à vous
         suivre ni à vous montrer de la publicité.
       </p>

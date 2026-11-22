@@ -812,7 +812,7 @@ export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=readest_web'
 
 // The app's name, shown in the library header. Provisional until the owner
 // picks the final name for the store listing.
-export const APP_DISPLAY_NAME = 'Ouiread';
+export const APP_DISPLAY_NAME = 'VoilaRead';
 
 // AGPL-3.0: the app is a modified version of Readest and must say so, with a
 // date (section 5a), and point to its complete source (sections 6 and 13).

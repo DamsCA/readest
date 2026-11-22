@@ -34,14 +34,14 @@ export default function MentionsLegalesPage() {
 
       <h2>Logiciel libre</h2>
       <p>
-        Ouiread est une version modifiée de Readest, publiée sous licence GNU Affero General Public
-        License, version 3. Son code source est disponible sur github.com/DamsCA/readest.
+        VoilaRead est une version modifiée de Readest, publiée sous licence GNU Affero General
+        Public License, version 3. Son code source est disponible sur github.com/DamsCA/readest.
       </p>
 
       <h2>Livre offert</h2>
       <p>
         « Ça marche » est une traduction française de « It Works » (R. H. J., 1926). Le texte
-        original appartient au domaine public. Traduction et couverture : Ouiread.
+        original appartient au domaine public. Traduction et couverture : VoilaRead.
       </p>
 
       <h2>Données personnelles</h2>
