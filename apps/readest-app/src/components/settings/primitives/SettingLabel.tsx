@@ -34,7 +34,7 @@ function SettingLabel<T extends React.ElementType = 'span'>({
 }: SettingLabelProps<T>) {
   const Tag = (as ?? 'span') as React.ElementType;
   return (
-    <Tag className={clsx('text-base-content line-clamp-2', className)} {...rest}>
+    <Tag className={clsx('text-base-content break-words', className)} {...rest}>
       {children}
     </Tag>
   );

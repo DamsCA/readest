@@ -121,7 +121,7 @@ const BackgroundTextureSelector: React.FC<BackgroundTextureSelectorProps> = ({
               <div className='flex items-center justify-center'>
                 <MdAdd className='text-primary/85 group-hover:text-primary h-6 w-6' />
               </div>
-              <div className='text-primary/85 group-hover:text-primary line-clamp-1 font-medium'>
+              <div className='text-primary/85 group-hover:text-primary break-words font-medium'>
                 {_('Import Image')}
               </div>
             </div>

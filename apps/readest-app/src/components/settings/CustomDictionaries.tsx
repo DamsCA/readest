@@ -180,7 +180,7 @@ const SortableRow: React.FC<SortableRowProps> = ({
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
           <span
-            className={clsx('truncate font-medium', row.disabled && 'text-base-content/60')}
+            className={clsx('break-words font-medium', row.disabled && 'text-base-content/60')}
             title={row.label}
           >
             {row.label}
@@ -833,7 +833,7 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
           >
             <MdAdd className='h-3.5 w-3.5' />
           </span>
-          <span className='line-clamp-1'>
+          <span className='break-words'>
             {importing ? _('Importing…') : _('Import Dictionary')}
           </span>
         </button>
@@ -863,7 +863,7 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
           >
             <MdAdd className='h-3.5 w-3.5' />
           </span>
-          <span className='line-clamp-1'>{_('Add Web Search')}</span>
+          <span className='break-words'>{_('Add Web Search')}</span>
         </button>
       </div>
 
@@ -880,7 +880,7 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
         >
           <div className='min-w-0'>
             <div className='text-base-content text-sm font-medium'>{_('System Lookup App')}</div>
-            <div className='text-base-content/60 line-clamp-1 text-xs'>
+            <div className='text-base-content/60 break-words text-xs'>
               {rememberedLookupApp.label}
             </div>
           </div>

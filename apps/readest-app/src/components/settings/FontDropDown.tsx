@@ -59,7 +59,7 @@ const FontItem: React.FC<FontItemProps> = ({ index, style, data }) => {
           )}
         </span>
         <span
-          className='line-clamp-1 overflow-visible break-all leading-loose'
+          className='overflow-visible break-words text-start leading-snug'
           style={{ fontFamily: onGetFontFamily(option.option, family) }}
           title={option.label || option.option}
         >
@@ -116,12 +116,12 @@ const FontDropdown: React.FC<DropdownProps> = ({
     <div className='dropdown dropdown-top'>
       <button
         tabIndex={0}
-        className='btn btn-sm flex items-center px-[10px] font-normal normal-case sm:px-[20px]'
+        className='btn btn-sm flex h-auto min-h-8 items-center px-[10px] py-1 font-normal normal-case sm:px-[20px]'
         onClick={(e) => e.currentTarget.focus()}
       >
         <div className='flex items-center gap-x-1'>
           <span
-            className='line-clamp-1 break-all leading-loose'
+            className='break-words text-start leading-snug'
             style={{
               fontFamily: onGetFontFamily(selectedOption.option, family ?? ''),
             }}

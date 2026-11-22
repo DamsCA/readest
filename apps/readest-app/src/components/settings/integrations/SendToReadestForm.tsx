@@ -257,7 +257,7 @@ const SendToReadestForm: React.FC<SendToReadestFormProps> = ({ onBack }) => {
             <SectionTitle className='mb-2'>{_('Your inbound address')}</SectionTitle>
             <div className='card eink-bordered border-base-200 bg-base-100 divide-base-200 overflow-hidden border'>
               <div className='flex items-center gap-2 px-4 py-3'>
-                <code className='line-clamp-2 min-w-0 flex-1 break-all text-sm'>{address}</code>
+                <code className='min-w-0 flex-1 break-all text-sm'>{address}</code>
                 {address && (
                   <button
                     type='button'
@@ -320,7 +320,7 @@ const SendToReadestForm: React.FC<SendToReadestFormProps> = ({ onBack }) => {
                 {senders.map((sender) => (
                   <div key={sender.id} className='flex items-center gap-3 px-4 py-3'>
                     <div className='flex min-w-0 flex-1 flex-col'>
-                      <code className='line-clamp-2 break-all text-sm'>{sender.email}</code>
+                      <code className='break-all text-sm'>{sender.email}</code>
                       {sender.status === 'pending' && (
                         <span className='text-warning text-[0.8em]'>{_('Pending approval')}</span>
                       )}
@@ -386,9 +386,7 @@ const SendToReadestForm: React.FC<SendToReadestFormProps> = ({ onBack }) => {
                 {activity.map((item) => (
                   <div key={item.id} className='flex items-center gap-3 px-4 py-3'>
                     <div className='flex min-w-0 flex-1 flex-col'>
-                      <SettingLabel className='!line-clamp-1'>
-                        {item.filename || item.url || _('Untitled')}
-                      </SettingLabel>
+                      <SettingLabel>{item.filename || item.url || _('Untitled')}</SettingLabel>
                       <span className='text-base-content/60 text-[0.8em]'>
                         {item.status === 'done' && _('Added to your library')}
                         {item.status === 'pending' && _('Waiting to be processed')}

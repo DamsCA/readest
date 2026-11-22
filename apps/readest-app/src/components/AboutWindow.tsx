@@ -87,7 +87,13 @@ export const AboutWindow = () => {
         <div className='about-content flex flex-col items-center justify-center gap-4 pb-10 sm:pb-0'>
           <div className='flex flex-1 flex-col items-center justify-end gap-2 px-8 py-2'>
             <div className='mb-2 mt-6'>
-              <Image src='/icon.png' alt='App Logo' className='h-20 w-20' width={64} height={64} />
+              <Image
+                src='/icon.png'
+                alt='Lis et Lead'
+                className='h-20 w-20 rounded-2xl'
+                width={64}
+                height={64}
+              />
             </div>
             <div className='flex select-text flex-col items-center'>
               <h2 className='font-display mb-2 text-2xl font-extrabold'>{APP_DISPLAY_NAME}</h2>

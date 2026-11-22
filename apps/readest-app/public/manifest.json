@@ -7,20 +7,24 @@
   "description": "La liseuse qui traduit vos livres en français et vous les lit à voix haute.",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/icon.png",
       "type": "image/png",
-      "sizes": "256x256"
+      "sizes": "512x512",
+      "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon-maskable-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "splash_pages": null
+  "splash_pages": null,
+  "theme_color": "#16241f"
 }

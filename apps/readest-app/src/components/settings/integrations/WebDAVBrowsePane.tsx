@@ -496,7 +496,7 @@ const WebDAVBrowsePane: React.FC<WebDAVBrowsePaneProps> = ({ settings, onUpdateS
           >
             <MdArrowBack className='h-4 w-4' />
           </button>
-          <span className='truncate text-sm' title={currentPath}>
+          <span className='break-all text-sm' title={currentPath}>
             {cleanupMode
               ? _('Cleanup · {{count}} book(s)', { count: displayedEntries.length })
               : currentPath}
@@ -825,7 +825,7 @@ const WebDAVBrowsePane: React.FC<WebDAVBrowsePaneProps> = ({ settings, onUpdateS
                   ? _('Deselect all')
                   : _('Select all')}
               </button>
-              <span className='text-base-content/60 truncate text-xs'>
+              <span className='text-base-content/60 break-words text-xs'>
                 {_('{{n}} selected', { n: selected.size })}
               </span>
             </div>

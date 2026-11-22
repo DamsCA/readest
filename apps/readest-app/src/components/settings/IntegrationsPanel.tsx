@@ -278,7 +278,7 @@ const IntegrationRow: React.FC<IntegrationRowProps> = ({ icon: Icon, title, stat
       </span>
       <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
         <SettingLabel>{title}</SettingLabel>
-        <span className='text-base-content/65 truncate text-[0.85em]'>{status}</span>
+        <span className='text-base-content/65 break-words text-[0.85em]'>{status}</span>
       </div>
       <MdChevronRight className='text-base-content/50 h-5 w-5 flex-shrink-0' />
     </button>
@@ -317,7 +317,7 @@ const IntegrationToggleRow: React.FC<IntegrationToggleRowProps> = ({
       </span>
       <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
         <SettingLabel>{title}</SettingLabel>
-        <span className='text-base-content/65 truncate text-[0.85em]'>{description}</span>
+        <span className='text-base-content/65 break-words text-[0.85em]'>{description}</span>
       </div>
       <input
         type='checkbox'

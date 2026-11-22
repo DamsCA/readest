@@ -139,7 +139,7 @@ const ReadwiseForm: React.FC<ReadwiseFormProps> = ({ onBack }) => {
                 <div className='flex min-h-14 items-center justify-between gap-3 px-4'>
                   <SettingLabel>{_('Custom URL')}</SettingLabel>
                   <span
-                    className='text-base-content/60 min-w-0 truncate text-end text-sm'
+                    className='text-base-content/60 min-w-0 break-words text-end text-sm'
                     title={configuredBaseUrl}
                   >
                     {configuredBaseUrl}

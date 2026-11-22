@@ -56,14 +56,16 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
     <Wrapper
       data-setting-id={dataSettingId}
       className={clsx(
-        'flex min-h-14 justify-between gap-3 pe-4',
+        // Wraps rather than cuts: a control too wide for what is left beside its
+        // label goes under it (French labels and menus, 360 px phones).
+        'flex min-h-14 flex-wrap justify-between gap-x-3 pe-4',
         align === 'start' ? 'items-start py-3.5' : 'items-center',
         disabled && 'cursor-not-allowed opacity-50',
         asLabel && !disabled && 'cursor-pointer',
         className,
       )}
     >
-      <div className='flex min-w-0 flex-col'>
+      <div className='flex min-w-[7.5rem] flex-[1_1_0%] flex-col'>
         <SettingLabel>{label}</SettingLabel>
         {description && (
           <span className='text-base-content/65 text-[0.8em] leading-snug'>{description}</span>

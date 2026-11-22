@@ -31,7 +31,7 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
   return (
     <div>
       <SectionTitle className='mb-2'>{_('Theme Color')}</SectionTitle>
-      <div className='grid grid-cols-3 gap-4'>
+      <div className='grid grid-cols-3 gap-3'>
         {themes.map(({ name, label, colors, isCustomizale }) => (
           <button
             key={name}
@@ -48,7 +48,7 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
             // background, light or dark. The transparent border on inactive
             // cards reserves the same 2px so selecting/deselecting doesn't
             // shift the grid.
-            className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 px-2 py-4 shadow-md ${
+            className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 px-1 py-4 shadow-md ${
               themeColor === name ? 'border-current' : 'border-transparent'
             }`}
             style={{
@@ -70,7 +70,9 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
             ) : (
               <MdRadioButtonUnchecked size={iconSize24} />
             )}
-            <span className='max-w-full truncate'>{_(label)}</span>
+            <span className='max-w-full hyphens-auto break-words text-center text-sm leading-tight'>
+              {_(label)}
+            </span>
             {isCustomizale && themeColor === name && (
               <button onClick={() => onEditTheme(name)}>
                 <CgColorPicker size={iconSize16} className='absolute right-2 top-2' />
@@ -79,11 +81,13 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
           </button>
         ))}
         <button
-          className='relative flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-2 py-4 shadow-md'
+          className='relative flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-1 py-4 shadow-md'
           onClick={onCreateTheme}
         >
           <PiPlus size={iconSize24} />
-          <span className='max-w-full truncate'>{_('Custom')}</span>
+          <span className='max-w-full hyphens-auto break-words text-center text-sm leading-tight'>
+            {_('Create Theme')}
+          </span>
         </button>
       </div>
     </div>

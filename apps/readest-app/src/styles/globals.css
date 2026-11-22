@@ -975,6 +975,12 @@ textarea:focus-within,
   box-shadow: none !important;
 }
 
+/* Multi-line text boxes keep gentle corners: the theme's pill radius
+   (fields) cut the first line's ends off (settings, CSS, 22 Nov 2026). */
+textarea.textarea {
+  border-radius: 0.75rem;
+}
+
 /* Reader top bar: round buttons, a little roomier under a finger. */
 .header-bar .btn-ghost {
   border-radius: 9999px;

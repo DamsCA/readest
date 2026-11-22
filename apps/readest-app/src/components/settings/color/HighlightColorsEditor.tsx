@@ -103,7 +103,7 @@ const EditableLabel: React.FC<{
         type='button'
         onClick={() => setEditing(true)}
         className={clsx(
-          'hover:text-base-content max-w-full truncate text-xs hover:underline',
+          'hover:text-base-content max-w-full break-words text-xs hover:underline',
           value ? 'text-base-content/75' : 'text-base-content/40',
         )}
         title={value || placeholder}

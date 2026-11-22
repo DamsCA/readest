@@ -208,7 +208,7 @@ const CustomFonts: React.FC<CustomFontsProps> = ({ bookKey, onBack }) => {
           >
             <MdAdd className='h-3.5 w-3.5' />
           </span>
-          <span className='line-clamp-1'>{_('Import Font')}</span>
+          <span className='break-words'>{_('Import Font')}</span>
         </button>
 
         {importingFont && (
@@ -217,7 +217,7 @@ const CustomFonts: React.FC<CustomFontsProps> = ({ bookKey, onBack }) => {
               {typeof importingFont === 'object' ? (
                 <div
                   style={{ fontFamily: `"${importingFont.family}", sans-serif`, fontWeight: 400 }}
-                  className='text-base-content line-clamp-1 break-all'
+                  className='text-base-content break-all'
                 >
                   {importingFont.family}
                 </div>
@@ -266,7 +266,7 @@ const CustomFonts: React.FC<CustomFontsProps> = ({ bookKey, onBack }) => {
                   fontFamily: `"${family.name}", sans-serif`,
                   fontWeight: 400,
                 }}
-                className='text-base-content line-clamp-1 break-all'
+                className='text-base-content break-all'
               >
                 {family.name}
               </div>

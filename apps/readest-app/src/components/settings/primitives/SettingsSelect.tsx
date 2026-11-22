@@ -34,14 +34,14 @@ const SettingsSelect: React.FC<SettingsSelectProps> = ({
   ariaLabel,
 }) => {
   return (
-    <div className='flex max-w-[60%] items-center rounded-md focus-within:bg-transparent hover:bg-transparent'>
+    <div className='ms-auto flex max-w-full items-center rounded-md focus-within:bg-transparent hover:bg-transparent'>
       <select
         value={value}
         onChange={onChange}
         onKeyDown={(e) => e.stopPropagation()}
         disabled={disabled}
         aria-label={ariaLabel}
-        className='select settings-content h-9 min-w-0 cursor-pointer !appearance-none truncate !border-0 !bg-transparent !bg-none !pe-1 !ps-2 text-end focus:!border-0 focus:!shadow-none focus:!outline-none focus:!ring-0'
+        className='select settings-content h-9 min-w-0 cursor-pointer !appearance-none text-ellipsis !border-0 !bg-transparent !bg-none !pe-1 !ps-2 text-end focus:!border-0 focus:!shadow-none focus:!outline-none focus:!ring-0'
         style={{
           textAlignLast: 'end',
         }}

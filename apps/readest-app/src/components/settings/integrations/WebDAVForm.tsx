@@ -367,7 +367,7 @@ const WebDAVForm: React.FC<WebDAVFormProps> = ({ onBack }) => {
               }
               description={
                 syncProgressDetail ? (
-                  <span className='line-clamp-1'>{syncProgressDetail}</span>
+                  <span className='break-words'>{syncProgressDetail}</span>
                 ) : undefined
               }
             >

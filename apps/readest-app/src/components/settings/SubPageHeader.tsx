@@ -54,7 +54,7 @@ const SubPageHeader: React.FC<SubPageHeaderProps> = ({
             aria-hidden='true'
             className='text-base-content/40 h-5 w-5 flex-shrink-0'
           />
-          <span className='text-base-content/70 truncate'>{currentLabel}</span>
+          <span className='text-base-content/70 break-words'>{currentLabel}</span>
         </div>
         {rightSlot}
       </div>
