@@ -49,12 +49,17 @@ export const AUTH_OAUTH_PROVIDERS: OAuthProvider[] = (
 
 /**
  * The voice that reads first. Fish Audio's free model is meant for personal
- * use, so a voice sold on the stores cannot lean on it: this edition reads with
+ * use, so a voice sold on the stores cannot lean on it: the apps read with
  * Edge's voices (or the phone's own) by default, and Fish stays one tap away in
- * the voice menu wherever the relay is set up. Turn this on with a paid Fish
- * plan behind the subscription.
+ * the voice menu wherever the relay is set up.
+ *
+ * On the web, Fish is the paid model behind the subscription, metered by the
+ * server (api/fishaudio/tts): every reader starts with the premium voice, a
+ * free reader for the few minutes offered each month, and the reading then goes
+ * on by itself with a standard voice (useTTSControl, handleEngineDown). They
+ * hear the difference Plus makes (22 Nov 2026).
  */
-export const FISH_VOICE_BY_DEFAULT = false;
+export const FISH_VOICE_BY_DEFAULT = process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web';
 
 /**
  * Paid plans (Stripe on the web): on once the Stripe account, its prices and

@@ -223,20 +223,49 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       // Premium voices (Fish Audio) are a Plus feature on the web: the server
       // answers 402 once a free reader's monthly taste is used, 429 once a
       // subscriber's monthly hours are, and 401 to a reader not signed in.
-      if (engine === 'Fish Audio' && (status === 402 || status === 429 || status === 401)) {
+      if (engine === 'Fish Audio') {
+        // The reading never stops for this (22 Nov 2026, "the person must be able
+        // to use the voices for free, but understand that Plus is much better"):
+        // it goes on at once with the free standard voice, as the translation goes
+        // on in standard translation, and the toast says what Plus would give.
         eventDispatcher.dispatch('toast', {
           message:
             status === 402
               ? _(
-                  'Premium voices are for Plus subscribers: your free taste this month is used. Choose a standard voice, or go Plus.',
+                  'Your free premium voice minutes for this month are used: reading goes on with the standard voice. Go Plus for 2 hours of premium voice a month.',
                 )
               : status === 429
-                ? _('Your premium voice hours for this month are used. Choose a standard voice.')
-                : _('Sign in to listen with a premium voice.'),
+                ? _(
+                    'Your premium voice hours for this month are used: reading goes on with the standard voice.',
+                  )
+                : status === 401
+                  ? _(
+                      'Sign in to listen with a premium voice: reading goes on with the standard voice.',
+                    )
+                  : _(
+                      'The premium voice is unavailable right now: reading goes on with the standard voice.',
+                    ),
           type: 'info',
           timeout: 10000,
         });
-        eventDispatcher.dispatch('tts-stop', { bookKey });
+        // Out of the engine's own call stack, the same way the voice menu
+        // switches voices while reading (handleSetVoice).
+        setTimeout(async () => {
+          const controller = ttsControllerRef.current;
+          if (!controller) return;
+          const lang = controller.getSpeakingLang() || '';
+          try {
+            const standardVoice = await controller.getStandardVoiceId(lang);
+            if (!standardVoice) throw new Error('No standard voice for ' + lang);
+            await controller.stop();
+            await controller.setVoice(standardVoice, lang);
+            await controller.start();
+            eventDispatcher.dispatch('tts-voice-changed', { bookKey });
+          } catch (err) {
+            console.warn('Switch to the standard voice failed, reading stopped:', err);
+            eventDispatcher.dispatch('tts-stop', { bookKey });
+          }
+        }, 0);
         return;
       }
       const reason =

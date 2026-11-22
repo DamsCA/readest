@@ -1372,6 +1372,21 @@ export class TTSController extends EventTarget {
     return this.ttsClient.getSpeakingLang();
   }
 
+  /**
+   * A free voice for `lang` (Edge's, else the phone's or the browser's): what
+   * the reading goes on with when a premium voice is refused. An explicit id,
+   * because '' would hand the reading back to Fish where it is the default.
+   */
+  async getStandardVoiceId(lang: string): Promise<string> {
+    for (const client of [this.ttsEdgeClient, this.ttsNativeClient, this.ttsWebClient]) {
+      if (client?.initialized && client.getVoiceIdFromLang) {
+        const voiceId = await client.getVoiceIdFromLang(lang);
+        if (voiceId) return voiceId;
+      }
+    }
+    return '';
+  }
+
   setTargetLang(lang: string) {
     this.ttsTargetLang = lang;
   }

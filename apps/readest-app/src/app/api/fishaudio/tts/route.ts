@@ -117,9 +117,11 @@ export async function POST(req: NextRequest) {
 
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => '');
-    // The account's own refusals (no credit left, bad key) are not the
-    // reader's: they must not read as "go Plus".
-    const status = upstream.status === 402 || upstream.status === 401 ? 503 : upstream.status;
+    // The account's own refusals (no credit left, bad key) and Fish's
+    // concurrency limit (5 requests at once for the whole account) are not
+    // the reader's: they must not read as "go Plus" or "your hours are used".
+    // 503 makes the app go on with a standard voice.
+    const status = [401, 402, 429].includes(upstream.status) ? 503 : upstream.status;
     return new Response(detail || `Fish Audio TTS failed (${upstream.status})`, { status });
   }
 

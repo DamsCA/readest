@@ -717,10 +717,15 @@ export class FishAudioTTSClient implements TTSClient {
           const detail = await response.text().catch(() => '');
           // Account-level refusals: retrying cannot help. 429 gets ONE retry
           // first, since a burst of parallel preloads can trip it transiently.
+          // On the web, 503 is the app's own server saying the premium voices
+          // cannot be served at all (no Fish credit left, key missing): as final
+          // as a refusal, and the reading must switch voice instead of skipping
+          // every sentence one by one.
           if (
             status === 401 ||
             status === 402 ||
             status === 403 ||
+            (status === 503 && isWebAppPlatform()) ||
             (status === 429 && attempt > 0)
           ) {
             this.#reportEngineDown(status);
