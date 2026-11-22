@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** Layout shared by VoilaRead's legal pages: a scrollable column of readable text. */
+/** Layout shared by Lis et Lead's legal pages: a scrollable column of readable text. */
 const LegalPage = ({
   title,
   updated,
@@ -13,7 +13,7 @@ const LegalPage = ({
   <main className='bg-base-100 text-base-content h-screen overflow-y-auto'>
     <article className='mx-auto max-w-2xl px-6 pb-16 pt-10 text-[15px] leading-relaxed'>
       <a href='/library' className='text-base-content/70 text-sm underline'>
-        ← Retour à VoilaRead
+        ← Retour à Lis et Lead
       </a>
       <h1 className='mb-2 mt-6 text-3xl font-bold'>{title}</h1>
       <p className='text-base-content/60 mb-8 text-sm'>Dernière mise à jour : {updated}</p>

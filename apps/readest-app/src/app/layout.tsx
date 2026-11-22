@@ -11,9 +11,9 @@ import '../styles/globals.css';
 
 // Ouiread's own address (the web build bakes NEXT_PUBLIC_API_BASE_URL).
 const url = `${(process.env['NEXT_PUBLIC_API_BASE_URL'] || 'https://ouiread.damien-aure99c.workers.dev').replace(/\/$/, '')}/`;
-const title = 'VoilaRead — la liseuse qui traduit et lit vos livres';
+const title = 'Lis et Lead — la liseuse qui traduit et lit vos livres';
 const description =
-  'VoilaRead traduit vos livres en français et vous les lit à voix haute. ' +
+  'Lis et Lead traduit vos livres en français et vous les lit à voix haute. ' +
   'Votre bibliothèque vous suit sur tous vos appareils, et un livre vous est offert ' +
   'à l’inscription : « Ça marche ».';
 const previewImage = '/og-ouiread.png';
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(url),
   title: {
     default: title,
-    template: '%s | VoilaRead',
+    template: '%s | Lis et Lead',
   },
   description,
   generator: 'Next.js',
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   keywords: ['liseuse', 'livres', 'traduction', 'lecture à voix haute', 'epub', 'pdf', 'ouiread'],
   authors: [
     {
-      name: 'VoilaRead',
+      name: 'Lis et Lead',
       url,
     },
   ],
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'VoilaRead',
+    title: 'Lis et Lead',
     statusBarStyle: 'default',
   },
   openGraph: {
@@ -49,8 +49,8 @@ export const metadata: Metadata = {
     title,
     description,
     locale: 'fr_FR',
-    siteName: 'VoilaRead',
-    images: [{ url: previewImage, width: 1200, height: 630, alt: 'VoilaRead' }],
+    siteName: 'Lis et Lead',
+    images: [{ url: previewImage, width: 1200, height: 630, alt: 'Lis et Lead' }],
   },
   twitter: {
     card: 'summary_large_image',
