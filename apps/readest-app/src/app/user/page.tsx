@@ -40,6 +40,7 @@ import UsageStats from './components/UsageStats';
 import PlansComparison from './components/PlansComparison';
 import { PAYMENTS_ENABLED } from '@/services/features';
 import AccountActions from './components/AccountActions';
+import PublicProfile from './components/PublicProfile';
 import StorageManager from './components/StorageManager';
 import SharedLinksSection from './components/SharedLinksSection';
 import { SyncPassphraseSection } from './components/SyncPassphraseSection';
@@ -67,6 +68,10 @@ const ProfilePage = () => {
   const [showSyncManager, setShowSyncManager] = useState(
     () => searchParams?.get('section') === 'sync',
   );
+  const [publicProfile, setPublicProfile] = useState<{
+    pseudo: string | null;
+    avatarUrl: string | null;
+  }>({ pseudo: null, avatarUrl: null });
   const [checkoutState, setCheckoutState] = useState<CheckoutState>({
     clientSecret: '',
     sessionId: '',
@@ -266,8 +271,16 @@ const ProfilePage = () => {
     );
   }
 
-  const avatarUrl = user?.user_metadata?.['picture'] || user?.user_metadata?.['avatar_url'];
-  const userFullName = user?.user_metadata?.['full_name'] || '-';
+  // The public profile (pseudo + avatar) comes first when the reader has set
+  // it; otherwise the Google name and picture, or the start of the e-mail.
+  const avatarUrl =
+    publicProfile.avatarUrl ||
+    user?.user_metadata?.['picture'] ||
+    user?.user_metadata?.['avatar_url'];
+  const userFullName =
+    publicProfile.pseudo ||
+    user?.user_metadata?.['full_name'] ||
+    (user?.email ? user.email.split('@')[0] : '-');
   const userEmail = user?.email || '';
   const userPlanDetails =
     getPlanDetails(userProfilePlan, availablePlans) || getPlanDetails('free', availablePlans);
@@ -313,7 +326,10 @@ const ProfilePage = () => {
                   />
 
                   {!showStorageManager && !showSharedLinksManager && !showSyncManager && (
-                    <UsageStats quotas={quotas} />
+                    <>
+                      {user?.id && <PublicProfile userId={user.id} onChange={setPublicProfile} />}
+                      <UsageStats quotas={quotas} />
+                    </>
                   )}
                 </div>
 

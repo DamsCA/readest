@@ -42,6 +42,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!files || files.length < PAGE) break;
     }
 
+    // The public avatar (api/profile/avatar) is not in the files table.
+    try {
+      await deleteObject(`avatars/${user.id}`);
+    } catch (objectError) {
+      console.error('Account deletion: could not delete the avatar', objectError);
+    }
+
     const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id);
     if (error) {
       return res.status(500).json({ error: error.message });
