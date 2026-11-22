@@ -31,7 +31,7 @@ const lockUntilMidnight = (plusRequired: boolean) => {
     type: 'info',
     message: plusRequired
       ? i18n.t(
-          'Your free AI translations for today are used up: the rest is in standard translation. Go Plus for unlimited AI translation.',
+          'Your free AI translations for today are used up: the rest is in standard translation. Go Plus to read your books in AI translation.',
         )
       : i18n.t('AI translation limit reached for today: the rest is in standard translation.'),
   });

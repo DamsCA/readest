@@ -84,6 +84,7 @@ import Spinner from '@/components/Spinner';
 import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
+import WelcomeGift from './components/WelcomeGift';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
 import ImportFromFolderDialog, {
@@ -1608,6 +1609,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         onClose={() => setShowImportFromUrl(false)}
         onSubmit={handleImportBookFromUrl}
       />
+      <WelcomeGift />
       <Toast />
     </div>
   );

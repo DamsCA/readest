@@ -165,8 +165,8 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ userId, onChange }) => {
     <section className='bg-base-100 border-base-300 rounded-xl border p-5'>
       <h3 className='text-base-content text-lg font-semibold'>Votre profil public</h3>
       <p className='text-base-content/70 mt-1 text-sm'>
-        Bientôt, un classement des lecteurs : choisissez le pseudo et l’avatar que les autres
-        lecteurs verront. Votre nom et votre e-mail restent privés.
+        Bientôt, le classement des meilleurs lecteurs. Choisissez dès maintenant le pseudo et
+        l’avatar qui vous y représenteront : votre nom et votre e-mail restent privés.
       </p>
 
       <div className='mt-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start'>

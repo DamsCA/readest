@@ -70,15 +70,24 @@ const SuccessPageWithSearchParams = () => {
 
       const { session: stripeCheckoutSession, error } = await response.json();
 
+      // Stripe only sends the reader here once the checkout is done: when the
+      // check cannot confirm it yet (signed out on this browser, network), say
+      // it is being processed, never that it failed.
       if (error) {
-        setSessionStatus((prev) => ({ ...prev, status: 'failed' }));
+        setSessionStatus((prev) => ({ ...prev, status: 'processing' }));
         console.error('Session check error:', error);
         return;
       }
 
       const session = stripeCheckoutSession as Stripe.Checkout.Session;
       setSessionStatus({
-        status: session.payment_status === 'paid' ? 'completed' : 'failed',
+        // A 100 % code gives "no_payment_required", which is a success too.
+        status:
+          session.status === 'complete' ||
+          session.payment_status === 'paid' ||
+          session.payment_status === 'no_payment_required'
+            ? 'completed'
+            : 'processing',
         customerEmail: session.customer_email || session.customer_details?.email || '',
         orderId: (session.subscription || session.payment_intent || '') as string,
         planName: session.line_items?.data?.[0]?.description || '',
@@ -90,7 +99,7 @@ const SuccessPageWithSearchParams = () => {
       refresh();
     } catch (error) {
       console.error('Failed to fetch session status:', error);
-      setSessionStatus((prev) => ({ ...prev, status: 'failed' }));
+      setSessionStatus((prev) => ({ ...prev, status: 'processing' }));
     }
   };
 

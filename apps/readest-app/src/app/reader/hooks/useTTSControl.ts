@@ -232,7 +232,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           message:
             status === 402
               ? _(
-                  'Your free premium voice minutes for this month are used: reading goes on with the standard voice. Go Plus for 2 hours of premium voice a month.',
+                  'Your free taste of the premium voices is over for this month: reading goes on with the standard voice. Go Plus to listen with the premium voices.',
                 )
               : status === 429
                 ? _(

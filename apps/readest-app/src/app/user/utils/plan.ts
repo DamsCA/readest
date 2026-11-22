@@ -121,13 +121,13 @@ export function getPlanDetails(
           {
             label: _('Traduction standard'),
             description: _(
-              'Une traduction automatique classique, souvent mot à mot. Pour goûter la traduction IA : 20 paragraphes par jour.',
+              'Une traduction automatique classique. Et chaque jour, un avant-goût de la traduction IA.',
             ),
           },
           {
             label: _('Voix standard'),
             description: _(
-              'Des voix de synthèse classiques pour écouter vos livres. Pour goûter les voix premium : 2 minutes par mois.',
+              'Des voix de synthèse classiques pour écouter vos livres, et un avant-goût des voix premium.',
             ),
           },
           {
@@ -135,10 +135,6 @@ export function getPlanDetails(
             description: _('« Ça marche », dans votre bibliothèque dès l’inscription.'),
           },
         ],
-        limits: {
-          [_('Stockage en ligne')]: '500 Mo',
-          [_('Traduction IA')]: _('20 paragraphes par jour'),
-        },
       };
     case 'plus':
       return {
@@ -158,25 +154,20 @@ export function getPlanDetails(
           {
             label: _('Traduction IA naturelle'),
             description: _(
-              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ». Jusqu’à 100 000 caractères par jour, environ un livre tous les 4 jours.',
+              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ».',
             ),
           },
           {
             label: _('Voix naturelles premium'),
             description: _(
-              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres : 2 heures par mois.',
+              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres.',
             ),
           },
           {
             label: _('Stockage en ligne'),
-            description: _('Jusqu’à 5 Go pour toute votre bibliothèque.'),
+            description: _('De la place pour toute votre bibliothèque.'),
           },
         ],
-        limits: {
-          [_('Stockage en ligne')]: '5 Go',
-          [_('Traduction IA')]: _('100 000 caractères par jour'),
-          [_('Voix premium')]: _('2 heures par mois'),
-        },
       };
     case 'pro':
       return {

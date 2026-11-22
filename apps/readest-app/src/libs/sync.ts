@@ -41,7 +41,12 @@ export interface SyncResult {
   configs: BookConfigRecord[] | null;
   statBooks?: StatBookRecord[] | null;
   statPages?: StatPageRecord[] | null;
+  /** Ouiread: the welcome book was added to the library by this very pull. */
+  welcomeGift?: { hash: string } | null;
 }
+
+/** Window event (and sessionStorage key) for the welcome book's unwrapping. */
+export const WELCOME_GIFT_EVENT = 'lel-welcome-gift';
 
 export type SyncRecord = BookRecord & BookConfigRecord & BookNoteRecord;
 
@@ -85,7 +90,13 @@ export class SyncClient {
       throw new Error(`Failed to pull changes: ${error.error || res.statusText}`);
     }
 
-    return res.json();
+    const result = (await res.json()) as SyncResult;
+    if (result.welcomeGift?.hash && typeof window !== 'undefined') {
+      // Kept until the library shows it, in case it isn't listening yet.
+      sessionStorage.setItem(WELCOME_GIFT_EVENT, result.welcomeGift.hash);
+      window.dispatchEvent(new CustomEvent(WELCOME_GIFT_EVENT, { detail: result.welcomeGift }));
+    }
+    return result;
   }
 
   /**

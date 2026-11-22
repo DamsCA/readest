@@ -18,13 +18,16 @@ export default function CgvPage() {
       <h2>1. Ce que vous achetez</h2>
       <p>Lis et Lead est gratuit. L’abonnement Plus ajoute, tant qu’il est actif :</p>
       <ul>
-        <li>la traduction IA naturelle, jusqu’à 100 000 caractères par jour ;</li>
-        <li>les voix premium, jusqu’à 2 heures d’écoute par mois ;</li>
+        <li>la traduction IA naturelle ;</li>
+        <li>les voix premium ;</li>
         <li>5 Go de stockage en ligne pour votre bibliothèque.</li>
       </ul>
       <p>
-        Au-delà de ces quantités, la lecture continue avec la traduction standard et les voix
-        standard. Les quantités se renouvellent chaque jour (traduction) et chaque mois (voix).
+        Ces services sont destinés à la lecture personnelle. Pour garantir leur qualité à tous les
+        abonnés, un usage raisonnable s’applique : jusqu’à 100 000 caractères traduits par jour et 2
+        heures d’écoute en voix premium par mois. Au-delà, la lecture continue avec la traduction
+        standard et les voix standard, jusqu’au lendemain pour la traduction et jusqu’au mois
+        suivant pour les voix.
       </p>
 
       <h2>2. Prix</h2>

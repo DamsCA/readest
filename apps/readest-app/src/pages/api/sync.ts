@@ -239,8 +239,12 @@ export async function GET(req: NextRequest) {
       // Ouiread: an empty library on a first pull gets the welcome book, once
       // per account (see libs/ouiread/welcomeGift.ts).
       if (!errors['books'] && results.books?.length === 0 && since.getTime() < 1000) {
-        if (await giveWelcomeGift(user.id)) {
+        const giftHash = await giveWelcomeGift(user.id);
+        if (giftHash) {
           await queryTables('books').catch((err) => (errors['books'] = err));
+          // Tells the client the book was given just now, so it can play the
+          // gift's unwrapping once (libs/sync.ts → WelcomeGift).
+          results.welcomeGift = { hash: giftHash };
         }
       }
       // TODO: Remove this hotfix for the initial race condition for books sync

@@ -220,9 +220,10 @@ export default function BienvenuePage() {
             <ul className='mt-6 space-y-3 text-[15px]'>
               <Coche>Lecture de vos livres, sur tous vos appareils</Coche>
               <Coche>Traduction standard illimitée</Coche>
-              <Coche>Traduction IA : 20 paragraphes par jour pour goûter</Coche>
-              <Coche>Voix standard, et 2 minutes de voix premium par mois</Coche>
+              <Coche>Un avant-goût de la traduction IA chaque jour</Coche>
+              <Coche>Voix standard, et un avant-goût des voix premium</Coche>
               <Coche>« Ça marche » offert</Coche>
+              <Coche>Bientôt : le classement des meilleurs lecteurs</Coche>
             </ul>
             <LienBibliotheque
               href={INSCRIPTION}
@@ -244,9 +245,9 @@ export default function BienvenuePage() {
             <p className='text-sm text-[#f3ecdd]/60'>59,99 € par an, ou 6,99 € au mois</p>
             <ul className='mt-6 space-y-3 text-[15px]'>
               <Coche>Tout le gratuit, et en plus :</Coche>
-              <Coche>Traduction IA naturelle, environ un livre tous les 4 jours</Coche>
-              <Coche>Voix premium expressives : 2 heures par mois</Coche>
-              <Coche>5 Go pour toute votre bibliothèque</Coche>
+              <Coche>Traduction IA naturelle, comme par un traducteur humain</Coche>
+              <Coche>Voix premium expressives, proches d’un vrai lecteur</Coche>
+              <Coche>De la place pour toute votre bibliothèque</Coche>
             </ul>
             <LienBibliotheque
               href={INSCRIPTION}

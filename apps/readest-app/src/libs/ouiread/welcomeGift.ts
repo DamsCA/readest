@@ -59,11 +59,15 @@ const releaseGift = async (userId: string) => {
   await admin.from('plans').update({ welcome_gift_at: null }).eq('id', userId);
 };
 
-/** Gives the welcome book to this account if it never had it. Returns true when given now. */
-export const giveWelcomeGift = async (userId: string): Promise<boolean> => {
+/**
+ * Gives the welcome book to this account if it never had it. Returns the
+ * book's hash when given now (the library then plays the gift's unwrapping,
+ * app/library/components/WelcomeGift.tsx), null otherwise.
+ */
+export const giveWelcomeGift = async (userId: string): Promise<string | null> => {
   const bucket = process.env['R2_BUCKET_NAME'];
-  if (!bucket || process.env['OUIREAD_WELCOME_GIFT'] === 'off') return false;
-  if (!(await claimGift(userId))) return false;
+  if (!bucket || process.env['OUIREAD_WELCOME_GIFT'] === 'off') return null;
+  if (!(await claimGift(userId))) return null;
 
   try {
     const manifestResponse = await r2Storage
@@ -108,10 +112,10 @@ export const giveWelcomeGift = async (userId: string): Promise<boolean> => {
       { onConflict: 'user_id,book_hash' },
     );
     if (bookError) throw bookError;
-    return true;
+    return gift.hash;
   } catch (error) {
     console.error('Welcome gift failed', error);
     await releaseGift(userId);
-    return false;
+    return null;
   }
 };
