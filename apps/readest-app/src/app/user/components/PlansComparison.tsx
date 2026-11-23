@@ -167,7 +167,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
 
       <div
         ref={plansScrollRef}
-        className='plans-container scrollbar-hide flex items-start overflow-x-auto scroll-smooth sm:px-52'
+        className='plans-container scrollbar-hide flex items-start overflow-x-auto scroll-smooth sm:justify-center sm:overflow-visible sm:px-4'
         onTouchStart={handleTouchStart}
         style={{
           scrollSnapType: appService?.isIOSApp ? 'x mandatory' : 'none',

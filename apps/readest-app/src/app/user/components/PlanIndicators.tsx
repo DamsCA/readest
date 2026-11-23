@@ -11,7 +11,7 @@ const PlanIndicators: React.FC<PlanIndicatorsProps> = ({
   currentPlanIndex,
   onSelectPlan,
 }) => (
-  <div className='flex justify-center space-x-2 pb-6 pt-2'>
+  <div className='flex justify-center space-x-2 pb-6 pt-2 sm:hidden'>
     {allPlans.map((_, index) => (
       <button
         key={index}

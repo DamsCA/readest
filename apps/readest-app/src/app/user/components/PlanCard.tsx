@@ -46,7 +46,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
   return (
     <div
       key={plan.plan}
-      className='w-full flex-shrink-0 px-4 py-6 sm:min-w-96 sm:max-w-96'
+      className='w-full flex-shrink-0 px-4 py-6 sm:w-auto sm:max-w-96 sm:flex-1 sm:px-2'
       style={{ scrollSnapAlign: 'start' }}
     >
       <div

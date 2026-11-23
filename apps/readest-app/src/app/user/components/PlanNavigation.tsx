@@ -12,7 +12,7 @@ const PlanNavigation: React.FC<PlanNavigationProps> = ({ allPlans, currentPlan, 
   const _ = useTranslation();
 
   return (
-    <div className='bg-base-200/50 border-base-200 border-b px-6 py-4'>
+    <div className='bg-base-200/50 border-base-200 border-b px-6 py-4 sm:hidden'>
       <div className='flex items-center justify-center'>
         <div
           className='bg-base-300 flex gap-2 overflow-x-auto rounded-lg p-1'
