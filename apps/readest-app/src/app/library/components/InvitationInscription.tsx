@@ -19,6 +19,29 @@ const FERMEE = 'lel-invitation-fermee';
 const DELAI_MS = 1500;
 const INSCRIPTION_EMAIL = '/auth?inscription=1';
 
+// TikTok, Instagram and Facebook open links in their own browser, where the
+// visitor is not signed in to Google: Google then asks for the address and the
+// password, and many give up (a TikTok visitor clicked Google on 24 Nov and never
+// came back). In the phone's own browser the same visitor taps their account.
+const appliHote = () => {
+  const ua = navigator.userAgent;
+  if (/musical_ly|BytedanceWebview|TikTok|trill_/i.test(ua)) return 'TikTok';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return 'Facebook';
+  return null;
+};
+
+const lienNavigateur = () => {
+  const ua = navigator.userAgent;
+  const page = 'lisetlead.com/?depuis=appli';
+  if (/Android/i.test(ua)) {
+    const secours = encodeURIComponent(`https://${page}`);
+    return `intent://${page}#Intent;scheme=https;action=android.intent.action.VIEW;S.browser_fallback_url=${secours};end`;
+  }
+  if (/iPhone|iPad|iPod/i.test(ua)) return `x-safari-https://${page}`;
+  return `https://${page}`;
+};
+
 const doitInviter = () => {
   if (!isWebAppPlatform()) return false;
   try {
@@ -31,6 +54,7 @@ const doitInviter = () => {
 export default function InvitationInscription() {
   const { user } = useAuth();
   const [ouverte, setOuverte] = useState(false);
+  const [appli, setAppli] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -39,6 +63,7 @@ export default function InvitationInscription() {
     }
     const t = setTimeout(() => {
       if (doitInviter()) {
+        setAppli(appliHote());
         setOuverte(true);
         mesurer('invitation_vue');
       }
@@ -84,6 +109,24 @@ export default function InvitationInscription() {
           « Ça marche », le célèbre petit livre rouge de 1926, en français. Créez votre compte
           gratuit : il arrive aussitôt dans votre bibliothèque.
         </p>
+        {appli && (
+          <div className='lel-invite__appli'>
+            <p>
+              Vous êtes dans {appli}. Ouvrez la page dans votre navigateur : l’inscription s’y fait
+              en un geste.
+            </p>
+            <a
+              className='lel-invite__navigateur'
+              href={lienNavigateur()}
+              onClick={() => mesurer('invitation_navigateur')}
+            >
+              Ouvrir dans mon navigateur
+            </a>
+            <p className='lel-invite__secours'>
+              Rien ne s’ouvre ? Touchez ⋯ en haut de l’écran, puis « Ouvrir dans le navigateur ».
+            </p>
+          </div>
+        )}
         <button type='button' className='lel-invite__google' onClick={avecGoogle}>
           <FcGoogle size={22} aria-hidden='true' />
           Recevoir mon livre avec Google
@@ -164,6 +207,17 @@ const STYLES = `
 .lel-invite__google svg {
   background: #fff; border-radius: 999px; padding: 2px; width: 26px; height: 26px;
 }
+.lel-invite__appli {
+  margin-top: 1.1rem; width: 100%; padding: 0.9rem 0.9rem 0.8rem; border-radius: 1.1rem;
+  background: rgba(232, 192, 106, 0.12); border: 1px solid rgba(232, 192, 106, 0.45);
+  font-size: 0.88rem; line-height: 1.4;
+}
+.lel-invite__navigateur {
+  margin-top: 0.7rem; display: flex; align-items: center; justify-content: center;
+  min-height: 3rem; border-radius: 999px; background: #f3ecdd; color: #16241f;
+  font-weight: 700; font-size: 0.98rem; text-decoration: none;
+}
+.lel-invite__secours { margin-top: 0.55rem; font-size: 0.76rem; opacity: 0.7; }
 .lel-invite__email {
   margin-top: 0.85rem; font-size: 0.92rem; font-weight: 600;
   color: #f3ecdd; text-decoration: underline; text-underline-offset: 3px;

@@ -17,6 +17,7 @@ const EVENEMENTS = new Set([
   'invitation_google',
   'invitation_email',
   'invitation_fermee',
+  'invitation_navigateur',
   // The TikTok bio page (legenieendormi.web.app, ktaffilliate/bio-genie-endormi).
   'bio_vue',
   'bio_kevin',
@@ -41,6 +42,24 @@ const domaine = (referrer: string | null) => {
   } catch {
     return null;
   }
+};
+
+// The kind of phone and the app whose browser opened the page, read from the
+// user agent: « iPhone · TikTok », « Android », « ordinateur »…
+const appareil = (navigateur: string) => {
+  const sorte = /iPhone|iPad|iPod/i.test(navigateur)
+    ? 'iPhone'
+    : /Android/i.test(navigateur)
+      ? 'Android'
+      : 'ordinateur';
+  const appli = /musical_ly|BytedanceWebview|TikTok|trill_/i.test(navigateur)
+    ? 'TikTok'
+    : /Instagram/i.test(navigateur)
+      ? 'Instagram'
+      : /FBAN|FBAV|FB_IAB/i.test(navigateur)
+        ? 'Facebook'
+        : null;
+  return appli ? `${sorte} · ${appli}` : sorte;
 };
 
 const sha256Hex = async (value: string) => {
@@ -82,6 +101,7 @@ export async function POST(req: NextRequest) {
       provenance: domaine(texte(corps?.r, 500)),
       pays: req.headers.get('cf-ipcountry'),
       visiteur,
+      appareil: appareil(navigateur),
       connecte: corps?.c === true,
     });
   if (error) console.error('visites:', error.message);

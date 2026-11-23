@@ -15,6 +15,8 @@ create table if not exists public.visites (
   connecte boolean not null default false
 );
 create index if not exists visites_at_idx on public.visites (at desc);
+-- « iPhone · TikTok », « Android », « ordinateur »… (added 24 Nov 2026).
+alter table public.visites add column if not exists appareil text;
 alter table public.visites enable row level security;
 revoke all on public.visites from anon, authenticated;
 
@@ -99,7 +101,7 @@ as $$
     ) p), '[]'::json),
     'derniers', coalesce((select json_agg(x) from (
       select to_char(at at time zone 'Indian/Reunion', 'DD/MM HH24:MI') as heure,
-        evenement, chemin, provenance, pays
+        evenement, chemin, provenance, pays, appareil
       from public.visites where not connecte
       order by at desc limit 20
     ) x), '[]'::json)

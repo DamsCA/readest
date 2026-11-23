@@ -41,6 +41,7 @@ interface Stats {
     chemin: string | null;
     provenance: string | null;
     pays: string | null;
+    appareil: string | null;
   }[];
 }
 
@@ -50,6 +51,7 @@ const NOMS: Record<string, string> = {
   invitation_google: 'a cliqué « Recevoir mon livre avec Google »',
   invitation_email: 'a cliqué « Avec mon adresse e-mail »',
   invitation_fermee: 'a fermé la fenêtre',
+  invitation_navigateur: 'a touché « Ouvrir dans mon navigateur »',
   bio_vue: 'a ouvert la page de la bio',
   bio_kevin: 'a cliqué « Recevoir le livre gratuit » (Kevin)',
   bio_liseuse: 'a cliqué « Ouvrir Lis et Lead »',
@@ -225,7 +227,8 @@ export default function StatsPage() {
           {stats.derniers.length === 0 && <p className='lel-stats__petit'>Personne encore</p>}
           {stats.derniers.map((d, i) => (
             <p key={i} className='lel-stats__passage'>
-              <time>{d.heure}</time> Un visiteur{d.pays ? ` (${d.pays})` : ''}{' '}
+              <time>{d.heure}</time> Un visiteur
+              {d.pays || d.appareil ? ` (${[d.pays, d.appareil].filter(Boolean).join(', ')})` : ''}{' '}
               {NOMS[d.evenement] ?? d.evenement}
               {d.evenement === 'vue' && d.chemin ? ` ${d.chemin}` : ''}
               {d.provenance ? ` · venu de ${d.provenance}` : ''}
