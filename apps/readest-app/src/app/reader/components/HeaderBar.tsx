@@ -140,6 +140,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   }, []);
 
   const isHeaderCompact = headerWidth > 0 && headerWidth < 350;
+  // Too narrow even then (320 px phones): one button fewer.
+  const isHeaderTight = headerWidth > 0 && headerWidth < 330;
   const insets = window.innerWidth < 640 ? screenInsets : gridInsets;
   const isHeaderVisible = hoveredBookKey === bookKey || isDropdownOpen;
 
@@ -204,11 +206,11 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           }
         }}
       >
-        <div className='header-tools-start bg-base-100 sidebar-bookmark-toggler z-20 flex h-full min-w-0 items-center gap-x-4 pe-2 max-[350px]:gap-x-2'>
-          <div
-            className='flex min-w-0 items-center gap-x-4 overflow-x-auto max-[350px]:gap-x-2'
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
+        {/* Every button whole: on a phone the start group used to shrink and
+            scroll, and the translation button, the app's own, was squeezed out
+            of sight (23 Nov 2026). Narrow screens get tighter gaps instead. */}
+        <div className='header-tools-start bg-base-100 sidebar-bookmark-toggler z-20 flex h-full shrink-0 items-center gap-x-4 pe-2 max-[420px]:gap-x-2'>
+          <div className='flex shrink-0 items-center gap-x-4 max-[420px]:gap-x-2'>
             {!isSideBarVisible && (
               <div className='hidden sm:flex'>
                 <SidebarToggler bookKey={bookKey} />
@@ -227,7 +229,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             <BookmarkToggler bookKey={bookKey} />
             <TranslationToggler bookKey={bookKey} />
           </div>
-          {enableAnnotationQuickActions && (
+          {/* On the narrowest phones the quick action (also in the settings)
+              leaves its place to the buttons that close the book. */}
+          {enableAnnotationQuickActions && !isHeaderTight && (
             <Dropdown
               label={
                 annotationQuickAction
@@ -284,7 +288,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </div>
         </div>
 
-        <div className='header-tools-end bg-base-100 z-20 ms-auto flex h-full min-w-max items-center gap-x-4 ps-2 max-[350px]:gap-x-2'>
+        <div className='header-tools-end bg-base-100 z-20 ms-auto flex h-full min-w-max items-center gap-x-4 ps-2 max-[420px]:gap-x-2'>
           {!isHeaderCompact && <SettingsToggler bookKey={bookKey} />}
           <NotebookToggler bookKey={bookKey} />
           <Dropdown

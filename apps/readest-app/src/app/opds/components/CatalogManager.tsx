@@ -43,28 +43,28 @@ const POPULAR_CATALOGS: OPDSCatalog[] = [
     id: 'gutenberg',
     name: 'Project Gutenberg',
     url: 'https://m.gutenberg.org/ebooks.opds/',
-    description: "World's largest collection of free ebooks",
+    description: 'La plus grande bibliothèque de livres gratuits au monde, surtout en anglais',
     icon: '🏛️',
   },
   {
     id: 'standardebooks',
     name: 'Standard Ebooks',
     url: 'https://standardebooks.org/feeds/opds',
-    description: 'Free and liberated ebooks, carefully produced for the true book lover',
+    description: 'Des classiques gratuits, soigneusement mis en page',
     icon: '📚',
   },
   {
     id: 'manybooks',
     name: 'ManyBooks',
     url: 'https://manybooks.net/opds/index.php',
-    description: 'Over 50,000 free ebooks',
+    description: 'Plus de 50 000 livres gratuits',
     icon: '📖',
   },
   {
     id: 'unglue.it',
     name: 'Unglue.it',
     url: 'https://unglue.it/api/opds/',
-    description: 'Free ebooks from authors who have "unglued" their books',
+    description: 'Des livres gratuits, libérés par leurs auteurs',
     icon: '🔓',
   },
 ];
@@ -427,7 +427,10 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
             <p className='text-base-content/70 mb-4 text-sm'>
               {_('Add your first OPDS catalog to start browsing books')}
             </p>
-            <button onClick={() => setShowAddDialog(true)} className='btn btn-primary btn-sm'>
+            <button
+              onClick={() => setShowAddDialog(true)}
+              className='btn btn-primary btn-sm h-auto min-h-8 px-4 py-2 leading-snug'
+            >
               {_('Add Your First Catalog')}
             </button>
           </div>

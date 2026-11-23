@@ -85,16 +85,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
 
   return (
     <div className='relative w-full rounded-lg'>
-      <div className='mb-6 me-4 flex h-32 items-start'>
+      <div className='mb-6 me-4 flex min-h-32 items-start'>
         <div className='me-6 aspect-[28/41] h-32 shadow-lg sm:me-10'>
           <BookCover mode='list' book={book} />
         </div>
-        <div className='title-author flex h-32 flex-col justify-between'>
+        <div className='title-author flex min-h-32 flex-col justify-between'>
           <div>
-            <p className='text-base-content mb-2 line-clamp-2 break-words text-lg font-bold'>
+            <p className='text-base-content mb-2 break-words text-lg font-bold'>
               {formatTitle(book.title).replace(/\u00A0/g, ' ') || _('Untitled')}
             </p>
-            <p className='text-neutral-content line-clamp-1'>
+            <p className='text-neutral-content break-words'>
               {formatAuthors(book.author, book.primaryLanguage) || _('Unknown')}
             </p>
           </div>
@@ -253,7 +253,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 </div>
                 <div className='overflow-hidden pe-1 text-end sm:text-start'>
                   <span className='font-bold'>{_('Subjects')}</span>
-                  <p className='text-neutral-content line-clamp-3 text-sm'>
+                  <p className='text-neutral-content break-words text-sm'>
                     {formatAuthors(metadata?.subject || '') || _('Unknown')}
                   </p>
                 </div>
@@ -269,7 +269,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 </div>
                 <div className='col-span-2 overflow-hidden sm:col-span-1'>
                   <span className='font-bold'>{_('Identifier')}</span>
-                  <p className='text-neutral-content line-clamp-1 text-sm'>
+                  <p className='text-neutral-content break-all text-sm'>
                     {metadata?.identifier || _('Unknown')}
                   </p>
                 </div>

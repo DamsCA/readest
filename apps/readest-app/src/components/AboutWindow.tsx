@@ -140,19 +140,19 @@ export const AboutWindow = () => {
               })}
             </p>
             <p className='text-neutral-content text-sm'>
-              © {new Date().getFullYear()} Bilingify LLC. All rights reserved.
+              © {new Date().getFullYear()} Bilingify LLC. Tous droits réservés.
             </p>
 
             <p className='text-neutral-content text-xs'>
-              This software is licensed under the{' '}
+              Ce logiciel est distribué sous la licence{' '}
               <Link
                 href='https://www.gnu.org/licenses/agpl-3.0.html'
                 className='text-blue-500 underline'
               >
                 GNU Affero General Public License v3.0
               </Link>
-              . You are free to use, modify, and distribute this software under the terms of the
-              AGPL v3 license. Please see the license for more details.
+              . Vous êtes libre de l’utiliser, de le modifier et de le redistribuer selon les termes
+              de cette licence.
             </p>
             <p className='text-neutral-content text-xs'>
               {_('The complete source code of this version:')}{' '}

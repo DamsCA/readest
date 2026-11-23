@@ -124,7 +124,9 @@ export const FontLayoutPanel: React.FC<FontLayoutPanelProps> = ({
         min={FONT_SIZE_LIMITS.MIN}
         max={FONT_SIZE_LIMITS.MAX}
       />
-      <div className='flex w-full items-center justify-between gap-x-6'>
+      {/* One under the other: side by side on a phone, each was too narrow
+          for its two labels and its thumb. */}
+      <div className='flex w-full flex-col gap-y-4'>
         <Slider
           label={_('Page Margin')}
           initialValue={getMarginProgressValue(

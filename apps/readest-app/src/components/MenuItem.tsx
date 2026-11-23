@@ -73,7 +73,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
             </span>
           )}
           <span
-            className={clsx('mx-2 flex-1 truncate text-base sm:text-sm', labelClass)}
+            className={clsx('mx-2 flex-1 break-words text-start text-base sm:text-sm', labelClass)}
             style={{ minWidth: 0 }}
           >
             {label}
@@ -94,7 +94,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
       <div className='flex w-full'>
         {description && (
           <span
-            className='mt-1 truncate text-start text-xs text-gray-500'
+            className='mt-1 break-words text-start text-xs text-gray-500'
             style={{ minWidth: 0, paddingInlineStart: noIcon ? '0' : `${iconSize + 8}px` }}
           >
             {description}

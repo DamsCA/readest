@@ -46,6 +46,19 @@ const Slider: React.FC<SliderProps> = ({
   const [value, setValue] = useState(initialValue);
   const [isRtl, setIsRtl] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const minRef = useRef<HTMLSpanElement>(null);
+  const maxRef = useRef<HTMLSpanElement>(null);
+  const [width, setWidth] = useState(0);
+
+  // The slider's width, to tell when the thumb covers a label.
+  useEffect(() => {
+    const node = sliderRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setWidth(node.clientWidth));
+    observer.observe(node);
+    setWidth(node.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   // Default linear mapping functions
   const defaultValueToPosition = (val: number, minVal: number, maxVal: number) => {
@@ -86,6 +99,20 @@ const Slider: React.FC<SliderProps> = ({
   const percentage = valueToPos(value, min, max);
   const visualPercentage = (percentage / 100) * 95;
 
+  // A label under the thumb fades away instead of showing half covered: on a
+  // phone the line spacing thumb hid « Petit » (23 Nov 2026). Measured from the
+  // spine side of the slider, whatever the writing direction.
+  const thumbCenter = Math.max(heightPx / 2, (visualPercentage / 100) * width);
+  const along = (el: HTMLSpanElement | null, end: 'start' | 'end') => {
+    if (!el || !width) return end === 'start' ? 0 : width;
+    const left = el.offsetLeft;
+    const right = left + el.offsetWidth;
+    if (isRtl) return end === 'start' ? width - right : width - left;
+    return end === 'start' ? left : right;
+  };
+  const minCovered = width > 0 && thumbCenter - heightPx / 2 < along(minRef.current, 'end') + 4;
+  const maxCovered = width > 0 && thumbCenter + heightPx / 2 > along(maxRef.current, 'start') - 4;
+
   return (
     <div
       ref={sliderRef}
@@ -109,8 +136,20 @@ const Slider: React.FC<SliderProps> = ({
         ></div>
         {/* Min/Max labels */}
         <div className='absolute inset-0 flex items-center justify-between px-4 text-sm'>
-          {minIcon ? minIcon : <span className={`ml-2 ${minClassName}`}>{minLabel}</span>}
-          {maxIcon ? maxIcon : <span className={`mr-2 ${maxClassName}`}>{maxLabel}</span>}
+          <span
+            ref={minRef}
+            className='transition-opacity duration-150'
+            style={{ opacity: minCovered ? 0 : 1 }}
+          >
+            {minIcon ? minIcon : <span className={`ml-2 ${minClassName}`}>{minLabel}</span>}
+          </span>
+          <span
+            ref={maxRef}
+            className='transition-opacity duration-150'
+            style={{ opacity: maxCovered ? 0 : 1 }}
+          >
+            {maxIcon ? maxIcon : <span className={`mr-2 ${maxClassName}`}>{maxLabel}</span>}
+          </span>
         </div>
         {/* Thumb bubble */}
         <div

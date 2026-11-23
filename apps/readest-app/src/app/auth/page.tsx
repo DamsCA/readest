@@ -34,6 +34,38 @@ import { startGoogleSignIn } from './utils/googleWeb';
 import { authWithCustomTab, authWithSafari } from './utils/nativeAuth';
 import WindowButtons from '@/components/WindowButtons';
 
+// Lis et Lead's colours for the sign-in form (its default was a mint green):
+// the deep green of the logo, gold in the dark theme, rounded like the site.
+const BRAND_AUTH = {
+  default: {
+    colors: {
+      brand: '#16241f',
+      brandAccent: '#24382f',
+      brandButtonText: '#f3ecdd',
+      inputBorderFocus: '#16241f',
+      inputBorderHover: '#16241f66',
+      anchorTextColor: '#16241fb3',
+      anchorTextHoverColor: '#16241f',
+    },
+    radii: {
+      borderRadiusButton: '9999px',
+      buttonBorderRadius: '9999px',
+      inputBorderRadius: '12px',
+    },
+    space: { buttonPadding: '12px 16px', inputPadding: '12px 16px' },
+  },
+  dark: {
+    colors: {
+      brand: '#e8c06a',
+      brandAccent: '#f3d58f',
+      brandButtonText: '#16241f',
+      inputBorderFocus: '#e8c06a',
+      anchorTextColor: '#f3ecddb3',
+      anchorTextHoverColor: '#f3ecdd',
+    },
+  },
+};
+
 type OAuthProvider = 'google' | 'apple' | 'azure' | 'github' | 'discord';
 
 interface SingleInstancePayload {
@@ -477,6 +509,19 @@ export default function AuthPage() {
       >
         <IoArrowBack className='text-base-content' />
       </button>
+      {/* The page a new reader sees first: the app's own face, not the sign-in
+          module's default look (23 Nov 2026). */}
+      <div className='mb-8 flex flex-col items-center text-center'>
+        <img src='/icon.png?v=2' alt='' width={64} height={64} className='mb-4 rounded-2xl' />
+        <h1 className='font-display text-base-content text-2xl font-extrabold tracking-[-0.02em]'>
+          Lis et Lead
+        </h1>
+        <p className='text-base-content/70 mt-2 text-sm leading-relaxed'>
+          {authView === 'sign_up'
+            ? _('Créez votre compte : « Ça marche » vous attend dans votre bibliothèque.')
+            : _('Connectez-vous pour retrouver vos livres sur tous vos appareils.')}
+        </p>
+      </div>
       {GOOGLE_ON_OUR_DOMAIN && (
         <>
           <button
@@ -485,8 +530,8 @@ export default function AuthPage() {
               startGoogleSignIn(new URLSearchParams(window.location.search).get('redirect'))
             }
             className={clsx(
-              'flex w-full items-center justify-center gap-2 rounded border px-4 py-2.5',
-              'bg-base-100 border-base-300 hover:bg-base-200 text-base-content text-sm shadow-sm transition',
+              'flex w-full items-center justify-center gap-2 rounded-full border px-4 py-3',
+              'bg-base-100 border-base-300 hover:bg-base-200 text-base-content text-sm font-medium shadow-sm transition',
             )}
           >
             <FcGoogle className='h-5 w-5' />
@@ -499,7 +544,7 @@ export default function AuthPage() {
         key={authView}
         view={authView}
         supabaseClient={supabase}
-        appearance={{ theme: ThemeSupa }}
+        appearance={{ theme: ThemeSupa, variables: BRAND_AUTH }}
         theme={isDarkMode ? 'dark' : 'light'}
         // E-mails serve the forgotten password only (22 Nov 2026): sign-in stays
         // Google or e-mail + password, without a one-time link.

@@ -142,11 +142,9 @@ const TOCItemView = React.memo<{
         </button>
       )}
       <div
-        className='ms-2 truncate text-ellipsis'
+        className='ms-2 min-w-0 break-words'
         style={{
           maxWidth: 'calc(100% - 24px)',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
         }}
       >
         {item.label}
@@ -240,12 +238,7 @@ export const CurrentPositionRow: React.FC<{
         style={{ paddingInlineStart: `${depth * 12 + 8}px` }}
       >
         <FiBookOpen className='h-4 w-4 shrink-0' aria-hidden='true' />
-        <div
-          className='ms-2 truncate text-ellipsis'
-          style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
-        >
-          {label}
-        </div>
+        <div className='ms-2 min-w-0 break-words'>{label}</div>
         <div aria-hidden='true' className='text-base-content/50 ms-auto ps-1 text-xs sm:pe-1'>
           {page}
         </div>

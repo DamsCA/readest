@@ -320,7 +320,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
               ? _('Logged in as {{userDisplayName}}', { userDisplayName })
               : _('Logged in')
           }
-          labelClass='!max-w-40'
           aria-label={_('View account details and quota')}
           Icon={
             avatarUrl ? (
