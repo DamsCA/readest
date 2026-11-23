@@ -24,8 +24,8 @@ export default function CgvPage() {
       </ul>
       <p>
         Ces services sont destinés à la lecture personnelle. Pour garantir leur qualité à tous les
-        abonnés, un usage raisonnable s’applique : jusqu’à 100 000 caractères traduits par jour et 2
-        heures d’écoute en voix premium par mois. Au-delà, la lecture continue avec la traduction
+        abonnés, un usage raisonnable s’applique : jusqu’à 100 000 caractères traduits par jour et
+        10 heures d’écoute en voix premium par mois. Au-delà, la lecture continue avec la traduction
         standard et les voix standard, jusqu’au lendemain pour la traduction et jusqu’au mois
         suivant pour les voix.
       </p>

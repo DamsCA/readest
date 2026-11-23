@@ -993,8 +993,18 @@ textarea.textarea {
 .header-bar .btn-ghost {
   border-radius: 9999px;
 }
+/* The close-book button: as big as its neighbours, not a small dot. */
+.header-bar .window-button {
+  height: 2rem;
+  width: 2rem;
+}
+.header-bar .window-button svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
 @media (max-width: 639px) {
-  .header-bar .btn-ghost {
+  .header-bar .btn-ghost,
+  .header-bar .window-button {
     height: 2.5rem;
     min-height: 2.5rem;
     width: 2.5rem;
