@@ -339,6 +339,21 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           <IconNext size={18} aria-hidden='true' />
         </button>
       )}
+      {/* The owner's ask (23 Nov 2026): a Plus reader sees at once, in the
+          menu, that the account is premium. Opens the account page, where the
+          subscription is managed. */}
+      {PAYMENTS_ENABLED && user && (userProfilePlan === 'plus' || userProfilePlan === 'pro') && (
+        <button type='button' className='lel-plus-member' onClick={handleUpgrade}>
+          <IconAI size={22} aria-hidden='true' />
+          <span className='lel-plus-cta-text'>
+            <span className='font-display lel-plus-cta-title'>
+              {userProfilePlan === 'pro' ? _('Membre Pro') : _('Membre Plus')}
+            </span>
+            <span className='lel-plus-cta-sub'>{_('Votre compte premium est actif')}</span>
+          </span>
+          <span className='lel-plus-member-badge'>{_('Actif')}</span>
+        </button>
+      )}
       {READEST_CLOUD_ENABLED && user ? (
         <MenuItem
           label={
