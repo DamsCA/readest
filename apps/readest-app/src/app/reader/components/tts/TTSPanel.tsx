@@ -1,19 +1,19 @@
 import clsx from 'clsx';
-import React, { useEffect, useRef, useState } from 'react';
 import {
-  MdCheck,
-  MdExpandLess,
-  MdExpandMore,
-  MdFastForward,
-  MdFastRewind,
-  MdOutlineCloudDownload,
-  MdPause,
-  MdPlayArrow,
-  MdSkipNext,
-  MdSkipPrevious,
-  MdVolumeDown,
-  MdVolumeUp,
-} from 'react-icons/md';
+  IconCheck,
+  IconCollapse,
+  IconDownload,
+  IconExpand,
+  IconFastForward,
+  IconPause,
+  IconPlay,
+  IconRewind,
+  IconSkipBack,
+  IconSkipForward,
+  IconVolumeDown,
+  IconVolumeUp,
+} from '@/components/icons/lisetlead';
+import React, { useEffect, useRef, useState } from 'react';
 import { TTSVoicesGroup } from '@/services/tts';
 import { TTSUtils } from '@/services/tts/TTSUtils';
 import type { TTSHighlightGranularity } from '@/services/tts/types';
@@ -250,23 +250,23 @@ const TTSPanel = ({
       <section className='flex flex-col items-center gap-3 pt-1'>
         <div className='flex items-center justify-center gap-1 sm:gap-3'>
           <RoundButton label={_('Previous Paragraph')} onClick={() => onBackward(false)}>
-            <MdFastRewind size={26} />
+            <IconRewind size={26} />
           </RoundButton>
           <RoundButton label={_('Previous Sentence')} onClick={() => onBackward(true)}>
-            <MdSkipPrevious size={28} />
+            <IconSkipBack size={28} />
           </RoundButton>
           <RoundButton
             label={isPlaying ? _('Pause') : _('Play')}
             onClick={onTogglePlay}
             className='bg-primary text-primary-content mx-2 h-16 w-16 shadow-md'
           >
-            {isPlaying ? <MdPause size={36} /> : <MdPlayArrow size={38} />}
+            {isPlaying ? <IconPause size={36} /> : <IconPlay size={38} />}
           </RoundButton>
           <RoundButton label={_('Next Sentence')} onClick={() => onForward(true)}>
-            <MdSkipNext size={28} />
+            <IconSkipForward size={28} />
           </RoundButton>
           <RoundButton label={_('Next Paragraph')} onClick={() => onForward(false)}>
-            <MdFastForward size={26} />
+            <IconFastForward size={26} />
           </RoundButton>
         </div>
         {(remaining.length > 0 || bankedMinutes > 0) && (
@@ -276,7 +276,7 @@ const TTSPanel = ({
             ))}
             {bankedMinutes > 0 && (
               <span className='flex items-center gap-1'>
-                <MdOutlineCloudDownload size={14} />
+                <IconDownload size={14} />
                 {_('{{time}} downloaded ahead', { time: formatDuration(bankedMinutes * 60) })}
               </span>
             )}
@@ -339,7 +339,7 @@ const TTSPanel = ({
                   <span className='font-medium'>{languageLabel(lang)}</span>
                   <span className='flex min-w-0 items-center gap-1 text-sm opacity-80'>
                     <span className='truncate'>{selectedName}</span>
-                    {open ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
+                    {open ? <IconCollapse size={20} /> : <IconExpand size={20} />}
                   </span>
                 </button>
                 {open && (
@@ -364,7 +364,7 @@ const TTSPanel = ({
                           >
                             <span className='truncate'>{voice.name}</span>
                             {voice.id === selected && (
-                              <MdCheck size={20} className='text-primary shrink-0' />
+                              <IconCheck size={20} className='text-primary shrink-0' />
                             )}
                           </button>
                         ))}
@@ -387,7 +387,7 @@ const TTSPanel = ({
                   </div>
                 )}
                 <div className='mt-2 flex items-center gap-2'>
-                  <MdVolumeDown size={20} className='shrink-0 opacity-60' />
+                  <IconVolumeDown size={20} className='shrink-0 opacity-60' />
                   <input
                     type='range'
                     className='range range-xs flex-1'
@@ -398,7 +398,7 @@ const TTSPanel = ({
                     aria-label={_('Volume of {{lang}}', { lang: languageLabel(lang) })}
                     onChange={(e) => applyVolume(lang, Number(e.target.value) / 100)}
                   />
-                  <MdVolumeUp size={20} className='shrink-0 opacity-60' />
+                  <IconVolumeUp size={20} className='shrink-0 opacity-60' />
                   <span className='w-11 text-end text-xs tabular-nums opacity-70'>
                     {Math.round(volume * 100)} %
                   </span>

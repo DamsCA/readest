@@ -1,0 +1,169 @@
+/*
+ * Lis et Lead's own look (23 Nov 2026). Asked: « tout ce qui ressemble à Readest est
+ * banni… notre propre identité… des formes tendances, une ambiance tendance 2026 ».
+ *
+ * Readest's chrome is flat: grey bands stuck to the screen's edges, small radii,
+ * plain white menus, blue toggles. Lis et Lead's is made of frosted glass that
+ * lets the page show through, deep rounded shapes, bars that float as docks off
+ * the edges, sheets that rise softly over a blurred page, and the gold of the logo
+ * for whatever is chosen. It takes its colours from the reading theme (daisyUI's
+ * --b1, --bc…), so it suits every theme, dark ones included. E-ink screens keep
+ * solid surfaces and no shadows.
+ */
+
+:root {
+  --lel-gold: #e8c06a;
+  --lel-gold-soft: #f3d58f;
+  --lel-ink: #16241f;
+  --lel-ease: cubic-bezier(0.2, 0.9, 0.25, 1);
+  /* Glass, but always readable: over a page of text a lighter one let the words
+     behind show through the menu's own. */
+  --lel-glass: oklch(var(--b1) / 0.86);
+  --lel-glass-strong: oklch(var(--b1) / 0.95);
+  --lel-hairline: oklch(var(--bc) / 0.09);
+  --lel-shadow: 0 18px 48px -14px rgba(6, 12, 9, 0.32), 0 4px 12px -6px rgba(6, 12, 9, 0.18);
+  --lel-shadow-up: 0 -18px 48px -16px rgba(6, 12, 9, 0.3);
+}
+
+/* ---------- Frosted glass for everything that floats ---------- */
+
+html:not([data-eink='true']) .lel-glass,
+html:not([data-eink='true']) .dropdown-content,
+html:not([data-eink='true']) .header-bar,
+html:not([data-eink='true']) .footerbar-font-mobile,
+html:not([data-eink='true']) .footerbar-color-mobile,
+html:not([data-eink='true']) .footerbar-progress-mobile {
+  background-color: var(--lel-glass) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid var(--lel-hairline);
+  box-shadow: var(--lel-shadow) !important;
+}
+
+/* Menus and the top bar sit over the text itself: nearly opaque. */
+html:not([data-eink='true']) .dropdown-content,
+html:not([data-eink='true']) .header-bar {
+  background-color: var(--lel-glass-strong) !important;
+}
+
+/* ---------- Menus: glass cards, soft rounded rows ---------- */
+
+.dropdown-content {
+  --rounded-btn: 0.875rem;
+  border-radius: 1.375rem !important;
+  padding: 0.5rem;
+}
+
+html:not([data-eink='true']) .dropdown-content .menu li > *:not(ul):hover,
+html:not([data-eink='true']) .dropdown-content button:not(:disabled):hover {
+  background-color: oklch(var(--bc) / 0.06);
+}
+
+/* ---------- The reader's top bar: a floating capsule ---------- */
+
+html:not([data-eink='true']) .header-bar {
+  left: 0.625rem !important;
+  right: 0.625rem !important;
+  width: auto !important;
+  top: 0.5rem !important;
+  border-radius: 1.375rem;
+  padding-inline-start: 0.75rem !important;
+  padding-inline-end: 0.75rem !important;
+}
+
+html:not([data-eink='true']) .header-bar .header-tools-start,
+html:not([data-eink='true']) .header-bar .header-tools-end,
+html:not([data-eink='true']) .header-bar .header-title {
+  background-color: transparent !important;
+}
+
+/* ---------- The reader's panels: floating cards above the dock ---------- */
+
+html:not([data-eink='true']) .footerbar-font-mobile,
+html:not([data-eink='true']) .footerbar-color-mobile,
+html:not([data-eink='true']) .footerbar-progress-mobile {
+  left: 0.75rem !important;
+  right: 0.75rem !important;
+  width: auto !important;
+  border-radius: 1.75rem !important;
+  margin-bottom: 0.625rem;
+}
+
+/* ---------- Sheets: deep rounded tops over a blurred page ---------- */
+
+html:not([data-eink='true']) .dialog-overlay {
+  background-color: rgba(10, 18, 14, 0.38) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.modal-box.settings-content {
+  border-radius: 2rem 2rem 0 0 !important;
+}
+
+@media (min-width: 640px) {
+  .modal-box.settings-content {
+    border-radius: 1.75rem !important;
+  }
+}
+
+html:not([data-eink='true']) .modal-box.settings-content {
+  box-shadow: var(--lel-shadow-up), var(--lel-shadow) !important;
+}
+
+.modal-box .drag-handle > div {
+  width: 2.75rem;
+  height: 0.3125rem;
+  background-color: oklch(var(--bc) / 0.22) !important;
+}
+
+.dialog-header .font-bold,
+.dialog-header h2,
+.dialog-header h3 {
+  font-family: 'Bricolage Grotesque Variable', 'DM Sans Variable', ui-sans-serif, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Choices in gold ---------- */
+
+.toggle:checked,
+.toggle[aria-checked='true'] {
+  color: var(--lel-gold) !important;
+  border-color: var(--lel-gold) !important;
+  --tglbg: oklch(var(--b1));
+}
+
+.checkbox:checked,
+.checkbox[aria-checked='true'] {
+  --chkbg: var(--lel-gold);
+  --chkfg: var(--lel-ink);
+  border-color: var(--lel-gold) !important;
+}
+
+.radio:checked {
+  --chkbg: var(--lel-gold);
+  border-color: var(--lel-gold) !important;
+}
+
+/* The settings' sections: a row of pills, the open one in gold. */
+.dialog-tabs .btn {
+  border-radius: 9999px;
+  min-height: 2.25rem;
+  height: 2.25rem;
+  transition: background-color 0.2s var(--lel-ease);
+}
+
+.dialog-tabs .btn.btn-active {
+  background-color: color-mix(in oklab, var(--lel-gold) 28%, transparent) !important;
+  border-color: transparent;
+}
+
+/* ---------- Motion: things settle, they do not snap ---------- */
+
+.dropdown-content,
+.footerbar-font-mobile,
+.footerbar-color-mobile,
+.footerbar-progress-mobile,
+.modal-box {
+  transition-timing-function: var(--lel-ease) !important;
+}

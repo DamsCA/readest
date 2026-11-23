@@ -1,7 +1,6 @@
 import clsx from 'clsx';
+import { IconLineSpacing, IconMargins } from '@/components/icons/lisetlead';
 import React, { useCallback } from 'react';
-import { TbBoxMargin } from 'react-icons/tb';
-import { RxLineHeight } from 'react-icons/rx';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -116,10 +115,8 @@ export const FontLayoutPanel: React.FC<FontLayoutPanelProps> = ({
         label={_('Font Size')}
         initialValue={viewSettings?.defaultFontSize ?? FONT_SIZE_LIMITS.DEFAULT}
         bubbleLabel={`${viewSettings?.defaultFontSize ?? FONT_SIZE_LIMITS.DEFAULT}`}
-        minLabel='A'
-        maxLabel='A'
-        minClassName='text-xs'
-        maxClassName='text-base'
+        minLabel={_('Small')}
+        maxLabel={_('Large')}
         onChange={handleFontSizeChange}
         min={FONT_SIZE_LIMITS.MIN}
         max={FONT_SIZE_LIMITS.MAX}
@@ -133,7 +130,7 @@ export const FontLayoutPanel: React.FC<FontLayoutPanelProps> = ({
             viewSettings?.marginTopPx ?? 44,
             viewSettings?.gapPercent ?? 5,
           )}
-          bubbleElement={<TbBoxMargin size={marginIconSize} />}
+          bubbleElement={<IconMargins size={marginIconSize} />}
           minLabel={_('Small')}
           maxLabel={_('Large')}
           step={10}
@@ -142,7 +139,7 @@ export const FontLayoutPanel: React.FC<FontLayoutPanelProps> = ({
         <Slider
           label={_('Line Spacing')}
           initialValue={(viewSettings?.lineHeight ?? 1.6) * LINE_HEIGHT_LIMITS.MULTIPLIER}
-          bubbleElement={<RxLineHeight size={marginIconSize} />}
+          bubbleElement={<IconLineSpacing size={marginIconSize} />}
           minLabel={_('Small')}
           maxLabel={_('Large')}
           min={LINE_HEIGHT_LIMITS.MIN}

@@ -1,9 +1,6 @@
 import clsx from 'clsx';
+import { IconBookmark, IconChat, IconContents, IconNotebook } from '@/components/icons/lisetlead';
 import React from 'react';
-import { MdBookmarkBorder } from 'react-icons/md';
-import { IoIosList } from 'react-icons/io';
-import { PiNotePencil } from 'react-icons/pi';
-import { LuMessageSquare } from 'react-icons/lu';
 
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -69,13 +66,13 @@ const TabNavigation: React.FC<{
         >
           <div className={clsx('flex h-6 items-center p-0', isMobile ? 'm-0.5' : 'm-0')}>
             {tab === 'toc' ? (
-              <IoIosList className='mx-auto' />
+              <IconContents className='mx-auto' />
             ) : tab === 'annotations' ? (
-              <PiNotePencil className='mx-auto' />
+              <IconNotebook className='mx-auto' />
             ) : tab === 'bookmarks' ? (
-              <MdBookmarkBorder className='mx-auto' />
+              <IconBookmark className='mx-auto' />
             ) : (
-              <LuMessageSquare className='mx-auto' />
+              <IconChat className='mx-auto' />
             )}
           </div>
         </div>

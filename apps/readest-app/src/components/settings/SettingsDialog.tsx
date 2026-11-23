@@ -1,16 +1,23 @@
 import clsx from 'clsx';
+import {
+  IconAI,
+  IconAccessibility,
+  IconControl,
+  IconFont,
+  IconLayout,
+  IconSearch,
+  IconShare,
+  IconSpeaker,
+  IconTheme,
+  IconTranslate,
+} from '@/components/icons/lisetlead';
 import React, { useEffect, useRef, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCommandPalette } from '@/components/command-palette';
-import { RiFontSize, RiShareLine } from 'react-icons/ri';
-import { RiDashboardLine, RiTranslate } from 'react-icons/ri';
-import { VscSymbolColor } from 'react-icons/vsc';
-import { PiDotsThreeVerticalBold, PiRobot, PiSpeakerHigh } from 'react-icons/pi';
-import { LiaHandPointerSolid } from 'react-icons/lia';
-import { IoAccessibilityOutline } from 'react-icons/io5';
+import { PiDotsThreeVerticalBold } from 'react-icons/pi';
 import {
   MdArrowBackIosNew,
   MdArrowForwardIos,
@@ -18,7 +25,6 @@ import {
   MdChevronRight,
   MdClose,
 } from 'react-icons/md';
-import { FiSearch } from 'react-icons/fi';
 import { getDirFromUILanguage } from '@/utils/rtl';
 import { getCommandPaletteShortcut } from '@/services/environment';
 import FontPanel from './FontPanel';
@@ -83,48 +89,48 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const tabConfig = [
     {
       tab: 'Font',
-      icon: RiFontSize,
+      icon: IconFont,
       label: _('Font'),
     },
     {
       tab: 'Layout',
-      icon: RiDashboardLine,
+      icon: IconLayout,
       label: _('Layout'),
     },
     {
       tab: 'Color',
-      icon: VscSymbolColor,
+      icon: IconTheme,
       label: _('Color'),
     },
     {
       tab: 'Control',
-      icon: LiaHandPointerSolid,
+      icon: IconControl,
       label: _('Behavior'),
     },
     {
       tab: 'Language',
-      icon: RiTranslate,
+      icon: IconTranslate,
       label: _('Language'),
     },
     {
       tab: 'Integrations',
-      icon: RiShareLine,
+      icon: IconShare,
       label: _('Integrations'),
     },
     {
       tab: 'AI',
-      icon: PiRobot,
+      icon: IconAI,
       label: _('AI Assistant'),
       disabled: process.env.NODE_ENV === 'production',
     },
     {
       tab: 'TTS',
-      icon: PiSpeakerHigh,
+      icon: IconSpeaker,
       label: _('TTS'),
     },
     {
       tab: 'Custom',
-      icon: IoAccessibilityOutline,
+      icon: IconAccessibility,
       label: _('Custom'),
     },
   ] as TabConfig[];
@@ -316,7 +322,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         title={`${_('Search Settings')} (${getCommandPaletteShortcut()})`}
         className='btn btn-ghost flex h-8 min-h-8 w-8 items-center justify-center p-0'
       >
-        <FiSearch />
+        <IconSearch />
       </button>
       <Dropdown
         label={_('Settings Menu')}

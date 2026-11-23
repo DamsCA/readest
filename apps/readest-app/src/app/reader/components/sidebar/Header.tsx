@@ -1,8 +1,6 @@
 import clsx from 'clsx';
+import { IconBack, IconMenu, IconPin, IconPinned, IconSearch } from '@/components/icons/lisetlead';
 import React, { useRef } from 'react';
-import { FiSearch } from 'react-icons/fi';
-import { MdOutlineMenu, MdOutlinePushPin, MdPushPin } from 'react-icons/md';
-import { MdArrowBackIosNew } from 'react-icons/md';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useTrafficLight } from '@/hooks/useTrafficLight';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
@@ -40,7 +38,7 @@ const SidebarHeader: React.FC<{
           onClick={onClose}
           className={'btn btn-ghost btn-circle flex h-6 min-h-6 w-6 hover:bg-transparent sm:hidden'}
         >
-          <MdArrowBackIosNew size={iconSize22} />
+          <IconBack size={iconSize22} />
         </button>
         <div className='hidden sm:flex'>
           <SidebarToggler bookKey={bookKey} />
@@ -55,7 +53,7 @@ const SidebarHeader: React.FC<{
             isSearchBarVisible ? 'bg-base-300' : '',
           )}
         >
-          <FiSearch size={iconSize18} className='text-base-content' />
+          <IconSearch size={iconSize18} className='text-base-content' />
         </button>
         <Dropdown
           label={_('Book Menu')}
@@ -67,7 +65,7 @@ const SidebarHeader: React.FC<{
           menuClassName={clsx('no-triangle mt-1', window.innerWidth < 640 ? '' : '!relative')}
           buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
           containerClassName='h-8'
-          toggleButton={<MdOutlineMenu className='fill-base-content' />}
+          toggleButton={<IconMenu className='fill-base-content' />}
         >
           <BookMenu />
         </Dropdown>
@@ -80,7 +78,7 @@ const SidebarHeader: React.FC<{
               isPinned ? 'bg-base-300' : 'bg-base-300/65',
             )}
           >
-            {isPinned ? <MdPushPin size={iconSize15} /> : <MdOutlinePushPin size={iconSize15} />}
+            {isPinned ? <IconPinned size={iconSize15} /> : <IconPin size={iconSize15} />}
           </button>
         </div>
       </div>

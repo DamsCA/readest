@@ -160,6 +160,14 @@ foliate-fxl {
   pointer-events: none;
 }
 
+/* Lis et Lead's icons (components/icons/lisetlead.tsx): the soft layer of the
+   two-tone icons takes the gold of the logo, or the colour given in --lel-accent
+   (the highlighter shows the highlight colour). */
+.lel-icon path[opacity='0.2'] {
+  fill: var(--lel-accent, #e8c06a);
+  opacity: 0.85;
+}
+
 .dropdown-content {
   position: relative;
   @apply bg-base-100;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RiFontSize } from 'react-icons/ri';
+import { IconReadingSettings } from '@/components/icons/lisetlead';
 
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -22,7 +22,7 @@ const SettingsToggler: React.FC<SettingsTogglerProps> = ({ bookKey }) => {
   };
   return (
     <Button
-      icon={<RiFontSize className='text-base-content' />}
+      icon={<IconReadingSettings className='text-base-content' />}
       onClick={handleToggleSettings}
       label={_('Font & Layout')}
     ></Button>

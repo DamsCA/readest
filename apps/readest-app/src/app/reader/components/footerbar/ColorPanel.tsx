@@ -1,6 +1,6 @@
 import clsx from 'clsx';
+import { IconSun } from '@/components/icons/lisetlead';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { PiSun } from 'react-icons/pi';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -120,8 +120,8 @@ export const ColorPanel: React.FC<ColorPanelProps> = ({
           label={_('Screen Brightness')}
           initialValue={screenBrightnessValue}
           bubbleLabel={`${screenBrightnessValue}`}
-          minIcon={<PiSun size={16} />}
-          maxIcon={<PiSun size={24} />}
+          minIcon={<IconSun size={16} />}
+          maxIcon={<IconSun size={24} />}
           onChange={handleScreenBrightnessChange}
           min={SCREEN_BRIGHTNESS_LIMITS.MIN}
           max={SCREEN_BRIGHTNESS_LIMITS.MAX}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RiBookmarkLine, RiBookmarkFill } from 'react-icons/ri';
+import { IconBookmark, IconBookmarkFilled } from '@/components/icons/lisetlead';
 
 import { useSettingsStore } from '@/store/settingsStore';
 import { useBookDataStore } from '@/store/bookDataStore';
@@ -112,9 +112,9 @@ const BookmarkToggler: React.FC<BookmarkTogglerProps> = ({ bookKey }) => {
     <Button
       icon={
         isBookmarked ? (
-          <RiBookmarkFill className='text-base-content' size={iconSize18} />
+          <IconBookmarkFilled className='text-base-content' size={iconSize18} />
         ) : (
-          <RiBookmarkLine className='text-base-content' size={iconSize18} />
+          <IconBookmark className='text-base-content' size={iconSize18} />
         )
       }
       onClick={toggleBookmark}

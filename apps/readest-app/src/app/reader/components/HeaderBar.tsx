@@ -1,8 +1,11 @@
 import clsx from 'clsx';
+import {
+  IconBack,
+  IconHighlight,
+  IconLibrary,
+  IconViewOptions,
+} from '@/components/icons/lisetlead';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { VscLibrary } from 'react-icons/vsc';
-import { MdOutlineMenu } from 'react-icons/md';
-import { ChevronLeft } from 'lucide-react';
 
 import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
@@ -20,7 +23,6 @@ import { getHighlightColorHex } from '../utils/annotatorUtil';
 import { annotationToolQuickActions } from './annotator/AnnotationTools';
 import { AnnotationToolType } from '@/types/annotator';
 import { saveViewSettings } from '@/helpers/settings';
-import { HighlighterIcon } from '@/components/HighlighterIcon';
 import Dropdown from '@/components/Dropdown';
 import ModalPortal from '@/components/ModalPortal';
 import WindowButtons from '@/components/WindowButtons';
@@ -63,7 +65,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const { isTrafficLightVisible } = useTrafficLight(headerRef);
   const { trafficLightInFullscreen, setTrafficLightVisibility } = useTrafficLightStore();
   const { bookKeys, hoveredBookKey } = useReaderStore();
-  const { isDarkMode, systemUIVisible, statusBarHeight } = useThemeStore();
+  const { systemUIVisible, statusBarHeight } = useThemeStore();
   const { isSideBarVisible, getIsSideBarVisible } = useSidebarStore();
   const { getView, getViewSettings, setHoveredBookKey } = useReaderStore();
   const { getBookData, getConfig } = useBookDataStore();
@@ -223,8 +225,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               onClick={onGoToLibrary}
             >
               {/* A back arrow on a phone, the library shelf on a wide screen. */}
-              <ChevronLeft aria-hidden='true' className='h-5 w-5 sm:hidden' />
-              <VscLibrary size={iconSize18} className='fill-base-content hidden sm:block' />
+              <IconBack aria-hidden='true' className='h-5 w-5 sm:hidden' />
+              <IconLibrary size={iconSize18} className='fill-base-content hidden sm:block' />
             </button>
             <BookmarkToggler bookKey={bookKey} />
             <TranslationToggler bookKey={bookKey} />
@@ -246,13 +248,14 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               )}
               toggleButton={
                 annotationQuickAction === 'highlight' || annotationQuickAction === null ? (
-                  <HighlighterIcon
+                  <IconHighlight
                     size={iconSize18}
-                    tipColor={annotationQuickAction === null ? '#8F8F8F' : highlightHexColor}
-                    tipStyle={{
-                      opacity: annotationQuickAction === null ? 0.5 : 0.8,
-                      mixBlendMode: isDarkMode ? 'screen' : 'multiply',
-                    }}
+                    style={
+                      {
+                        '--lel-accent':
+                          annotationQuickAction === null ? undefined : highlightHexColor,
+                      } as React.CSSProperties
+                    }
                   />
                 ) : (
                   <AnnotationToolQuickActionIcon size={iconSize18} />
@@ -296,7 +299,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             containerClassName='h-8'
             className='exclude-title-bar-mousedown dropdown-bottom dropdown-end'
             buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0 mt-0'
-            toggleButton={<MdOutlineMenu />}
+            toggleButton={<IconViewOptions />}
             onToggle={handleToggleDropdown}
           >
             <ViewMenu

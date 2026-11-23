@@ -1,15 +1,22 @@
 import clsx from 'clsx';
 import {
+  IconAutoTheme,
+  IconCloudSync,
+  IconMoon,
+  IconSettings,
+  IconSun,
+  IconSync,
+  IconSyncProblem,
+  IconUser,
+  IconUserChecked,
+} from '@/components/icons/lisetlead';
+import {
   PAYMENTS_ENABLED,
   READEST_CLOUD_ENABLED,
   READEST_PREMIUM_ENABLED,
 } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PiUserCircle, PiUserCircleCheck, PiGear } from 'react-icons/pi';
-import { PiSun, PiMoon } from 'react-icons/pi';
-import { TbSunMoon } from 'react-icons/tb';
-import { MdCloudSync, MdSync, MdSyncProblem } from 'react-icons/md';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
@@ -323,16 +330,16 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           aria-label={_('View account details and quota')}
           Icon={
             avatarUrl ? (
-              <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={PiUserCircleCheck} />
+              <UserAvatar url={avatarUrl} size={iconSize} DefaultIcon={IconUserChecked} />
             ) : (
-              PiUserCircleCheck
+              IconUserChecked
             )
           }
         >
           <ul className='ms-0 flex flex-col ps-0 before:hidden'>
             <MenuItem
               label={_('Cloud File Transfers')}
-              Icon={MdCloudSync}
+              Icon={IconCloudSync}
               description={
                 hasActiveTransfers
                   ? _('{{activeCount}} active, {{pendingCount}} pending', {
@@ -353,7 +360,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
                     })
                   : _('Never synced')
               }
-              Icon={user ? MdSync : MdSyncProblem}
+              Icon={user ? IconSync : IconSyncProblem}
               labelClass='ps-2 pe-1 !mx-0'
               iconClassName={user && isSyncing ? 'animate-reverse-spin' : ''}
               onClick={handleSyncLibrary}
@@ -371,7 +378,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
           </ul>
         </MenuItem>
       ) : READEST_CLOUD_ENABLED ? (
-        <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
+        <MenuItem label={_('Sign In')} Icon={IconUser} onClick={handleUserLogin}></MenuItem>
       ) : null}
 
       {READEST_CLOUD_ENABLED && (
@@ -427,10 +434,10 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       )}
       <MenuItem
         label={themeModeLabel}
-        Icon={themeMode === 'dark' ? PiMoon : themeMode === 'light' ? PiSun : TbSunMoon}
+        Icon={themeMode === 'dark' ? IconMoon : themeMode === 'light' ? IconSun : IconAutoTheme}
         onClick={cycleThemeMode}
       />
-      <MenuItem label={_('Settings')} Icon={PiGear} onClick={openSettingsDialog} />
+      <MenuItem label={_('Settings')} Icon={IconSettings} onClick={openSettingsDialog} />
       <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('Advanced Settings')}>
         <ul className='ms-0 flex flex-col ps-0 before:hidden'>

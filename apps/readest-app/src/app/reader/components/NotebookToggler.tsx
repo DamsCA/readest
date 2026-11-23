@@ -1,5 +1,5 @@
 import React from 'react';
-import { RiQuillPenLine } from 'react-icons/ri';
+import { IconNotebook } from '@/components/icons/lisetlead';
 
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
@@ -36,9 +36,9 @@ const NotebookToggler: React.FC<NotebookTogglerProps> = ({ bookKey }) => {
     <Button
       icon={
         sideBarBookKey == bookKey && isNotebookVisible ? (
-          <RiQuillPenLine size={iconSize18} className='text-base-content' />
+          <IconNotebook size={iconSize18} className='text-base-content' />
         ) : (
-          <RiQuillPenLine size={iconSize18} className='text-base-content' />
+          <IconNotebook size={iconSize18} className='text-base-content' />
         )
       }
       onClick={handleToggleSidebar}

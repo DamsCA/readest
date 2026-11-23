@@ -1,7 +1,14 @@
 import clsx from 'clsx';
+import {
+  IconClose,
+  IconMenu,
+  IconPlus,
+  IconSearch,
+  IconSelect,
+  IconSelected,
+} from '@/components/icons/lisetlead';
 import React, { useCallback, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Menu, Plus, Search, SquareCheckBig, SquareDashed, X } from 'lucide-react';
 
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -139,7 +146,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               onClick={() => (isSearchOpen ? closeSearch() : setIsSearchOpen(true))}
               className={ROUND_BUTTON}
             >
-              <Search aria-hidden='true' className='h-5 w-5' />
+              <IconSearch aria-hidden='true' className='h-5 w-5' />
             </button>
             {!isMobile && (
               <button
@@ -149,14 +156,14 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
                 title={_('Select Books')}
                 className={ROUND_BUTTON}
               >
-                <SquareDashed aria-hidden='true' className='h-5 w-5' />
+                <IconSelect aria-hidden='true' className='h-5 w-5' />
               </button>
             )}
             <Dropdown
               label={_('Settings Menu')}
               className='dropdown-bottom dropdown-end'
               buttonClassName={ROUND_BUTTON}
-              toggleButton={<Menu role='none' className='h-5 w-5' />}
+              toggleButton={<IconMenu role='none' className='h-5 w-5' />}
             >
               <SettingsMenu onPullLibrary={onPullLibrary} />
             </Dropdown>
@@ -164,7 +171,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               label={_('Import Books')}
               className='dropdown-bottom dropdown-end'
               buttonClassName='bg-base-content text-base-100 flex h-11 min-h-11 w-11 items-center justify-center rounded-full border-0 p-0'
-              toggleButton={<Plus role='none' className='h-5 w-5' />}
+              toggleButton={<IconPlus role='none' className='h-5 w-5' />}
             >
               <ImportMenu
                 onImportBooksFromFiles={onImportBooksFromFiles}
@@ -190,13 +197,13 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             aria-label={_('Select Books')}
             className={clsx(ROUND_BUTTON, 'exclude-title-bar-mousedown shrink-0')}
           >
-            <SquareCheckBig aria-hidden='true' className='h-5 w-5' />
+            <IconSelected aria-hidden='true' className='h-5 w-5' />
           </button>
         )}
       </div>
       {isSearchOpen && (
         <div className='exclude-title-bar-mousedown relative mx-4 mb-1 flex items-center'>
-          <Search
+          <IconSearch
             aria-hidden='true'
             className='text-neutral-content pointer-events-none absolute start-4 h-4 w-4'
           />
@@ -224,7 +231,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             aria-label={_('Clear Search')}
             className='text-neutral-content absolute end-1 flex h-11 w-11 items-center justify-center rounded-full'
           >
-            <X aria-hidden='true' className='h-4 w-4' />
+            <IconClose aria-hidden='true' className='h-4 w-4' />
           </button>
         </div>
       )}

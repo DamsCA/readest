@@ -8,6 +8,7 @@ import Providers from '@/components/Providers';
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/bricolage-grotesque';
 import '../styles/globals.css';
+import '../styles/identity.css';
 
 // Ouiread's own address (the web build bakes NEXT_PUBLIC_API_BASE_URL).
 const url = `${(process.env['NEXT_PUBLIC_API_BASE_URL'] || 'https://ouiread.damien-aure99c.workers.dev').replace(/\/$/, '')}/`;

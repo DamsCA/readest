@@ -1,8 +1,13 @@
 import clsx from 'clsx';
+import {
+  IconFirst,
+  IconLast,
+  IconNext,
+  IconPrevious,
+  IconRedo,
+  IconUndo,
+} from '@/components/icons/lisetlead';
 import React, { useCallback, useEffect } from 'react';
-import { RiArrowLeftSLine, RiArrowRightSLine } from 'react-icons/ri';
-import { RiArrowGoBackLine, RiArrowGoForwardLine } from 'react-icons/ri';
-import { RiArrowLeftDoubleLine, RiArrowRightDoubleLine } from 'react-icons/ri';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -88,50 +93,34 @@ export const NavigationPanel: React.FC<NavigationPanelProps> = ({
       </div>
       <div className='flex w-full items-center justify-between gap-x-6'>
         <Button
-          icon={getNavigationIcon(
-            viewSettings?.rtl,
-            <RiArrowLeftDoubleLine />,
-            <RiArrowRightDoubleLine />,
-          )}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconFirst />, <IconLast />)}
           onClick={navigationHandlers.onPrevSection}
           label={_('Previous Section')}
         />
         <Button
-          icon={getNavigationIcon(viewSettings?.rtl, <RiArrowLeftSLine />, <RiArrowRightSLine />)}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconPrevious />, <IconNext />)}
           onClick={navigationHandlers.onPrevPage}
           label={_('Previous Page')}
         />
         <Button
-          icon={getNavigationIcon(
-            viewSettings?.rtl,
-            <RiArrowGoBackLine />,
-            <RiArrowGoForwardLine />,
-          )}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconUndo />, <IconRedo />)}
           onClick={navigationHandlers.onGoBack}
           label={_('Go Back')}
           disabled={!view?.history.canGoBack}
         />
         <Button
-          icon={getNavigationIcon(
-            viewSettings?.rtl,
-            <RiArrowGoForwardLine />,
-            <RiArrowGoBackLine />,
-          )}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconRedo />, <IconUndo />)}
           onClick={navigationHandlers.onGoForward}
           label={_('Go Forward')}
           disabled={!view?.history.canGoForward}
         />
         <Button
-          icon={getNavigationIcon(viewSettings?.rtl, <RiArrowRightSLine />, <RiArrowLeftSLine />)}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconNext />, <IconPrevious />)}
           onClick={navigationHandlers.onNextPage}
           label={_('Next Page')}
         />
         <Button
-          icon={getNavigationIcon(
-            viewSettings?.rtl,
-            <RiArrowRightDoubleLine />,
-            <RiArrowLeftDoubleLine />,
-          )}
+          icon={getNavigationIcon(viewSettings?.rtl, <IconLast />, <IconFirst />)}
           onClick={navigationHandlers.onNextSection}
           label={_('Next Section')}
         />

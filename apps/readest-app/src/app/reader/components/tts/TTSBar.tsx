@@ -1,14 +1,14 @@
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
 import {
-  MdPlayArrow,
-  MdOutlinePause,
-  MdFastRewind,
-  MdFastForward,
-  MdSkipPrevious,
-  MdSkipNext,
-  MdOutlineCloudDownload,
-} from 'react-icons/md';
+  IconDownload,
+  IconFastForward,
+  IconPause,
+  IconPlay,
+  IconRewind,
+  IconSkipBack,
+  IconSkipForward,
+} from '@/components/icons/lisetlead';
+import { useEffect, useState } from 'react';
 import { Insets } from '@/types/misc';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
@@ -84,7 +84,7 @@ const TTSBar = ({
             className='text-base-content/60 pointer-events-none flex items-center gap-1 pt-1 text-xs'
             title='Audio déjà téléchargé en avance (lecture hors-ligne possible)'
           >
-            <MdOutlineCloudDownload size={14} />
+            <IconDownload size={14} />
             <span>{bankedLabel}</span>
           </div>
         )}
@@ -95,7 +95,7 @@ const TTSBar = ({
             title={_('Previous Paragraph')}
             aria-label={_('Previous Paragraph')}
           >
-            <MdFastRewind size={iconSize32} />
+            <IconRewind size={iconSize32} />
           </button>
           <button
             onClick={onBackward.bind(null, true)}
@@ -103,7 +103,7 @@ const TTSBar = ({
             title={_('Previous Sentence')}
             aria-label={_('Previous Sentence')}
           >
-            <MdSkipPrevious size={iconSize32} />
+            <IconSkipBack size={iconSize32} />
           </button>
           <button
             onClick={onTogglePlay}
@@ -111,7 +111,7 @@ const TTSBar = ({
             title={isPlaying ? _('Pause') : _('Play')}
             aria-label={isPlaying ? _('Pause') : _('Play')}
           >
-            {isPlaying ? <MdOutlinePause size={iconSize48} /> : <MdPlayArrow size={iconSize48} />}
+            {isPlaying ? <IconPause size={iconSize48} /> : <IconPlay size={iconSize48} />}
           </button>
           <button
             onClick={onForward.bind(null, true)}
@@ -119,7 +119,7 @@ const TTSBar = ({
             title={_('Next Sentence')}
             aria-label={_('Next Sentence')}
           >
-            <MdSkipNext size={iconSize32} />
+            <IconSkipForward size={iconSize32} />
           </button>
           <button
             onClick={onForward.bind(null, false)}
@@ -127,7 +127,7 @@ const TTSBar = ({
             title={_('Next Paragraph')}
             aria-label={_('Next Paragraph')}
           >
-            <MdFastForward size={iconSize32} />
+            <IconFastForward size={iconSize32} />
           </button>
         </div>
       </div>

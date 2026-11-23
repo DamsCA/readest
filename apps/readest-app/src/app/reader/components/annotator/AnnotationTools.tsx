@@ -1,13 +1,15 @@
 import { IconType } from 'react-icons';
-import { FiSearch } from 'react-icons/fi';
-import { FiCopy } from 'react-icons/fi';
-import { FiShare } from 'react-icons/fi';
-import { PiHighlighterFill } from 'react-icons/pi';
-import { BsPencilSquare } from 'react-icons/bs';
-import { BsTranslate } from 'react-icons/bs';
-import { TbHexagonLetterD } from 'react-icons/tb';
-import { FaHeadphones } from 'react-icons/fa6';
-import { IoIosBuild } from 'react-icons/io';
+import {
+  IconAnnotate,
+  IconCopy,
+  IconDictionary,
+  IconHighlight,
+  IconListen,
+  IconSearch,
+  IconShare,
+  IconTools,
+  IconTranslate,
+} from '@/components/icons/lisetlead';
 import { AnnotationToolType } from '@/types/annotator';
 import { stubTranslation as _ } from '@/utils/misc';
 
@@ -40,61 +42,61 @@ export const annotationToolButtons = createAnnotationToolButtons([
     type: 'copy',
     label: _('Copy'),
     tooltip: _('Copy text after selection'),
-    Icon: FiCopy,
+    Icon: IconCopy,
     quickAction: true,
   },
   {
     type: 'highlight',
     label: _('Highlight'),
     tooltip: _('Highlight text after selection'),
-    Icon: PiHighlighterFill,
+    Icon: IconHighlight,
     quickAction: true,
   },
   {
     type: 'annotate',
     label: _('Annotate'),
     tooltip: _('Annotate text after selection'),
-    Icon: BsPencilSquare,
+    Icon: IconAnnotate,
   },
   {
     type: 'search',
     label: _('Search'),
     tooltip: _('Search text after selection'),
-    Icon: FiSearch,
+    Icon: IconSearch,
     quickAction: true,
   },
   {
     type: 'dictionary',
     label: _('Dictionary'),
     tooltip: _('Look up text in dictionary after selection'),
-    Icon: TbHexagonLetterD,
+    Icon: IconDictionary,
     quickAction: true,
   },
   {
     type: 'translate',
     label: _('Translate'),
     tooltip: _('Translate text after selection'),
-    Icon: BsTranslate,
+    Icon: IconTranslate,
     quickAction: true,
   },
   {
     type: 'tts',
     label: _('Speak'),
     tooltip: _('Read text aloud after selection'),
-    Icon: FaHeadphones,
+    Icon: IconListen,
     quickAction: true,
   },
   {
     type: 'proofread',
     label: _('Proofread'),
     tooltip: _('Proofread text after selection'),
-    Icon: IoIosBuild,
+    Icon: IconTools,
   },
   {
     type: 'share',
     label: _('Share'),
     tooltip: _('Share text after selection'),
-    Icon: FiShare,
+    Icon: IconShare,
     quickAction: true,
   },
 ]);

@@ -117,15 +117,15 @@ const Slider: React.FC<SliderProps> = ({
     <div
       ref={sliderRef}
       aria-label={label}
-      className={`slider bg-base-200 mx-auto w-full rounded-xl ${className}`}
+      className={`slider mx-auto w-full rounded-full ${className}`}
       dir={isRtl ? 'rtl' : undefined}
     >
       <div className='relative' style={{ height: `${heightPx}px` }}>
         {/* Background track */}
-        <div className='bg-base-300/40 absolute h-full w-full rounded-full'></div>
+        <div className='bg-base-content/[0.07] absolute h-full w-full rounded-full'></div>
         {/* Filled portion */}
         <div
-          className='bg-base-300 absolute h-full rounded-full'
+          className='absolute h-full rounded-full bg-gradient-to-r from-[#e8c06a]/45 to-[#e8c06a]/80'
           style={{
             width:
               visualPercentage > 0
@@ -161,7 +161,7 @@ const Slider: React.FC<SliderProps> = ({
           }}
         >
           <div
-            className={`bg-base-200 flex h-full items-center justify-center rounded-full text-xs shadow-md ${bubbleClassName}`}
+            className={`bg-base-100 flex h-full items-center justify-center rounded-full text-xs font-semibold shadow-[0_4px_14px_rgba(6,12,9,0.22)] ring-1 ring-black/5 ${bubbleClassName}`}
             style={{ width: `${heightPx}px` }}
           >
             {bubbleElement || bubbleLabel}

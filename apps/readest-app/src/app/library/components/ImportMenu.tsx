@@ -1,6 +1,5 @@
 import clsx from 'clsx';
-import { MdLink, MdRssFeed } from 'react-icons/md';
-import { IoFileTray } from 'react-icons/io5';
+import { IconFromFile, IconLink, IconOnlineLibrary } from '@/components/icons/lisetlead';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import MenuItem from '@/components/MenuItem';
@@ -51,26 +50,26 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
     >
       <MenuItem
         label={_('From Local File')}
-        Icon={<IoFileTray className='h-5 w-5' />}
+        Icon={<IconFromFile className='h-5 w-5' />}
         onClick={handleImportFromFiles}
       />
       {onImportBooksFromDirectory && (
         <MenuItem
           label={_('From Directory')}
-          Icon={<IoFileTray className='h-5 w-5' />}
+          Icon={<IconFromFile className='h-5 w-5' />}
           onClick={handleImportFromDirectory}
         />
       )}
       {onImportBookFromUrl && (
         <MenuItem
           label={_('From Web URL')}
-          Icon={<MdLink className='h-5 w-5' />}
+          Icon={<IconLink className='h-5 w-5' />}
           onClick={handleImportFromUrl}
         />
       )}
       <MenuItem
         label={appService?.isOnlineCatalogsAccessible ? _('Online Library') : _('OPDS Catalogs')}
-        Icon={<MdRssFeed className='h-5 w-5' />}
+        Icon={<IconOnlineLibrary className='h-5 w-5' />}
         onClick={handleOpenCatalogManager}
       />
     </Menu>

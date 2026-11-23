@@ -1,6 +1,12 @@
 import clsx from 'clsx';
+import {
+  IconContents,
+  IconListen,
+  IconProgress,
+  IconText,
+  IconTheme,
+} from '@/components/icons/lisetlead';
 import React from 'react';
-import { Headphones, ListTree, Palette, SlidersHorizontal, Type } from 'lucide-react';
 import { useEnv } from '@/context/EnvContext';
 import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -34,7 +40,7 @@ const Tab: React.FC<TabProps> = ({ label, icon, active, onClick }) => (
     <span
       className={clsx(
         'flex h-[30px] w-14 items-center justify-center rounded-full transition-colors',
-        active ? 'bg-neutral text-base-content' : 'text-neutral-content',
+        active ? 'text-base-content bg-[#e8c06a]/30' : 'text-neutral-content',
       )}
     >
       {icon}
@@ -72,7 +78,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   return (
     <div
       className={clsx(
-        'not-eink:bg-base-100 eink:bg-base-100 z-30 mt-auto flex w-full justify-between px-2 pt-1.5',
+        // A glass dock floating off the screen's edges (Lis et Lead's look).
+        'lel-glass not-eink:mx-3 not-eink:mb-2 not-eink:w-auto not-eink:rounded-[1.75rem]',
+        'eink:bg-base-100 eink:w-full z-30 mt-auto flex justify-between px-2 pt-1.5',
         'eink:border-base-content eink:border-t',
         !forceMobileLayout && 'sm:hidden',
       )}
@@ -85,32 +93,32 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       {isSideBarVisible && isSideBarPinned ? null : (
         <Tab
           label={_('Contents')}
-          icon={<ListTree aria-hidden='true' className={iconClass} />}
+          icon={<IconContents aria-hidden='true' className={iconClass} />}
           active={actionTab === 'toc'}
           onClick={() => onSetActionTab('toc')}
         />
       )}
       <Tab
         label={_('Theme')}
-        icon={<Palette aria-hidden='true' className={iconClass} />}
+        icon={<IconTheme aria-hidden='true' className={iconClass} />}
         active={actionTab === 'color'}
         onClick={() => onSetActionTab('color')}
       />
       <Tab
         label={_('Progress')}
-        icon={<SlidersHorizontal aria-hidden='true' className={iconClass} />}
+        icon={<IconProgress aria-hidden='true' className={iconClass} />}
         active={actionTab === 'progress'}
         onClick={() => onSetActionTab('progress')}
       />
       <Tab
         label={_('Text')}
-        icon={<Type aria-hidden='true' className={iconClass} />}
+        icon={<IconText aria-hidden='true' className={iconClass} />}
         active={actionTab === 'font'}
         onClick={() => onSetActionTab('font')}
       />
       <Tab
         label={_('Listen')}
-        icon={<Headphones aria-hidden='true' className={iconClass} />}
+        icon={<IconListen aria-hidden='true' className={iconClass} />}
         active={!!viewState?.ttsEnabled}
         onClick={() => onSetActionTab('tts')}
       />

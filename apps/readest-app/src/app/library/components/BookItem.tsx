@@ -1,12 +1,13 @@
 import clsx from 'clsx';
+import {
+  IconChecked,
+  IconDownload,
+  IconInfo,
+  IconUnchecked,
+  IconUpload,
+} from '@/components/icons/lisetlead';
 import { READEST_CLOUD_ENABLED } from '@/services/features';
 import { useEffect, useState } from 'react';
-import { MdCheckCircle, MdCheckCircleOutline } from 'react-icons/md';
-import {
-  LiaCloudUploadAltSolid,
-  LiaCloudDownloadAltSolid,
-  LiaInfoCircleSolid,
-} from 'react-icons/lia';
 
 import { Book } from '@/types/book';
 import { useEnv } from '@/context/EnvContext';
@@ -106,9 +107,9 @@ const BookItem: React.FC<BookItemProps> = ({
         {isSelectMode && (
           <div className='absolute bottom-1 right-1'>
             {bookSelected ? (
-              <MdCheckCircle className='fill-blue-500' />
+              <IconChecked className='fill-blue-500' />
             ) : (
-              <MdCheckCircleOutline className='fill-gray-300 drop-shadow-sm' />
+              <IconUnchecked className='fill-gray-300 drop-shadow-sm' />
             )}
           </div>
         )}
@@ -169,7 +170,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 }}
               >
                 <div className='pt-[2px] sm:pt-[1px]'>
-                  <LiaInfoCircleSolid size={iconSize15} />
+                  <IconInfo size={iconSize15} />
                 </div>
               </button>
             )}
@@ -206,12 +207,8 @@ const BookItem: React.FC<BookItemProps> = ({
                     }
                   }}
                 >
-                  {!book.uploadedAt && settings.autoUpload && (
-                    <LiaCloudUploadAltSolid size={iconSize15} />
-                  )}
-                  {book.uploadedAt && !book.downloadedAt && (
-                    <LiaCloudDownloadAltSolid size={iconSize15} />
-                  )}
+                  {!book.uploadedAt && settings.autoUpload && <IconUpload size={iconSize15} />}
+                  {book.uploadedAt && !book.downloadedAt && <IconDownload size={iconSize15} />}
                 </button>
               )
             )}
