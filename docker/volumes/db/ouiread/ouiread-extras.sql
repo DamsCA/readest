@@ -112,3 +112,4 @@ GRANT EXECUTE ON FUNCTION public.ouiread_storage_usage(uuid) TO service_role;
 -- La fonction du déclencheur de création de compte n'a pas à être appelable
 -- de l'extérieur (alerte du Security Advisor de Supabase).
 REVOKE EXECUTE ON FUNCTION public.ouiread_handle_new_user() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ouiread_handle_new_user() TO supabase_auth_admin;
