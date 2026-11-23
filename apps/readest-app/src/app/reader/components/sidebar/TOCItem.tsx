@@ -1,27 +1,22 @@
 import clsx from 'clsx';
 import React, { useCallback } from 'react';
-import { FiBookOpen } from 'react-icons/fi';
+import { IconNext, IconReading } from '@/components/icons/lisetlead';
 import { TOCItem } from '@/libs/document';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getContentMd5 } from '@/utils/misc';
 
+// Lis et Lead's caret, turning down when the part is open.
 const createExpanderIcon = (isExpanded: boolean) => {
   return (
-    <svg
-      viewBox='0 0 8 10'
-      width='8'
-      height='10'
-      className={clsx(
-        'text-base-content transform transition-transform',
-        isExpanded ? 'rotate-90' : 'rotate-0',
-      )}
-      style={{ transformOrigin: 'center' }}
-      fill='currentColor'
+    <IconNext
       aria-hidden='true'
       focusable='false'
-    >
-      <polygon points='0 0, 8 5, 0 10' />
-    </svg>
+      size={14}
+      className={clsx(
+        'text-base-content/70 transform transition-transform duration-200',
+        isExpanded ? 'rotate-90' : 'rotate-0',
+      )}
+    />
   );
 };
 
@@ -118,7 +113,9 @@ const TOCItemView = React.memo<{
       aria-selected={isActive ? 'true' : 'false'}
       data-href={item.href ? getContentMd5(item.href) : undefined}
       className={clsx(
-        'flex w-full cursor-pointer items-center rounded-md py-4 sm:py-2 sm:hover:bg-base-300/75',
+        'flex w-full cursor-pointer items-center rounded-2xl py-3.5 transition-colors sm:py-2.5',
+        'hover:bg-base-content/[0.05]',
+        isActive && 'font-semibold',
       )}
       style={{
         height: itemSize ? `${itemSize}px` : 'auto',
@@ -150,7 +147,10 @@ const TOCItemView = React.memo<{
         {item.label}
       </div>
       {(item.location || item.index !== undefined) && (
-        <div aria-hidden='true' className='text-base-content/50 ms-auto ps-1 text-xs sm:pe-1'>
+        <div
+          aria-hidden='true'
+          className='bg-base-content/[0.06] text-base-content/60 ms-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums'
+        >
           {item.location ? item.location.current + 1 : item.index + 1}
         </div>
       )}
@@ -180,13 +180,7 @@ export const StaticListRow: React.FC<ListRowProps> = ({
   const isActive = activeHref === flatItem.item.href;
 
   return (
-    <div
-      className={clsx(
-        'border-base-300 w-full border-b sm:border-none',
-        'pe-4 ps-2 pt-[1px] sm:pe-2',
-      )}
-      title={flatItem.item.label || ''}
-    >
+    <div className='w-full px-2 py-0.5' title={flatItem.item.label || ''}>
       <TOCItemView
         bookKey={bookKey}
         flatItem={flatItem}
@@ -216,13 +210,7 @@ export const CurrentPositionRow: React.FC<{
   );
 
   return (
-    <div
-      className={clsx(
-        'border-base-300 w-full border-b sm:border-none',
-        'pe-4 ps-2 pt-[1px] sm:pe-2',
-      )}
-      title={label}
-    >
+    <div className='w-full px-2 py-0.5' title={label}>
       <div
         tabIndex={onClick ? 0 : undefined}
         role='treeitem'
@@ -231,15 +219,18 @@ export const CurrentPositionRow: React.FC<{
         onClick={onClick ? handleClick : undefined}
         onKeyDown={onClick ? (e) => e.key === 'Enter' && handleClick(e) : undefined}
         className={clsx(
-          'flex w-full items-center rounded-md py-4 sm:py-2',
-          'text-bold-in-eink sm:bg-base-300/65 sm:text-base-content text-blue-500',
-          onClick && 'cursor-pointer sm:hover:bg-base-300/75',
+          'flex w-full items-center rounded-2xl py-3.5 sm:py-2.5',
+          'text-bold-in-eink text-base-content bg-[#e8c06a]/25 font-semibold',
+          onClick && 'cursor-pointer',
         )}
         style={{ paddingInlineStart: `${depth * 12 + 8}px` }}
       >
-        <FiBookOpen className='h-4 w-4 shrink-0' aria-hidden='true' />
+        <IconReading className='h-[18px] w-[18px] shrink-0' aria-hidden='true' />
         <div className='ms-2 min-w-0 break-words'>{label}</div>
-        <div aria-hidden='true' className='text-base-content/50 ms-auto ps-1 text-xs sm:pe-1'>
+        <div
+          aria-hidden='true'
+          className='text-base-content ms-auto me-2 shrink-0 rounded-full bg-[#e8c06a]/40 px-2 py-0.5 text-[11px] font-semibold tabular-nums'
+        >
           {page}
         </div>
       </div>

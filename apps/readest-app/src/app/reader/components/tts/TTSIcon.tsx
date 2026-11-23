@@ -28,7 +28,7 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
     >
       {/* The app's green, with a soft ring that breathes while the voice reads. */}
       <div
-        className='bg-primary absolute inset-0 overflow-hidden rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.25)]'
+        className='absolute inset-0 overflow-hidden rounded-full bg-[#e8c06a] shadow-[0_10px_26px_-6px_rgba(150,110,30,0.6)]'
         style={{
           animation: isPlaying && ttsInited ? 'ttsBreathe 2.4s ease-in-out infinite' : 'none',
         }}
@@ -49,7 +49,7 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
           {bars.map((bar) => (
             <div
               key={bar}
-              className='bg-primary-content w-1 rounded-full'
+              className='w-1 rounded-full bg-[#16241f]'
               style={{
                 height: '16px',
                 animationName: isPlaying ? 'bounce' : 'none',

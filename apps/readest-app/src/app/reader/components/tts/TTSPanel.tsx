@@ -61,10 +61,11 @@ const Card: React.FC<{ title?: string; children: React.ReactNode; aside?: React.
   children,
   aside,
 }) => (
-  <section className='bg-base-200 rounded-2xl p-4'>
+  // Lis et Lead's cards: softly filled, the title in the display face.
+  <section className='bg-base-content/[0.045] rounded-[1.375rem] p-4'>
     {title && (
       <div className='mb-3 flex items-center justify-between gap-2'>
-        <h3 className='text-sm font-semibold uppercase tracking-wide opacity-70'>{title}</h3>
+        <h3 className='font-display text-[0.95rem] font-semibold opacity-80'>{title}</h3>
         {aside}
       </div>
     )}
@@ -85,7 +86,7 @@ const RoundButton: React.FC<{
     onClick={onClick}
     className={clsx(
       'flex items-center justify-center rounded-full transition-transform active:scale-95',
-      className ?? 'hover:bg-base-300 h-11 w-11',
+      className ?? 'hover:bg-base-content/[0.06] h-11 w-11',
     )}
   >
     {children}
@@ -258,7 +259,7 @@ const TTSPanel = ({
           <RoundButton
             label={isPlaying ? _('Pause') : _('Play')}
             onClick={onTogglePlay}
-            className='bg-primary text-primary-content mx-2 h-16 w-16 shadow-md'
+            className='mx-2 h-16 w-16 bg-[#e8c06a] text-[#16241f] shadow-[0_10px_28px_-8px_rgba(150,110,30,0.55)]'
           >
             {isPlaying ? <IconPause size={36} /> : <IconPlay size={38} />}
           </RoundButton>
@@ -305,7 +306,9 @@ const TTSPanel = ({
               onClick={() => applyRate(preset)}
               className={clsx(
                 'rounded-full px-3 py-1 text-sm tabular-nums transition-colors',
-                preset === rate ? 'bg-primary text-primary-content' : 'bg-base-300',
+                preset === rate
+                  ? 'bg-[#e8c06a] font-semibold text-[#16241f]'
+                  : 'bg-base-content/[0.07]',
               )}
             >
               {formatRate(preset, locale)}
@@ -328,7 +331,7 @@ const TTSPanel = ({
             return (
               <div
                 key={lang}
-                className='border-base-300 border-t py-3 first:border-t-0 first:pt-0 last:pb-0'
+                className='border-base-content/[0.07] border-t py-3 first:border-t-0 first:pt-0 last:pb-0'
               >
                 <button
                   type='button'
@@ -338,8 +341,12 @@ const TTSPanel = ({
                 >
                   <span className='font-medium'>{languageLabel(lang)}</span>
                   <span className='flex min-w-0 items-center gap-1 text-sm opacity-80'>
-                    <span className='truncate'>{selectedName}</span>
-                    {open ? <IconCollapse size={20} /> : <IconExpand size={20} />}
+                    <span className='break-words text-end'>{selectedName}</span>
+                    {open ? (
+                      <IconCollapse size={20} className='shrink-0' />
+                    ) : (
+                      <IconExpand size={20} className='shrink-0' />
+                    )}
                   </span>
                 </button>
                 {open && (
@@ -360,11 +367,11 @@ const TTSPanel = ({
                             role='radio'
                             aria-checked={voice.id === selected}
                             onClick={() => selectVoice(lang, voice.id, voice.lang)}
-                            className='hover:bg-base-300 flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-start'
+                            className='hover:bg-base-content/[0.06] flex items-center justify-between gap-2 rounded-xl px-2 py-2 text-start'
                           >
-                            <span className='truncate'>{voice.name}</span>
+                            <span className='break-words'>{voice.name}</span>
                             {voice.id === selected && (
-                              <IconCheck size={20} className='text-primary shrink-0' />
+                              <IconCheck size={20} className='shrink-0 text-[#c79a3c]' />
                             )}
                           </button>
                         ))}
@@ -374,7 +381,7 @@ const TTSPanel = ({
                       <button
                         type='button'
                         onClick={() => setAllEngines((prev) => ({ ...prev, [lang]: true }))}
-                        className='text-primary px-2 py-2 text-start text-sm'
+                        className='px-2 py-2 text-start text-sm font-medium text-[#c79a3c]'
                       >
                         {_('More voices ({{count}})', { count: hidden })}
                       </button>
@@ -441,7 +448,9 @@ const TTSPanel = ({
                   onClick={() => onSelectTimeout(bookKey, seconds)}
                   className={clsx(
                     'rounded-full px-3 py-1 text-sm transition-colors',
-                    seconds === timeoutOption ? 'bg-primary text-primary-content' : 'bg-base-300',
+                    seconds === timeoutOption
+                      ? 'bg-[#e8c06a] font-semibold text-[#16241f]'
+                      : 'bg-base-content/[0.07]',
                   )}
                 >
                   {seconds ? formatDuration(seconds) : _('Off')}

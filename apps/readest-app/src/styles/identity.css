@@ -213,3 +213,8 @@ html:not([data-eink='true']) .popup-triangle-inner:not([class*='16241f']),
 html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
   color: oklch(var(--b1) / 0.95);
 }
+
+/* The volume slider of the voices panel, in gold. */
+.range {
+  --range-shdw: #e8c06a;
+}

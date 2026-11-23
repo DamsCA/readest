@@ -78,7 +78,7 @@ const TTSBar = ({
       onTouchStart={() => !appService?.isMobile && setHoveredBookKey('')}
     >
       {/* A floating capsule: the play button in the middle, sentence and paragraph steps around it. */}
-      <div className='bg-base-100 border-base-300/70 flex w-full flex-col items-center rounded-[2rem] border px-2 py-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)] sm:w-auto'>
+      <div className='lel-glass flex w-full flex-col items-center rounded-[2rem] px-2 py-1.5 sm:w-auto'>
         {bankedLabel && (
           <div
             className='text-base-content/60 pointer-events-none flex items-center gap-1 pt-1 text-xs'
@@ -91,7 +91,7 @@ const TTSBar = ({
         <div className='text-base-content flex h-16 items-center gap-1.5 px-1'>
           <button
             onClick={onBackward.bind(null, false)}
-            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-200 active:scale-95'
+            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-content/[0.06] active:scale-95'
             title={_('Previous Paragraph')}
             aria-label={_('Previous Paragraph')}
           >
@@ -99,7 +99,7 @@ const TTSBar = ({
           </button>
           <button
             onClick={onBackward.bind(null, true)}
-            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-200 active:scale-95'
+            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-content/[0.06] active:scale-95'
             title={_('Previous Sentence')}
             aria-label={_('Previous Sentence')}
           >
@@ -107,7 +107,7 @@ const TTSBar = ({
           </button>
           <button
             onClick={onTogglePlay}
-            className='bg-primary text-primary-content flex h-14 w-14 items-center justify-center rounded-full transition-transform duration-200 active:scale-95'
+            className='flex h-14 w-14 items-center justify-center rounded-full bg-[#e8c06a] text-[#16241f] shadow-[0_8px_22px_-8px_rgba(150,110,30,0.55)] transition-transform duration-200 active:scale-95'
             title={isPlaying ? _('Pause') : _('Play')}
             aria-label={isPlaying ? _('Pause') : _('Play')}
           >
@@ -115,7 +115,7 @@ const TTSBar = ({
           </button>
           <button
             onClick={onForward.bind(null, true)}
-            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-200 active:scale-95'
+            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-content/[0.06] active:scale-95'
             title={_('Next Sentence')}
             aria-label={_('Next Sentence')}
           >
@@ -123,7 +123,7 @@ const TTSBar = ({
           </button>
           <button
             onClick={onForward.bind(null, false)}
-            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-200 active:scale-95'
+            className='flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:bg-base-content/[0.06] active:scale-95'
             title={_('Next Paragraph')}
             aria-label={_('Next Paragraph')}
           >

@@ -135,7 +135,7 @@ const SpeedWheel: React.FC<{
         </div>
       </div>
       {/* The rate under this line is the one read. */}
-      <div className='bg-primary pointer-events-none absolute bottom-0 left-1/2 h-9 w-0.5 -translate-x-1/2 rounded-full' />
+      <div className='pointer-events-none absolute bottom-0 left-1/2 h-9 w-1 -translate-x-1/2 rounded-full bg-[#e8c06a]' />
     </div>
   );
 };
