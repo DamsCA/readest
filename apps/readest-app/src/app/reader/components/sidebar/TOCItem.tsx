@@ -114,7 +114,7 @@ const TOCItemView = React.memo<{
       data-href={item.href ? getContentMd5(item.href) : undefined}
       className={clsx(
         'flex w-full cursor-pointer items-center rounded-2xl py-3.5 transition-colors sm:py-2.5',
-        'hover:bg-base-content/[0.05]',
+        'sm:hover:bg-base-content/[0.05]',
         isActive && 'font-semibold',
       )}
       style={{

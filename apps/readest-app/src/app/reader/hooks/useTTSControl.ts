@@ -209,7 +209,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     const handleNeedAuth = () => {
       eventDispatcher.dispatch('toast', {
         message: _('Please log in to use advanced TTS features'),
-        type: 'error',
+        type: 'info',
         timeout: 5000,
       });
     };
