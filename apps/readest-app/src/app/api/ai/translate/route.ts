@@ -13,6 +13,8 @@ import { preparePassage } from './proverbs';
 
 const MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 const MAX_CHARS = 6000;
+// The whole request (text + language codes), before parsing.
+const MAX_BODY_CHARS = 24_000;
 const FREE_AI_PARAGRAPHS_PER_DAY = 20;
 // Plus at 6,99 € a month or 59,99 € a year (22 Nov 2026): about a book every
 // four days, so that even a yearly subscriber who uses it all stays profitable.
@@ -34,12 +36,15 @@ const LANG_NAMES: Record<string, string> = {
   ko: 'Korean',
   ar: 'Arabic',
 };
+// Only a known language name or a bare 2-3 letter code ever reaches the
+// model's instructions: anything else (a sentence slipped into "target")
+// would be obeyed as an instruction.
 const langName = (code: unknown) => {
   const short = String(code || '')
     .toLowerCase()
     .split(/[-_]/)[0];
   if (!short || short === 'auto') return '';
-  return LANG_NAMES[short] || short;
+  return LANG_NAMES[short] || (/^[a-z]{2,3}$/.test(short) ? short : '');
 };
 
 // Same instructions as the relay (relay/fish-audio, /v1/translate): a short
@@ -96,9 +101,11 @@ export async function POST(req: Request): Promise<Response> {
   const { user, token } = await validateUserAndToken(req.headers.get('authorization'));
   if (!user || !token) return json(401, { error: 'NOT_AUTHENTICATED' });
 
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_CHARS) return json(413, { error: 'body too large' });
   let body: { text?: unknown; source?: unknown; target?: unknown };
   try {
-    body = await req.json();
+    body = JSON.parse(raw);
   } catch {
     return json(400, { error: 'invalid json' });
   }
@@ -109,16 +116,6 @@ export async function POST(req: Request): Promise<Response> {
 
   const plan = getSubscriptionPlan(token);
   const paid = plan !== 'free';
-  if (paid) {
-    const used = await UsageStatsManager.getCurrentUsage(user.id, PAID_USAGE, 'daily');
-    if (used + text.length > PAID_AI_CHARS_PER_DAY) {
-      return json(429, { error: 'DAILY_QUOTA_EXCEEDED' });
-    }
-  } else {
-    const used = await UsageStatsManager.getCurrentUsage(user.id, FREE_USAGE, 'daily');
-    if (used >= FREE_AI_PARAGRAPHS_PER_DAY) return json(402, { error: 'PLUS_REQUIRED' });
-  }
-
   let ai: AiBinding | undefined;
   try {
     ai = (getCloudflareContext().env as { AI?: AiBinding }).AI;
@@ -126,6 +123,26 @@ export async function POST(req: Request): Promise<Response> {
     ai = undefined;
   }
   if (!ai) return json(503, { error: 'AI translation unavailable' });
+
+  // Counted BEFORE the model runs (parallel requests cannot all pass the same
+  // check), and kept even when the answer turns out unusable: only our own
+  // outages hand it back.
+  const usageType = paid ? PAID_USAGE : FREE_USAGE;
+  const amount = paid ? text.length : 1;
+  const reservation = await UsageStatsManager.reserve(
+    user.id,
+    usageType,
+    amount,
+    'daily',
+    paid ? PAID_AI_CHARS_PER_DAY : FREE_AI_PARAGRAPHS_PER_DAY,
+    { plan_type: plan, source: 'workers_ai' },
+  );
+  if (reservation.status === 'over') {
+    return paid
+      ? json(429, { error: 'DAILY_QUOTA_EXCEEDED' })
+      : json(402, { error: 'PLUS_REQUIRED' });
+  }
+  if (reservation.status === 'error') return json(503, { error: 'AI translation unavailable' });
 
   // Whole English sayings go in already in French (see ./proverbs.ts).
   const prepared = preparePassage(text, target);
@@ -146,17 +163,13 @@ export async function POST(req: Request): Promise<Response> {
     if (!translation || looksExpanded(text, translation)) {
       return json(502, { error: 'translation unusable' });
     }
-    const count = await UsageStatsManager.trackUsage(
-      user.id,
-      paid ? PAID_USAGE : FREE_USAGE,
-      paid ? text.length : 1,
-      { plan_type: plan, source: 'workers_ai' },
-    );
     return json(200, {
       translation,
-      ...(paid ? {} : { free_left: Math.max(0, FREE_AI_PARAGRAPHS_PER_DAY - count) }),
+      ...(paid ? {} : { free_left: Math.max(0, FREE_AI_PARAGRAPHS_PER_DAY - reservation.total) }),
     });
   } catch (err) {
+    // Our side failed: the reader does not pay for it.
+    await UsageStatsManager.release(user.id, usageType, amount);
     const message = String((err as Error)?.message || err);
     if (/4006|neuron|allocation/i.test(message)) {
       return json(429, { error: 'AI_ALLOCATION_EXHAUSTED' });

@@ -9,6 +9,38 @@ import {
 import { getDownloadSignedUrl, getUploadSignedUrl, isSafeObjectKeyName } from '@/utils/object';
 import { READEST_PUBLIC_STORAGE_BASE_URL } from '@/services/constants';
 
+// One book file at most (the presigned URL signs the exact size, so the
+// declared size is the real one).
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
+// Temporary files are small images (the desktop app's cover for Discord):
+// they skip the storage quota, so they stay tiny.
+const MAX_TEMP_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+// The reader's live storage, from the database. The SQL function
+// (ouiread-extras.sql) sums it in one query; until it exists, the rows are
+// added up page by page (the API returns at most 1,000 rows at a time).
+// NaN on any error: the caller refuses.
+const readStorageUsage = async (
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string,
+): Promise<number> => {
+  const { data, error } = await supabase.rpc('ouiread_storage_usage', { p_user_id: userId });
+  if (!error) return Number(data);
+  let total = 0;
+  for (let from = 0; ; from += 1000) {
+    const { data: rows, error: rowsError } = await supabase
+      .from('files')
+      .select('file_size')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('id')
+      .range(from, from + 999);
+    if (rowsError || !rows) return NaN;
+    for (const row of rows) total += Number(row.file_size) || 0;
+    if (rows.length < 1000) return total;
+  }
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await runMiddleware(req, res, corsAllMethods);
 
@@ -30,6 +62,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!isSafeObjectKeyName(fileName)) {
     return res.status(400).json({ error: 'Invalid fileName' });
   }
+  const size = Number(fileSize);
+  if (!Number.isSafeInteger(size) || size <= 0) {
+    return res.status(400).json({ error: 'Invalid fileSize' });
+  }
+  if (size > (temp ? MAX_TEMP_UPLOAD_BYTES : MAX_UPLOAD_BYTES)) {
+    return res.status(413).json({ error: 'File too large' });
+  }
 
   if (temp) {
     try {
@@ -38,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const userStr = user.id.slice(0, 8);
       const fileKey = `temp/img/${timeStr}/${userStr}/${fileName}`;
       const bucketName = process.env['TEMP_STORAGE_PUBLIC_BUCKET_NAME'] || '';
-      const uploadUrl = await getUploadSignedUrl(fileKey, fileSize, 1800, bucketName);
+      const uploadUrl = await getUploadSignedUrl(fileKey, size, 1800, bucketName);
       const downloadUrl = await getDownloadSignedUrl(fileKey, 3 * 86400, bucketName);
       const pathname = new URL(downloadUrl).pathname;
       const publicBaseUrl = READEST_PUBLIC_STORAGE_BASE_URL;
@@ -54,14 +93,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (!fileName || !fileSize) {
+    if (!fileName) {
       return res.status(400).json({ error: 'Missing file info' });
     }
 
-    const { usage, quota } = getStoragePlanData(token);
-    if (usage + fileSize > quota + STORAGE_QUOTA_GRACE_BYTES) {
-      return res.status(403).json({ error: 'Insufficient storage quota', usage });
-    }
+    // The plan's quota comes from the token; the usage does NOT: the token can
+    // be an hour old, so every upload of that hour would be measured against
+    // the same old figure. The real total is read from the database below,
+    // after this file is recorded, so parallel uploads cannot all pass.
+    const { quota } = getStoragePlanData(token);
 
     const fileKey = `${user.id}/${fileName}`;
     const supabase = createSupabaseAdminClient();
@@ -76,7 +116,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (fetchError && fetchError.code !== 'PGRST116') {
       return res.status(500).json({ error: fetchError.message });
     }
-    let objSize = fileSize;
+    let objSize = size;
+    let insertedId: string | null = null;
     if (existingRecord) {
       objSize = existingRecord.file_size;
     } else {
@@ -89,13 +130,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             replica_kind: replicaKind ?? null,
             replica_id: replicaId ?? null,
             file_key: fileKey,
-            file_size: fileSize,
+            file_size: size,
           },
         ])
         .select()
         .single();
-      console.log('Inserted record:', inserted);
       if (insertError) return res.status(500).json({ error: insertError.message });
+      insertedId = inserted?.id ?? null;
+    }
+
+    const dropInserted = async () => {
+      if (insertedId) await supabase.from('files').delete().eq('id', insertedId);
+    };
+    const usage = await readStorageUsage(supabase, user.id);
+    if (!Number.isFinite(usage)) {
+      await dropInserted();
+      return res.status(503).json({ error: 'Storage usage unavailable' });
+    }
+    if (usage > quota + STORAGE_QUOTA_GRACE_BYTES) {
+      await dropInserted();
+      return res.status(403).json({
+        error: 'Insufficient storage quota',
+        usage: insertedId ? usage - size : usage,
+      });
     }
 
     try {
@@ -104,7 +161,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(200).json({
         uploadUrl,
         fileKey,
-        usage: usage + fileSize,
+        usage,
         quota,
       });
     } catch (error) {

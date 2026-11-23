@@ -822,3 +822,30 @@ CREATE POLICY auth_admin_read_plans ON public.plans
 DROP POLICY IF EXISTS auth_admin_read_files ON public.files;
 CREATE POLICY auth_admin_read_files ON public.files
   FOR SELECT TO supabase_auth_admin USING (true);
+
+-- Stockage : seul le serveur écrit la table files (routes storage/*, livre
+-- offert). Avant, un lecteur pouvait changer la taille de ses fichiers
+-- (file_size = 0) et remettre son compteur de stockage à zéro.
+REVOKE INSERT, UPDATE, DELETE ON public.files FROM anon, authenticated;
+ALTER TABLE public.files DROP CONSTRAINT IF EXISTS files_size_not_negative;
+ALTER TABLE public.files ADD CONSTRAINT files_size_not_negative CHECK (file_size >= 0);
+
+-- Stockage réellement utilisé, lu par la route d'envoi (le jeton peut avoir
+-- une heure de retard). Réservé au serveur.
+CREATE OR REPLACE FUNCTION public.ouiread_storage_usage(p_user_id uuid)
+RETURNS bigint
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(SUM(file_size), 0)::bigint
+    FROM public.files
+   WHERE user_id = p_user_id AND deleted_at IS NULL;
+$$;
+REVOKE ALL ON FUNCTION public.ouiread_storage_usage(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ouiread_storage_usage(uuid) TO service_role;
+
+-- La fonction du déclencheur de création de compte n'a pas à être appelable
+-- de l'extérieur (alerte du Security Advisor de Supabase).
+REVOKE EXECUTE ON FUNCTION public.ouiread_handle_new_user() FROM PUBLIC, anon, authenticated;
