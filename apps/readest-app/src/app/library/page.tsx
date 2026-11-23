@@ -85,6 +85,7 @@ import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import WelcomeGift from './components/WelcomeGift';
+import InvitationInscription from './components/InvitationInscription';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
 import ImportFromFolderDialog, {
@@ -1610,6 +1611,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         onSubmit={handleImportBookFromUrl}
       />
       <WelcomeGift />
+      <InvitationInscription />
       <Toast />
     </div>
   );

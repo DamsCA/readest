@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { ViewTransitions } from 'next-view-transitions';
 import { EnvProvider } from '@/context/EnvContext';
 import Providers from '@/components/Providers';
+import MesureAudience from '@/components/MesureAudience';
 
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/bricolage-grotesque';
@@ -158,7 +159,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ViewTransitions>
           <EnvProvider>
-            <Providers>{children}</Providers>
+            <Providers>
+              <MesureAudience />
+              {children}
+            </Providers>
           </EnvProvider>
         </ViewTransitions>
       </body>
