@@ -51,10 +51,11 @@ const hasUnlimitedVoice = async (userId: string): Promise<boolean> => {
 };
 
 // Shared memory of the premium voice: the same sentence, read by the same
-// voice with the same settings, is synthesized (and paid) once for everyone,
-// then served from R2 (prefix voix/). Every reader of the welcome book, every
-// second listening, every other device: free. A hit does not count against
-// the reader's monthly allowance, since it costs nothing.
+// voice with the same settings, is synthesized once for everyone, then served
+// from R2 (prefix voix/). For a subscriber a hit does not count against the
+// monthly allowance. For a free reader it does (the owner's rule, 23 Nov 2026:
+// free readers must feel what they are missing, never live off the memory),
+// except for the welcome book, which every reader hears in the premium voice.
 interface VoiceBucket {
   get: (key: string) => Promise<{ arrayBuffer: () => Promise<ArrayBuffer> } | null>;
   put: (
@@ -70,6 +71,39 @@ const getVoiceBucket = (): VoiceBucket | undefined => {
     return undefined;
   }
 };
+// The welcome book ("Ça marche"), the only one every reader hears in the
+// premium voice. Its text lives in R2 (cadeaux/ca-marche.txt, published with
+// the book by ouiread-ca-marche/publier-texte-voix.mjs), not in this public
+// repository. A sentence is the book's when, letters and digits only, it is a
+// piece of the book's text. Unreadable or missing text: no sentence matches.
+const WELCOME_TEXT_KEY = 'cadeaux/ca-marche.txt';
+const squeeze = (s: string) =>
+  s
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+let welcomeText: Promise<string> | null = null;
+const loadWelcomeText = (bucket: VoiceBucket): Promise<string> => {
+  if (!welcomeText) {
+    welcomeText = bucket
+      .get(WELCOME_TEXT_KEY)
+      .then(async (o) => (o ? squeeze(new TextDecoder().decode(await o.arrayBuffer())) : ''))
+      .catch(() => '');
+    // Not kept when empty: the next request tries again.
+    void welcomeText.then((t) => {
+      if (!t) welcomeText = null;
+    });
+  }
+  return welcomeText;
+};
+const isWelcomeBookText = async (text: string, bucket?: VoiceBucket): Promise<boolean> => {
+  const piece = squeeze(text);
+  if (!piece || !bucket) return false;
+  const book = await loadWelcomeText(bucket);
+  return !!book && book.includes(piece);
+};
+
 const cacheKeyFor = async (body: string, timed: boolean) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
   const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -98,9 +132,28 @@ export async function POST(req: NextRequest) {
   const contentType = timed ? 'text/event-stream' : 'audio/mpeg';
   const bucket = getVoiceBucket();
   const cacheKey = await cacheKeyFor(body, timed);
+
+  const plan = getSubscriptionPlan(token);
+  const paid = plan !== 'free';
+  const welcome = await isWelcomeBookText(text, bucket);
+  const capped = !welcome && !(await hasUnlimitedVoice(user.id));
+  // A free reader's taste is checked first and counts every sentence, even
+  // one the shared memory could serve.
+  const strictTaste = !paid && capped;
+  if (strictTaste) {
+    const used = await UsageStatsManager.getCurrentUsage(user.id, USAGE_TYPE, 'monthly');
+    if (used + text.length > FREE_VOICE_CHARS_PER_MONTH) return refuse(402, 'PLUS_REQUIRED');
+  }
+
   if (bucket) {
     const hit = await bucket.get(cacheKey).catch(() => null);
     if (hit) {
+      if (strictTaste) {
+        await UsageStatsManager.trackUsage(user.id, USAGE_TYPE, text.length, {
+          plan_type: plan,
+          source: 'voice_cache',
+        });
+      }
       return new Response(await hit.arrayBuffer(), {
         status: 200,
         headers: {
@@ -112,13 +165,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const plan = getSubscriptionPlan(token);
-  const paid = plan !== 'free';
-  if (!(await hasUnlimitedVoice(user.id))) {
+  if (paid && capped) {
     const used = await UsageStatsManager.getCurrentUsage(user.id, USAGE_TYPE, 'monthly');
-    const allowance = paid ? PAID_VOICE_CHARS_PER_MONTH : FREE_VOICE_CHARS_PER_MONTH;
-    if (used + text.length > allowance) {
-      return refuse(paid ? 429 : 402, paid ? 'VOICE_QUOTA_EXCEEDED' : 'PLUS_REQUIRED');
+    if (used + text.length > PAID_VOICE_CHARS_PER_MONTH) {
+      return refuse(429, 'VOICE_QUOTA_EXCEEDED');
     }
   }
 
@@ -157,10 +207,13 @@ export async function POST(req: NextRequest) {
       .catch((err) => console.error('Voice cache write failed:', err));
   }
 
-  await UsageStatsManager.trackUsage(user.id, USAGE_TYPE, text.length, {
-    plan_type: plan,
-    source: 'fish_audio',
-  });
+  // The welcome book is everyone's: it never eats into an allowance.
+  if (!welcome) {
+    await UsageStatsManager.trackUsage(user.id, USAGE_TYPE, text.length, {
+      plan_type: plan,
+      source: 'fish_audio',
+    });
+  }
 
   return new Response(audio, {
     status: 200,
