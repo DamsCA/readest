@@ -8,8 +8,10 @@ describe('English sayings for the AI translation', () => {
       '"If wishes were horses, beggars would ride," is the attitude taken by the average man.',
     ]) {
       const prepared = preparePassage(text, 'French');
-      expect(prepared.text).toContain('Avec des si, on mettrait Paris en bouteille');
-      expect(prepared.text).not.toMatch(/horses|beggars/);
+      expect(prepared.text).toContain(
+        'Si les souhaits étaient des chevaux, les mendiants monteraient à cheval',
+      );
+      expect(prepared.text).not.toMatch(/horses|beggars|Paris en bouteille/);
       expect(prepared.instruction).toContain('word for word');
     }
   });

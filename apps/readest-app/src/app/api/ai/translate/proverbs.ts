@@ -2,11 +2,15 @@
 //
 // The models on Workers AI translate a proverb's images instead of its lesson,
 // even when told not to. Measured on 22 Nov 2026 with Mistral Small 3.1, Llama
-// 3.3 70B and gpt-oss-120b: "If wishes were horses, beggars would ride" (It
-// Works, R. H. Jarrett) always came back as « Si les vœux étaient des chevaux,
-// les mendiants monteraient à cheval », never « Avec des si, on mettrait Paris
-// en bouteille »; "the early bird catches the worm" and "every cloud has a
-// silver lining" often word for word too. A reader who opens a book to read it
+// 3.3 70B and gpt-oss-120b: "the early bird catches the worm" and "every cloud
+// has a silver lining" often came back word for word.
+//
+// "If wishes were horses, beggars would ride" (It Works, R. H. Jarrett) keeps
+// its image: « Avec des si, on mettrait Paris en bouteille » mocks reasoning on
+// what-ifs, whereas the English says that wishing alone gets you nothing, the
+// very belief the book sets out to overturn (23 Nov 2026: « n'est pas du tout
+// l'équivalent de cette phrase »). The saying is fixed so it reads the same in
+// the app as in the French edition, with « souhaits », the book's own word. A reader who opens a book to read it
 // in good French notices at once.
 //
 // Telling the model which French saying to use was not enough: online, the same
@@ -22,7 +26,10 @@
 // Whole sayings, as they are usually written. The first letter may be missing
 // (a drop cap turned into an image: "F wishes were horses").
 const WHOLE: Array<[string, string]> = [
-  ['if wishes were horses, beggars would ride', 'Avec des si, on mettrait Paris en bouteille'],
+  [
+    'if wishes were horses, beggars would ride',
+    'Si les souhaits étaient des chevaux, les mendiants monteraient à cheval',
+  ],
   [
     "don't count your chickens before they hatch",
     "Il ne faut pas vendre la peau de l'ours avant de l'avoir tué",
@@ -103,7 +110,7 @@ const WHOLE: Array<[string, string]> = [
 // Idioms that bend with their sentence, and leftovers of the sayings above
 // written another way: lower-case fragments, and the French to use.
 const IDIOMS: Array<[string, string]> = [
-  ['wishes were horses', 'Avec des si, on mettrait Paris en bouteille'],
+  ['wishes were horses', 'Si les souhaits étaient des chevaux, les mendiants monteraient à cheval'],
   ['count your chickens', "vendre la peau de l'ours avant de l'avoir tué"],
   ["count one's chickens", "vendre la peau de l'ours avant de l'avoir tué"],
   ['early bird', "l'avenir appartient à ceux qui se lèvent tôt"],
