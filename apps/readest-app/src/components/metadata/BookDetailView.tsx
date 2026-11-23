@@ -1,14 +1,14 @@
 import clsx from 'clsx';
-import React from 'react';
 import {
-  MdOutlineCloudDownload,
-  MdOutlineCloudUpload,
-  MdOutlineDelete,
-  MdOutlineEdit,
-  MdMenu,
-  MdExpandMore,
-  MdExpandLess,
-} from 'react-icons/md';
+  IconCollapse,
+  IconDownload,
+  IconEdit,
+  IconExpand,
+  IconMenu,
+  IconTrash,
+  IconUpload,
+} from '@/components/icons/lisetlead';
+import React from 'react';
 
 import { Book } from '@/types/book';
 import { BookMetadata } from '@/libs/document';
@@ -105,17 +105,17 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 className={!metadata ? 'btn-disabled opacity-50' : ''}
                 title={_('Edit Metadata')}
               >
-                <MdOutlineEdit className='hover:fill-blue-500' />
+                <IconEdit className='hover:fill-blue-500' />
               </button>
             )}
             {book.uploadedAt && onDownload && (
               <button onClick={onDownload} title={_('Download from Cloud')}>
-                <MdOutlineCloudDownload className='fill-base-content' />
+                <IconDownload className='fill-base-content' />
               </button>
             )}
             {book.downloadedAt && onUpload && (
               <button onClick={onUpload} title={_('Upload to Cloud')}>
-                <MdOutlineCloudUpload className='fill-base-content' />
+                <IconUpload className='fill-base-content' />
               </button>
             )}
             {onDelete && (
@@ -123,7 +123,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 label={_('Delete Book Options')}
                 className='dropdown-bottom dropdown-center flex justify-center'
                 buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
-                toggleButton={<MdOutlineDelete className='fill-red-500' />}
+                toggleButton={<IconTrash className='fill-red-500' />}
               >
                 <div
                   className={clsx(
@@ -158,7 +158,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
               label={_('More Actions')}
               className='dropdown-bottom dropdown-center flex justify-center'
               buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
-              toggleButton={<MdMenu className='fill-base-content' />}
+              toggleButton={<IconMenu className='fill-base-content' />}
             >
               <div
                 className={clsx(
@@ -216,9 +216,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
             <span className='text-neutral-content/85 text-base font-semibold'>{_('Metadata')}</span>
             <div className='transition-transform duration-200'>
               {settings.metadataOthersCollapsed ? (
-                <MdExpandMore className='h-5 w-5' />
+                <IconExpand className='h-5 w-5' />
               ) : (
-                <MdExpandLess className='h-5 w-5' />
+                <IconCollapse className='h-5 w-5' />
               )}
             </div>
           </button>
@@ -303,9 +303,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
             <span className='text-neutral-content/85 text-base font-semibold'>{_('Series')}</span>
             <div className='transition-transform duration-200'>
               {settings.metadataSeriesCollapsed ? (
-                <MdExpandMore className='h-5 w-5' />
+                <IconExpand className='h-5 w-5' />
               ) : (
-                <MdExpandLess className='h-5 w-5' />
+                <IconCollapse className='h-5 w-5' />
               )}
             </div>
           </button>
@@ -339,9 +339,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
             </span>
             <div className='transition-transform duration-200'>
               {settings.metadataDescriptionCollapsed ? (
-                <MdExpandMore className='h-5 w-5' />
+                <IconExpand className='h-5 w-5' />
               ) : (
-                <MdExpandLess className='h-5 w-5' />
+                <IconCollapse className='h-5 w-5' />
               )}
             </div>
           </button>

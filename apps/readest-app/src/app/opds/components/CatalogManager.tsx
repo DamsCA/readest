@@ -421,7 +421,7 @@ export function CatalogManager({ inSubPage = false }: CatalogManagerProps = {}) 
         </div>
 
         {catalogs.length === 0 ? (
-          <div className='eink-bordered border-base-300 rounded-lg border-2 border-dashed p-12 text-center'>
+          <div className='eink-bordered bg-base-content/[0.045] rounded-[1.75rem] px-8 py-10 text-center'>
             <IoBook className='text-base-content/40 mx-auto mb-4 h-12 w-12' />
             <h3 className='mb-2 font-semibold'>{_('No catalogs yet')}</h3>
             <p className='text-base-content/70 mb-4 text-sm'>

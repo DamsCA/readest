@@ -1,7 +1,5 @@
 import React from 'react';
-import { CgColorPicker } from 'react-icons/cg';
-import { MdRadioButtonUnchecked, MdRadioButtonChecked } from 'react-icons/md';
-import { PiPlus } from 'react-icons/pi';
+import { IconColorPicker, IconPlus, IconRadioOff, IconRadioOn } from '@/components/icons/lisetlead';
 import { Theme } from '@/styles/themes';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
@@ -48,8 +46,8 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
             // background, light or dark. The transparent border on inactive
             // cards reserves the same 2px so selecting/deselecting doesn't
             // shift the grid.
-            className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 px-1 py-4 shadow-md ${
-              themeColor === name ? 'border-current' : 'border-transparent'
+            className={`relative flex cursor-pointer flex-col items-center justify-center rounded-[1.25rem] border-2 px-1 py-4 shadow-sm ${
+              themeColor === name ? 'border-[#e8c06a]' : 'border-transparent'
             }`}
             style={{
               backgroundColor: isDarkMode ? colors.dark['base-100'] : colors.light['base-100'],
@@ -66,25 +64,25 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
               className='hidden'
             />
             {themeColor === name ? (
-              <MdRadioButtonChecked size={iconSize24} />
+              <IconRadioOn size={iconSize24} />
             ) : (
-              <MdRadioButtonUnchecked size={iconSize24} />
+              <IconRadioOff size={iconSize24} />
             )}
             <span className='max-w-full hyphens-auto break-words text-center text-sm leading-tight'>
               {_(label)}
             </span>
             {isCustomizale && themeColor === name && (
               <button onClick={() => onEditTheme(name)}>
-                <CgColorPicker size={iconSize16} className='absolute right-2 top-2' />
+                <IconColorPicker size={iconSize16} className='absolute right-2 top-2' />
               </button>
             )}
           </button>
         ))}
         <button
-          className='relative flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-1 py-4 shadow-md'
+          className='relative flex cursor-pointer flex-col items-center justify-center rounded-[1.25rem] border border-dashed px-1 py-4'
           onClick={onCreateTheme}
         >
-          <PiPlus size={iconSize24} />
+          <IconPlus size={iconSize24} />
           <span className='max-w-full hyphens-auto break-words text-center text-sm leading-tight'>
             {_('Create Theme')}
           </span>

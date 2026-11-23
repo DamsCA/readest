@@ -62,13 +62,13 @@ html:not([data-eink='true']) .dropdown-content button:not(:disabled):hover {
 /* ---------- The reader's top bar: a floating capsule ---------- */
 
 html:not([data-eink='true']) .header-bar {
-  left: 0.625rem !important;
-  right: 0.625rem !important;
+  left: 0.5rem !important;
+  right: 0.5rem !important;
   width: auto !important;
   top: 0.5rem !important;
   border-radius: 1.375rem;
-  padding-inline-start: 0.75rem !important;
-  padding-inline-end: 0.75rem !important;
+  padding-inline-start: 0.5rem !important;
+  padding-inline-end: 0.5rem !important;
 }
 
 html:not([data-eink='true']) .header-bar .header-tools-start,
@@ -166,4 +166,50 @@ html:not([data-eink='true']) .modal-box.settings-content {
 .footerbar-progress-mobile,
 .modal-box {
   transition-timing-function: var(--lel-ease) !important;
+}
+
+/* ---------- Inside the settings ---------- */
+
+/* Soft filled cards, no hairline frame. */
+html:not([data-eink='true']) .settings-content .card {
+  border-radius: 1.375rem;
+  border-color: transparent !important;
+  background-color: oklch(var(--bc) / 0.045) !important;
+}
+
+html:not([data-eink='true']) .settings-content .card .divide-base-200 > * + * {
+  border-color: oklch(var(--bc) / 0.07);
+}
+
+/* The + / − buttons: soft round pads, gold when touched. */
+html:not([data-eink='true']) .settings-content .btn-circle {
+  border: none;
+  background-color: oklch(var(--bc) / 0.07);
+  transition: background-color 0.2s var(--lel-ease);
+}
+
+html:not([data-eink='true']) .settings-content .btn-circle:not(.btn-disabled):active,
+html:not([data-eink='true']) .settings-content .btn-circle:not(.btn-disabled):hover {
+  background-color: color-mix(in oklab, var(--lel-gold) 35%, transparent);
+}
+
+/* The reader's side panel: the page's own surface, rows that breathe. */
+html:not([data-eink='true']) .sidebar-container {
+  background-color: oklch(var(--b1)) !important;
+}
+
+/* ---------- Bubbles over the text (dictionary, translation…) ---------- */
+
+html:not([data-eink='true']) .popup-container:not(.selection-popup) {
+  background-color: var(--lel-glass-strong) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid var(--lel-hairline);
+  border-radius: 1.25rem;
+  box-shadow: var(--lel-shadow) !important;
+}
+
+html:not([data-eink='true']) .popup-triangle-inner:not([class*='16241f']),
+html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
+  color: oklch(var(--b1) / 0.95);
 }

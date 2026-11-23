@@ -3,6 +3,7 @@ import type { IconBaseProps, IconType } from 'react-icons';
 import {
   PiArrowsClockwiseDuotone,
   PiArrowsOutLineVerticalDuotone,
+  PiArrowSquareOutDuotone,
   PiArrowUUpLeftDuotone,
   PiArrowUUpRightDuotone,
   PiBookBookmarkDuotone,
@@ -22,15 +23,17 @@ import {
   PiCheckCircleDuotone,
   PiCheckCircleFill,
   PiCheckSquareDuotone,
+  PiCircleDuotone,
   PiCircleHalfDuotone,
   PiCloudArrowDownDuotone,
   PiCloudArrowUpDuotone,
   PiCloudWarningDuotone,
   PiCompassDuotone,
   PiCopyDuotone,
-  PiDotsThreeCircleDuotone,
+  PiEyedropperDuotone,
   PiFastForwardDuotone,
   PiFileArrowUpDuotone,
+  PiFolderPlusDuotone,
   PiFrameCornersDuotone,
   PiGearSixDuotone,
   PiGlobeDuotone,
@@ -43,31 +46,37 @@ import {
   PiListBulletsDuotone,
   PiListDuotone,
   PiMagnifyingGlassDuotone,
+  PiMinusBold,
   PiMoonDuotone,
   PiNotePencilDuotone,
   PiPaletteDuotone,
   PiPauseFill,
+  PiPencilSimpleDuotone,
   PiPenNibDuotone,
   PiPersonArmsSpreadDuotone,
   PiPlayFill,
   PiPlusBold,
   PiPushPinDuotone,
   PiPushPinFill,
+  PiRadioButtonFill,
   PiRewindDuotone,
   PiSelectionDuotone,
   PiShareNetworkDuotone,
   PiSkipBackDuotone,
   PiSkipForwardDuotone,
+  PiSlidersHorizontalDuotone,
   PiSparkleDuotone,
   PiSpeakerHighDuotone,
   PiSpeakerLowDuotone,
   PiSunDuotone,
   PiTextAlignLeftDuotone,
   PiTranslateDuotone,
+  PiTrashDuotone,
   PiUserCircleCheckDuotone,
   PiUserCircleDuotone,
   PiWrenchDuotone,
   PiXBold,
+  PiXCircleDuotone,
 } from 'react-icons/pi';
 
 // Lis et Lead's own icons. Asked 23 Nov 2026: « tous les interfaces… ressemblent
@@ -134,7 +143,7 @@ export const IconBookmark = brand(PiBookmarkSimpleDuotone, 'IconBookmark');
 export const IconBookmarkFilled = brand(PiBookmarkSimpleFill, 'IconBookmarkFilled');
 export const IconNotebook = brand(PiNotePencilDuotone, 'IconNotebook');
 export const IconHighlight = brand(PiHighlighterDuotone, 'IconHighlight');
-export const IconViewOptions = brand(PiDotsThreeCircleDuotone, 'IconViewOptions');
+export const IconViewOptions = brand(PiSlidersHorizontalDuotone, 'IconViewOptions');
 export const IconReadingSettings = brand(PiGearSixDuotone, 'IconReadingSettings');
 export const IconMargins = brand(PiFrameCornersDuotone, 'IconMargins');
 export const IconLineSpacing = brand(PiArrowsOutLineVerticalDuotone, 'IconLineSpacing');
@@ -166,3 +175,14 @@ export const IconControl = brand(PiHandPointingDuotone, 'IconControl');
 export const IconAI = brand(PiSparkleDuotone, 'IconAI');
 export const IconSpeaker = brand(PiSpeakerHighDuotone, 'IconSpeaker');
 export const IconAccessibility = brand(PiPersonArmsSpreadDuotone, 'IconAccessibility');
+
+// Actions on a book, choices.
+export const IconOpen = brand(PiArrowSquareOutDuotone, 'IconOpen');
+export const IconFolderPlus = brand(PiFolderPlusDuotone, 'IconFolderPlus');
+export const IconTrash = brand(PiTrashDuotone, 'IconTrash');
+export const IconCancel = brand(PiXCircleDuotone, 'IconCancel');
+export const IconEdit = brand(PiPencilSimpleDuotone, 'IconEdit');
+export const IconMinus = brand(PiMinusBold, 'IconMinus');
+export const IconRadioOn = brand(PiRadioButtonFill, 'IconRadioOn');
+export const IconRadioOff = brand(PiCircleDuotone, 'IconRadioOff');
+export const IconColorPicker = brand(PiEyedropperDuotone, 'IconColorPicker');

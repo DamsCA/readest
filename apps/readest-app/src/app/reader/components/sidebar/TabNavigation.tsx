@@ -38,7 +38,9 @@ const TabNavigation: React.FC<{
   return (
     <div
       className={clsx(
-        'bottom-tab border-base-300/50 bg-base-200 flex w-full border-t',
+        // Lis et Lead's dock: glass, off the edges, the open tab in gold.
+        'bottom-tab lel-glass flex',
+        'not-eink:mx-3 not-eink:mb-3 not-eink:w-auto not-eink:rounded-[1.5rem] eink:w-full',
         appService?.hasRoundedWindow && 'rounded-window-bottom-left',
         isMobile && 'h-[65px]',
       )}
@@ -50,8 +52,8 @@ const TabNavigation: React.FC<{
           tabIndex={0}
           role='button'
           className={clsx(
-            'flex-1 m-1.5 cursor-pointer rounded-lg transition-colors duration-200',
-            activeTab === tab && 'bg-base-300/85',
+            'flex-1 m-1.5 cursor-pointer rounded-full transition-colors duration-200',
+            activeTab === tab && 'bg-[#e8c06a]/30',
             isMobile ? 'p-3' : 'p-2',
           )}
           onClick={() => onTabChange(tab)}

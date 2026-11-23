@@ -1,6 +1,6 @@
 import clsx from 'clsx';
+import { IconMinus, IconPlus } from '@/components/icons/lisetlead';
 import React, { useEffect, useState } from 'react';
-import { FiMinus, FiPlus } from 'react-icons/fi';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SettingLabel } from './primitives';
 
@@ -95,7 +95,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
           onClick={decrement}
           className={`btn btn-circle btn-sm ${currentNumericValue <= min || disabled ? 'btn-disabled !bg-opacity-5' : ''}`}
         >
-          <FiMinus className='h-4 w-4' />
+          <IconMinus className='h-4 w-4' />
         </button>
         <button
           tabIndex={disabled ? -1 : 0}
@@ -103,7 +103,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
           onClick={increment}
           className={`btn btn-circle btn-sm ${currentNumericValue >= max || disabled ? 'btn-disabled !bg-opacity-5' : ''}`}
         >
-          <FiPlus className='h-4 w-4' />
+          <IconPlus className='h-4 w-4' />
         </button>
       </div>
     </div>

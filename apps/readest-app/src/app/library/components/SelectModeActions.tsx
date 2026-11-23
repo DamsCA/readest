@@ -1,13 +1,13 @@
 import clsx from 'clsx';
 import {
-  MdDelete,
-  MdOpenInNew,
-  MdOutlineCancel,
-  MdInfoOutline,
-  MdCheckCircleOutline,
-} from 'react-icons/md';
-import { IoShareSocialOutline } from 'react-icons/io5';
-import { LuFolderPlus } from 'react-icons/lu';
+  IconCancel,
+  IconFolderPlus,
+  IconInfo,
+  IconOpen,
+  IconShare,
+  IconTrash,
+  IconUnchecked,
+} from '@/components/icons/lisetlead';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useTranslation } from '@/hooks/useTranslation';
 import { isMd5 } from '@/utils/md5';
@@ -64,8 +64,8 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
       <div
         className={clsx(
           'text-base-content text-xs shadow-lg',
-          'not-eink:bg-base-300 eink:bg-base-100 eink:border eink:border-base-content',
-          'mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-lg p-4',
+          'lel-glass eink:bg-base-100 eink:border eink:border-base-content',
+          'mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-[1.75rem] p-4',
           'flex items-center justify-center gap-x-6',
           'max-[500px]:grid max-[500px]:grid-cols-4 max-[500px]:gap-x-6 max-[500px]:gap-y-3',
         )}
@@ -77,7 +77,7 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
             (!hasSelection || !hasValidBooks) && 'btn-disabled opacity-50',
           )}
         >
-          <MdOpenInNew />
+          <IconOpen />
           <div>{_('Open')}</div>
         </button>
         <button
@@ -87,7 +87,7 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
             !hasSelection && 'btn-disabled opacity-50',
           )}
         >
-          <LuFolderPlus />
+          <IconFolderPlus />
           <div>{_('Group')}</div>
         </button>
         <button
@@ -97,7 +97,7 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
             (!hasSelection || !hasValidBooks) && 'btn-disabled opacity-50',
           )}
         >
-          <MdCheckCircleOutline />
+          <IconUnchecked />
           <div>{_('Status')}</div>
         </button>
         <button
@@ -107,7 +107,7 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
             (!hasSingleSelection || !hasValidBooks) && 'btn-disabled opacity-50',
           )}
         >
-          <MdInfoOutline />
+          <IconInfo />
           <div>{_('Details')}</div>
         </button>
         {sendEnabled && (
@@ -120,7 +120,7 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
               (!hasSingleSelection || !hasValidBooks) && 'btn-disabled opacity-50',
             )}
           >
-            <IoShareSocialOutline />
+            <IconShare />
             <div>{_('Send')}</div>
           </button>
         )}
@@ -137,11 +137,11 @@ const SelectModeActions: React.FC<SelectModeActionsProps> = ({
             !hasSelection && 'btn-disabled opacity-50',
           )}
         >
-          <MdDelete className='text-red-500' />
+          <IconTrash className='text-red-500' />
           <div className='text-red-500'>{_('Delete')}</div>
         </button>
         <button onClick={onCancel} className='flex flex-col items-center justify-center gap-1'>
-          <MdOutlineCancel />
+          <IconCancel />
           <div>{_('Cancel')}</div>
         </button>
       </div>

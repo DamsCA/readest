@@ -40,8 +40,8 @@ function SectionTitle<T extends React.ElementType = 'h3'>({
       className={clsx(
         'ps-4',
         isCaselessUILang()
-          ? 'text-base-content/65 text-[0.8em] font-medium'
-          : 'text-base-content/65 text-[0.8em] font-medium',
+          ? 'text-base-content/75 text-[0.85em] font-semibold'
+          : 'font-display text-base-content/75 text-[0.85em] font-semibold tracking-[-0.005em]',
         className,
       )}
       {...rest}

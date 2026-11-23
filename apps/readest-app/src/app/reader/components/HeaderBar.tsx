@@ -141,9 +141,11 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     );
   }, []);
 
-  const isHeaderCompact = headerWidth > 0 && headerWidth < 350;
-  // Too narrow even then (320 px phones): one button fewer.
-  const isHeaderTight = headerWidth > 0 && headerWidth < 330;
+  // What the buttons need, gaps included (Lis et Lead's capsule, 23 Nov 2026):
+  // all of them 368 px; without the font button 320 px; then the quick action
+  // leaves too.
+  const isHeaderCompact = headerWidth > 0 && headerWidth < 368;
+  const isHeaderTight = headerWidth > 0 && headerWidth < 320;
   const insets = window.innerWidth < 640 ? screenInsets : gridInsets;
   const isHeaderVisible = hoveredBookKey === bookKey || isDropdownOpen;
 
