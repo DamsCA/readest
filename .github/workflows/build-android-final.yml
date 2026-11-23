@@ -1,13 +1,18 @@
 name: Build Android (Claire — release + auto-update)
 
-# Final personal build: signed release arm64 APK. Publishes the APK +
-# latest.json to a GitHub Release so "install once, update forever" works.
+# Final personal build: signed release arm64 APK. Uploads the APK +
+# latest.json to the relay (relay/fish-audio, /maj/) so "install once, update
+# forever" works.
 #
 # Voice (Oct 2026): Fish Audio's free model with the "Claire" voice, reached
 # through a Cloudflare Worker relay (relay/fish-audio). The Fish key lives in
-# the Worker's secrets and is NOT embedded — this fork is public, so anything
-# compiled into the APK is effectively published. The relay URL and its
-# X-Relay-Token are build *variables*, not secrets: they ship in the APK.
+# the Worker's secrets and is NOT embedded.
+#
+# The relay token (23 Nov 2026): it ships in the APK, so the APK must never be
+# public. It used to be a build *variable* (printed in this public repo's
+# logs) and the APK a public GitHub Release: anyone could take the token and
+# spend Damien's Claude key through /v1/rewrite. Now the token is a *secret*
+# (masked in logs), and the APK is only served by the relay behind that token.
 #
 # No longer configured, and why:
 #   - Claire self-hosted server + Kokoro: retired and archived (Sept 2026).
@@ -56,14 +61,16 @@ jobs:
           echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> $f
           # Refuse to ship a voiceless app: without the relay, Fish reports
           # itself unavailable and the reader silently falls back to Edge.
-          if [ -z "${{ vars.FISH_RELAY_URL }}" ] || [ -z "${{ vars.FISH_RELAY_TOKEN }}" ]; then
-            echo "::error::repository variables FISH_RELAY_URL / FISH_RELAY_TOKEN are not set" && exit 1
+          if [ -z "${{ vars.FISH_RELAY_URL }}" ] || [ -z "$FISH_RELAY_TOKEN" ]; then
+            echo "::error::variable FISH_RELAY_URL / secret FISH_RELAY_TOKEN not set" && exit 1
           fi
           echo "NEXT_PUBLIC_FISH_RELAY_URL=${{ vars.FISH_RELAY_URL }}" >> $f
-          echo "NEXT_PUBLIC_FISH_RELAY_TOKEN=${{ vars.FISH_RELAY_TOKEN }}" >> $f
-          # Point the in-app updater at this fork's GitHub Releases (latest.json
-          # + APK are published there) instead of the official Readest server.
-          echo "NEXT_PUBLIC_UPDATER_BASE_URL=https://github.com/${{ github.repository }}/releases/latest/download" >> $f
+          echo "NEXT_PUBLIC_FISH_RELAY_TOKEN=$FISH_RELAY_TOKEN" >> $f
+          # The in-app updater reads latest.json + the APK from the relay,
+          # behind the token (never a public GitHub Release: see the top).
+          echo "NEXT_PUBLIC_UPDATER_BASE_URL=${{ vars.FISH_RELAY_URL }}/maj/$FISH_RELAY_TOKEN" >> $f
+        env:
+          FISH_RELAY_TOKEN: ${{ secrets.FISH_RELAY_TOKEN }}
 
       - name: typecheck
         run: pnpm --filter @readest/readest-app exec tsgo --noEmit
@@ -96,13 +103,16 @@ jobs:
         with:
           workspaces: apps/readest-app/src-tauri
 
-      - name: build + sign release arm64 APK, publish latest.json
+      - name: build + sign release arm64 APK, upload it with latest.json to the relay
         shell: bash
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          RELAY_URL: ${{ vars.FISH_RELAY_URL }}
+          FISH_RELAY_TOKEN: ${{ secrets.FISH_RELAY_TOKEN }}
+          UPLOAD_KEY: ${{ secrets.CLAIRE_UPLOAD_KEY }}
         run: |
           set -euo pipefail
           cd apps/readest-app
@@ -145,7 +155,7 @@ jobs:
           pnpm tauri signer sign "$apk_name"
           sig="$(cat "${apk_name}.sig")"
 
-          url="https://github.com/${{ github.repository }}/releases/download/claire-v${version}/${apk_name}"
+          url="${RELAY_URL}/maj/${FISH_RELAY_TOKEN}/${apk_name}"
           cat > latest.json <<JSON
           {
             "version": "${version}",
@@ -157,8 +167,11 @@ jobs:
           }
           JSON
 
-          gh release create "claire-v${version}" "$apk_name" "latest.json" \
-            --repo "${{ github.repository }}" \
-            --title "Readest Claire ${version}" \
-            --notes "Build Claire (voix locale + cloud R2). Installe une fois, mises à jour auto ensuite." \
-            --latest
+          # The APK first, then latest.json: the updater never sees a version
+          # whose APK is not there yet. Never `gh release`: the repo is public.
+          for f in "$apk_name" latest.json; do
+            curl --fail --silent --show-error -X PUT -H "X-Upload-Key: ${UPLOAD_KEY}" \
+              --upload-file "$f" "${RELAY_URL}/maj/${f}"
+            echo
+          done
+          echo "Uploaded ${apk_name} and latest.json to the relay."

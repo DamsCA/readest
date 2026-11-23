@@ -719,6 +719,48 @@ async function handleProofread(request, env) {
   }
 }
 
+// --- Mises a jour de l'appli (23/11/2026) -----------------------------------
+// L'APK contient le jeton du relais : publie sur GitHub (depot PUBLIC), il
+// donnait a n'importe qui la voix et la reecriture de Damien. L'APK et son
+// latest.json ne sont donc plus publies la-bas : la fabrication les depose ici
+// (PUT /maj/<fichier>, cle d'envoi UPLOAD_KEY, qui n'est jamais dans l'APK) et
+// l'appli les lit a /maj/<RELAY_TOKEN>/<fichier>. Sans le bon jeton : 404,
+// comme si rien n'existait.
+const MAJ_FILE = /^(latest\.json|Readest-Claire_[\w.-]+\.apk)$/;
+const MAJ_TYPE = (name) =>
+  name.endsWith('.json') ? 'application/json' : 'application/vnd.android.package-archive';
+
+async function handleUpdates(request, env, url) {
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (!env.UPDATES) return json(404, { error: 'not found' });
+  if (request.method === 'PUT' && parts.length === 2) {
+    const name = parts[1];
+    if (!env.UPLOAD_KEY || request.headers.get('X-Upload-Key') !== env.UPLOAD_KEY) {
+      return json(403, { error: 'forbidden' });
+    }
+    if (!MAJ_FILE.test(name)) return json(400, { error: 'bad file name' });
+    await env.UPDATES.put(name, request.body, { httpMetadata: { contentType: MAJ_TYPE(name) } });
+    return json(200, { ok: true, name });
+  }
+  if ((request.method === 'GET' || request.method === 'HEAD') && parts.length === 3) {
+    const [, token, name] = parts;
+    if (!env.RELAY_TOKEN || token !== env.RELAY_TOKEN || !MAJ_FILE.test(name)) {
+      return json(404, { error: 'not found' });
+    }
+    const obj = await env.UPDATES.get(name);
+    if (!obj) return json(404, { error: 'not found' });
+    return new Response(request.method === 'HEAD' ? null : obj.body, {
+      headers: {
+        'Content-Type': obj.httpMetadata?.contentType || MAJ_TYPE(name),
+        'Content-Length': String(obj.size),
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+  return json(404, { error: 'not found' });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -726,6 +768,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return json(200, { status: 'ok', model: FREE_MODEL, keyConfigured: !!env.FISH_KEY });
     }
+    if (url.pathname.startsWith('/maj/')) return handleUpdates(request, env, url);
     if (url.pathname === '/v1/translate') return handleTranslate(request, env);
     if (url.pathname === '/v1/rewrite') return handleRewrite(request, env);
     if (url.pathname === '/v1/proofread') return handleProofread(request, env);

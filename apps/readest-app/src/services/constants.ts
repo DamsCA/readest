@@ -824,7 +824,12 @@ export const SHARE_CFI_MAX_LENGTH = 512;
 // build (e.g. 0.11.18) that can't even install over the fork's own signature.
 // Hardcoded (not env-derived) so it can never silently fall back to the official
 // host if a NEXT_PUBLIC_ var fails to inline at build time.
-const LATEST_DOWNLOAD_BASE_URL = 'https://github.com/DamsCA/readest/releases/latest/download';
+// Personal build (23 Nov 2026): the APK and its latest.json are served by the
+// relay behind its token, set at build time. They are no longer published on
+// GitHub: the repo is public and the APK carries the relay token.
+const LATEST_DOWNLOAD_BASE_URL =
+  process.env['NEXT_PUBLIC_UPDATER_BASE_URL'] ||
+  'https://github.com/DamsCA/readest/releases/latest/download';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 

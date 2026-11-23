@@ -24,3 +24,9 @@ binding = "AI"
 name = "TRANSLATE_LIMITER"
 namespace_id = "1002"
 simple = { limit = 120, period = 60 }
+
+# Mises a jour de l'appli (APK + latest.json) : plus sur GitHub public, car
+# l'APK contient le jeton du relais. Voir handleUpdates dans src/index.js.
+[[r2_buckets]]
+binding = "UPDATES"
+bucket_name = "readest-claire-maj"
