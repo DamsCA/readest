@@ -59,7 +59,7 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
     <Button
       icon={
         <IconTranslate
-          className={translationEnabled ? 'text-blue-500' : 'text-base-content'}
+          className={translationEnabled ? 'lel-accent-text' : 'text-base-content'}
           size={iconSize20}
         />
       }

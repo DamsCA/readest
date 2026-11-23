@@ -107,7 +107,7 @@ const BookItem: React.FC<BookItemProps> = ({
         {isSelectMode && (
           <div className='absolute bottom-1 right-1'>
             {bookSelected ? (
-              <IconChecked className='fill-blue-500' />
+              <IconChecked className='fill-[#e8c06a] drop-shadow-sm' />
             ) : (
               <IconUnchecked className='fill-gray-300 drop-shadow-sm' />
             )}

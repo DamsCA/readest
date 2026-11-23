@@ -270,7 +270,7 @@ const BooknoteItem: React.FC<BooknoteItemProps> = ({ bookKey, item, isNearest, o
             {isEditable && (
               <button
                 onClick={item.type === 'bookmark' ? editBookmark : editNote.bind(null, item)}
-                className='btn btn-ghost btn-xs p-0 text-blue-500 opacity-0 transition duration-300 ease-in-out hover:bg-transparent group-focus-within:opacity-100 group-hover:opacity-100'
+                className='btn btn-ghost btn-xs lel-accent-text p-0 opacity-0 transition duration-300 ease-in-out hover:bg-transparent group-focus-within:opacity-100 group-hover:opacity-100'
                 aria-label={_('Edit')}
               >
                 <MdEdit size={size18} />

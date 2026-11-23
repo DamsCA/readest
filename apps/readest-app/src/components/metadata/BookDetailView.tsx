@@ -105,7 +105,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 className={!metadata ? 'btn-disabled opacity-50' : ''}
                 title={_('Edit Metadata')}
               >
-                <IconEdit className='hover:fill-blue-500' />
+                <IconEdit className='hover:fill-[#c79a3c]' />
               </button>
             )}
             {book.uploadedAt && onDownload && (

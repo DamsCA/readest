@@ -1,6 +1,6 @@
 import clsx from 'clsx';
+import { IconFile, IconWarning } from '@/components/icons/lisetlead';
 import React from 'react';
-import { MdErrorOutline, MdInsertDriveFile } from 'react-icons/md';
 
 import Dialog from '@/components/Dialog';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -39,7 +39,7 @@ const FailedImportsDialog: React.FC<FailedImportsDialogProps> = ({ failedImports
             'bg-error/8 text-base-content border-error/15 border px-3.5 py-2.5',
           )}
         >
-          <MdErrorOutline className='text-error h-5 w-5 flex-shrink-0' aria-hidden='true' />
+          <IconWarning className='text-error h-5 w-5 flex-shrink-0' aria-hidden='true' />
           <p className='text-[0.85em] leading-snug'>{subtitle}</p>
         </div>
 
@@ -51,10 +51,7 @@ const FailedImportsDialog: React.FC<FailedImportsDialogProps> = ({ failedImports
         >
           {failedImports.map((item, index) => (
             <li key={`${item.filename}-${index}`} className='flex items-center gap-2.5 px-3 py-2'>
-              <MdInsertDriveFile
-                className='text-base-content/40 h-4 w-4 flex-shrink-0'
-                aria-hidden='true'
-              />
+              <IconFile className='text-base-content/40 h-4 w-4 flex-shrink-0' aria-hidden='true' />
               <div className='flex min-w-0 flex-1 flex-col'>
                 <span className='break-all text-[0.9em] font-medium leading-snug'>
                   {item.filename}

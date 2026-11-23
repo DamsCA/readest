@@ -1,6 +1,6 @@
 import clsx from 'clsx';
+import { IconFolderOpen } from '@/components/icons/lisetlead';
 import React, { useState } from 'react';
-import { MdFolderOpen } from 'react-icons/md';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
@@ -275,7 +275,7 @@ const ImportFromFolderDialog: React.FC<ImportFromFolderDialogProps> = ({
             title={directory || _('Choose a folder')}
             aria-label={_('Choose a folder')}
           >
-            <MdFolderOpen className='text-base-content/70 h-5 w-5 flex-shrink-0' />
+            <IconFolderOpen className='text-base-content/70 h-5 w-5 flex-shrink-0' />
             <span className={clsx('min-w-0 flex-1 truncate', !directory && 'text-base-content/50')}>
               {directory || _('Choose a folder')}
             </span>

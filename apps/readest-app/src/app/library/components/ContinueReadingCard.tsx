@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Headphones } from 'lucide-react';
+import { IconListen } from '@/components/icons/lisetlead';
 import { Book } from '@/types/book';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -76,7 +76,7 @@ const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen,
           onClick={() => onListen(book)}
           className='flex h-12 w-12 items-center justify-center rounded-full bg-[#F2C14E] text-[#3A2A06] transition-transform active:scale-95'
         >
-          <Headphones aria-hidden='true' className='h-5 w-5' />
+          <IconListen aria-hidden='true' className='h-5 w-5' />
         </button>
         <button
           type='button'

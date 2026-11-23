@@ -1,6 +1,6 @@
 import React from 'react';
+import { IconBack } from '@/components/icons/lisetlead';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MdArrowBack } from 'react-icons/md';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { navigateToLibrary } from '@/utils/nav';
@@ -55,7 +55,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ groupBy, groupName }) => {
         className='btn btn-ghost btn-sm h-8 min-h-8 px-2'
         aria-label={_('Back to library')}
       >
-        <MdArrowBack size={iconSize} />
+        <IconBack size={iconSize} />
       </button>
       <div className='flex items-center gap-2 overflow-hidden'>
         <span className='text-neutral-content text-sm'>{getGroupTypeLabel()}:</span>

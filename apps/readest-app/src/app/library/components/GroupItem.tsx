@@ -1,6 +1,6 @@
 import clsx from 'clsx';
+import { IconChecked, IconNext, IconPrevious, IconUnchecked } from '@/components/icons/lisetlead';
 import { useEffect, useRef, useState } from 'react';
-import { MdCheckCircle, MdCheckCircleOutline, MdChevronRight, MdChevronLeft } from 'react-icons/md';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
@@ -159,7 +159,7 @@ const GroupItem: React.FC<GroupItemProps> = ({ mode, group, isSelectMode, groupS
                 className='absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110'
               >
                 <div className='bg-base-100 border-base-content/10 hover:border-base-content/30 rounded-full border p-1 shadow-sm transition-colors duration-200'>
-                  <MdChevronLeft
+                  <IconPrevious
                     size={16}
                     className='text-base-content/50 hover:text-base-content/70'
                   />
@@ -181,10 +181,7 @@ const GroupItem: React.FC<GroupItemProps> = ({ mode, group, isSelectMode, groupS
                 className='absolute right-2 top-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110'
               >
                 <div className='bg-base-100 border-base-content/10 hover:border-base-content/30 rounded-full border p-1 shadow-sm transition-colors duration-200'>
-                  <MdChevronRight
-                    size={16}
-                    className='text-base-content/50 hover:text-base-content/70'
-                  />
+                  <IconNext size={16} className='text-base-content/50 hover:text-base-content/70' />
                 </div>
               </button>
             </div>
@@ -201,9 +198,9 @@ const GroupItem: React.FC<GroupItemProps> = ({ mode, group, isSelectMode, groupS
         {isSelectMode && (
           <div className='absolute bottom-1 right-1'>
             {groupSelected ? (
-              <MdCheckCircle className='fill-blue-500' />
+              <IconChecked className='fill-[#e8c06a] drop-shadow-sm' />
             ) : (
-              <MdCheckCircleOutline className='fill-gray-300 drop-shadow-sm' />
+              <IconUnchecked className='fill-gray-300 drop-shadow-sm' />
             )}
           </div>
         )}

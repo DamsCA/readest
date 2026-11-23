@@ -218,3 +218,9 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
 .range {
   --range-shdw: #e8c06a;
 }
+
+/* Lis et Lead's accent for text and line icons (Readest used blue): the gold of the
+   logo, darkened on light themes and lightened on dark ones so it stays readable. */
+.lel-accent-text {
+  color: color-mix(in oklab, #c79a3c 68%, oklch(var(--bc))) !important;
+}

@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import type { IconBaseProps, IconType } from 'react-icons';
 import {
   PiArrowsClockwiseDuotone,
+  PiArrowsDownUpDuotone,
   PiArrowsOutLineVerticalDuotone,
   PiArrowSquareOutDuotone,
   PiArrowUUpLeftDuotone,
@@ -33,6 +34,10 @@ import {
   PiEyedropperDuotone,
   PiFastForwardDuotone,
   PiFileArrowUpDuotone,
+  PiFileDuotone,
+  PiFolderDuotone,
+  PiFolderMinusDuotone,
+  PiFolderOpenDuotone,
   PiFolderPlusDuotone,
   PiFrameCornersDuotone,
   PiGearSixDuotone,
@@ -74,6 +79,7 @@ import {
   PiTrashDuotone,
   PiUserCircleCheckDuotone,
   PiUserCircleDuotone,
+  PiWarningCircleDuotone,
   PiWrenchDuotone,
   PiXBold,
   PiXCircleDuotone,
@@ -112,6 +118,7 @@ export const IconSettings = brand(PiGearSixDuotone, 'IconSettings');
 export const IconMenu = brand(PiListDuotone, 'IconMenu');
 export const IconPlus = brand(PiPlusBold, 'IconPlus');
 export const IconSearch = brand(PiMagnifyingGlassDuotone, 'IconSearch');
+export const IconSort = brand(PiArrowsDownUpDuotone, 'IconSort');
 export const IconSelect = brand(PiSelectionDuotone, 'IconSelect');
 export const IconSelected = brand(PiCheckSquareDuotone, 'IconSelected');
 export const IconFromFile = brand(PiFileArrowUpDuotone, 'IconFromFile');
@@ -186,3 +193,10 @@ export const IconMinus = brand(PiMinusBold, 'IconMinus');
 export const IconRadioOn = brand(PiRadioButtonFill, 'IconRadioOn');
 export const IconRadioOff = brand(PiCircleDuotone, 'IconRadioOff');
 export const IconColorPicker = brand(PiEyedropperDuotone, 'IconColorPicker');
+
+// Folders and files.
+export const IconFolder = brand(PiFolderDuotone, 'IconFolder');
+export const IconFolderOpen = brand(PiFolderOpenDuotone, 'IconFolderOpen');
+export const IconFolderMinus = brand(PiFolderMinusDuotone, 'IconFolderMinus');
+export const IconFile = brand(PiFileDuotone, 'IconFile');
+export const IconWarning = brand(PiWarningCircleDuotone, 'IconWarning');

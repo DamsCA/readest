@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MdLink } from 'react-icons/md';
+import { IconLink } from '@/components/icons/lisetlead';
 import Dialog from '@/components/Dialog';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -102,7 +102,7 @@ const ImportFromUrlDialog: React.FC<ImportFromUrlDialogProps> = ({ isOpen, onClo
             {submitting ? (
               <span className='loading loading-spinner loading-xs' />
             ) : (
-              <MdLink className='h-4 w-4' />
+              <IconLink className='h-4 w-4' />
             )}
             {_('Import')}
           </button>
