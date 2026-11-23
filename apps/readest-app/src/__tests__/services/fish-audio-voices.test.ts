@@ -12,7 +12,10 @@ vi.mock('@/services/tts/TTSUtils', () => ({
     sortVoicesPreferLocaleFunc: vi.fn(() => () => 0),
   },
 }));
-vi.mock('@/utils/misc', () => ({ getUserLocale: vi.fn((lang: string) => lang) }));
+vi.mock('@/utils/misc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/misc')>()),
+  getUserLocale: vi.fn((lang: string) => lang),
+}));
 vi.mock('@/services/environment', () => ({
   getAPIBaseUrl: () => '/api',
   isTauriAppPlatform: () => true,
@@ -25,6 +28,7 @@ import { FishAudioTTSClient } from '@/services/tts/FishAudioTTSClient';
 const CLAIRE = 'da05ae30d8c0428eb47498df524e448c';
 const SARAH = '933563129e564b19a115bedd57b7406a';
 const LAURA = 'e3cd384158934cc9a01029cd7d278634';
+const CLEMENCE = 'a288bdc744da4ad194921adad6863175';
 
 describe('Fish Audio voices', () => {
   beforeEach(() => {
@@ -52,6 +56,19 @@ describe('Fish Audio voices', () => {
     const [group] = await client.getVoices('en');
     const langs = group!.voices.map((v) => v.lang);
     expect(langs.slice(0, 5)).toEqual(['en-US', 'en-US', 'en-US', 'en-US', 'en-US']);
-    expect(group!.voices.at(-1)!.id).toBe(CLAIRE);
+    expect(langs.slice(5)).toEqual(['fr-FR', 'fr-FR', 'fr-FR', 'fr-FR']);
+  });
+
+  it('offers four French voices, Claire first, and keeps the one picked', async () => {
+    const [group] = await new FishAudioTTSClient().getVoices('fr');
+    const french = group!.voices.filter((v) => v.lang === 'fr-FR');
+    expect(french.map((v) => v.name)).toEqual([
+      'Claire (voix premium)',
+      'Clémence (voix premium)',
+      'Mathieu (voix premium)',
+      'Louis (voix premium)',
+    ]);
+    preferred['fr'] = CLEMENCE;
+    expect(new FishAudioTTSClient().getVoiceIdFromLang('fr')).toBe(CLEMENCE);
   });
 });

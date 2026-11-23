@@ -42,6 +42,13 @@ const FISH_AUDIO_VOICES: TTSVoice[] = [
     name: 'Claire (voix premium)',
     lang: 'fr-FR',
   },
+  // More French reading voices (asked 23 Nov 2026), among the most used of the
+  // public Fish Audio library, generic voices only (no famous person, no
+  // character): soft and calm woman (Fish "Clémence", 142,536 uses), deep
+  // documentary man ("Voix de documentaire"), gentle storyteller ("Clyde").
+  { id: 'a288bdc744da4ad194921adad6863175', name: 'Clémence (voix premium)', lang: 'fr-FR' },
+  { id: 'b6efa2e7896645c28589046c576ddb2e', name: 'Mathieu (voix premium)', lang: 'fr-FR' },
+  { id: 'e93fc926cdcb4b0e983509743e07c726', name: 'Louis (voix premium)', lang: 'fr-FR' },
   { id: '933563129e564b19a115bedd57b7406a', name: 'Sarah (voix premium)', lang: 'en-US' },
   { id: 'b347db033a6549378b48d00acb0d06cd', name: 'Selene (voix premium)', lang: 'en-US' },
   { id: 'e3cd384158934cc9a01029cd7d278634', name: 'Laura (voix premium)', lang: 'en-US' },
