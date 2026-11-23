@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getSubscriptionPlan, validateUserAndToken } from '@/utils/access';
+import { createSupabaseAdminClient } from '@/utils/supabase';
 import { UsageStatsManager } from '@/utils/usage';
 
 // Server-side proxy for Fish Audio TTS, the premium voices of Lis et Lead.
@@ -8,18 +9,22 @@ import { UsageStatsManager } from '@/utils/usage';
 // headers and because the API key must stay on the server. The Tauri apps go
 // through the relay (relay/fish-audio) instead. See FishAudioTTSClient.
 //
-// Premium voices are a Plus feature, metered per month so that every
-// subscriber stays profitable: Fish Audio S2.1 Pro costs $15 per million UTF-8
-// bytes, about $1.25 per hour of audio (docs.fish.audio, read 22 Nov 2026).
+// Premium voices are a Plus feature, metered per month. For the launch they run
+// on Fish Audio's free model (S2.1 Pro Free, $0, "fair-use limits" — the docs
+// say it is for testing, development and smaller businesses, and recommend the
+// paid s2.1-pro for production; docs.fish.audio, read 23 Nov 2026). The owner's
+// choice: free model while the audience grows, the paid one ($15 per million
+// UTF-8 bytes) once subscriptions pay for it — then only this line changes.
 // A free reader gets a short taste each month to hear the difference.
 const FISH_AUDIO_TTS_URL = 'https://api.fish.audio/v1/tts';
 // ?timestamps=1: same synthesis plus per-word timings, streamed back untouched
 // as Server-Sent Events (parsed by services/tts/fishTimestamps.ts).
 const FISH_AUDIO_TIMED_URL = 'https://api.fish.audio/v1/tts/stream/with-timestamp';
-// The paid model: the free one (s2.1-pro-free) is meant for personal use.
-const FISH_AUDIO_MODEL = 's2.1-pro';
-// About 1,250 characters of French per minute of speech.
-const PAID_VOICE_CHARS_PER_MONTH = 150_000; // ~2 hours
+const FISH_AUDIO_MODEL = 's2.1-pro-free';
+// Plus: about two books a month, at most (the owner's dosage). A full book
+// runs 478,000 to 528,000 characters (Think and Grow Rich, Ask and It Is Given
+// in French), so two books are about a million.
+const PAID_VOICE_CHARS_PER_MONTH = 1_000_000;
 const FREE_VOICE_CHARS_PER_MONTH = 2_500; // ~2 minutes
 const USAGE_TYPE = 'premium_voice_chars';
 const MAX_CHARS_PER_REQUEST = 2_000;
@@ -28,6 +33,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const refuse = (status: number, error: string) => Response.json({ error }, { status });
+
+// A few accounts listen without the monthly cap (the owner's own, for the
+// readers' leaderboard): public.plans.voice_unlimited, set by hand in the
+// database, never from the app. Any failure reads as "no", so the cap holds.
+const hasUnlimitedVoice = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await createSupabaseAdminClient()
+      .from('plans')
+      .select('voice_unlimited')
+      .eq('id', userId)
+      .maybeSingle();
+    return !error && data?.voice_unlimited === true;
+  } catch {
+    return false;
+  }
+};
 
 // Shared memory of the premium voice: the same sentence, read by the same
 // voice with the same settings, is synthesized (and paid) once for everyone,
@@ -93,10 +114,12 @@ export async function POST(req: NextRequest) {
 
   const plan = getSubscriptionPlan(token);
   const paid = plan !== 'free';
-  const used = await UsageStatsManager.getCurrentUsage(user.id, USAGE_TYPE, 'monthly');
-  const allowance = paid ? PAID_VOICE_CHARS_PER_MONTH : FREE_VOICE_CHARS_PER_MONTH;
-  if (used + text.length > allowance) {
-    return refuse(paid ? 429 : 402, paid ? 'VOICE_QUOTA_EXCEEDED' : 'PLUS_REQUIRED');
+  if (!(await hasUnlimitedVoice(user.id))) {
+    const used = await UsageStatsManager.getCurrentUsage(user.id, USAGE_TYPE, 'monthly');
+    const allowance = paid ? PAID_VOICE_CHARS_PER_MONTH : FREE_VOICE_CHARS_PER_MONTH;
+    if (used + text.length > allowance) {
+      return refuse(paid ? 429 : 402, paid ? 'VOICE_QUOTA_EXCEEDED' : 'PLUS_REQUIRED');
+    }
   }
 
   let upstream: Response;

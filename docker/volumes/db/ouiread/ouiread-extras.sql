@@ -22,6 +22,11 @@ DROP POLICY IF EXISTS select_own_plan ON public.plans;
 CREATE POLICY select_own_plan ON public.plans
   FOR SELECT TO authenticated USING ((SELECT auth.uid()) = id);
 
+-- Écoute des voix premium sans plafond mensuel (le compte du propriétaire,
+-- pour le classement des lecteurs). Posée à la main dans la base, jamais par
+-- l'appli : aucune politique n'ouvre l'écriture de plans aux lecteurs.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS voice_unlimited boolean NOT NULL DEFAULT false;
+
 -- La ligne est créée en même temps que le compte.
 CREATE OR REPLACE FUNCTION public.ouiread_handle_new_user()
 RETURNS trigger
