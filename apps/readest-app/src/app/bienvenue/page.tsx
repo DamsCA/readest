@@ -106,7 +106,7 @@ export default function BienvenuePage() {
                 Commencer gratuitement
               </LienBibliotheque>
               <p className='text-center text-sm text-[#f3ecdd]/65 sm:text-left'>
-                Sans carte bancaire · un livre offert
+                Sans carte bancaire · un livre spectaculaire offert
               </p>
             </div>
           </div>
