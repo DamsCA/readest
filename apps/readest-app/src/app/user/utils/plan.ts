@@ -28,6 +28,11 @@ export type PlanDetails = {
   features: FeatureType[];
   limits?: Record<string, string | number>;
   products?: ProductInfo[];
+  /** One line under the price: what the plan changes for the reader. */
+  pitch?: string;
+  /** Colour of the ticks, and of the action button. */
+  checkColor?: string;
+  buttonColor?: string;
 };
 
 const getProductFeature = (productId: string): QuotaFeature | undefined => {
@@ -98,41 +103,48 @@ export function getPlanDetails(
         products: purchasableProducts,
       };
     }
-    // Lis et Lead's two plans (22 Nov 2026): the free plan shows what it lacks,
-    // so the difference with Plus is felt in reading, not just read about.
+    // Lis et Lead's two plans. The texts sell the reading, not the machinery
+    // (23 Nov 2026: « des textes marketing de haut niveau… qui donnent envie de
+    // prendre un abonnement »): the free plan gives a real taste of everything,
+    // Plus keeps it for the whole book. No caps or figures for the reader: those
+    // are in the CGV.
     case 'free':
       return {
         name: _('Gratuit'),
         plan: planCode,
         type: 'subscription',
-        color: 'bg-gray-200 text-gray-800',
-        hintColor: 'text-gray-800/75',
+        color: 'bg-[#f3ecdd] text-[#16241f] border-[#16241f]/10',
+        hintColor: 'text-[#16241f]/70',
+        checkColor: 'text-[#16241f]/60',
         price: 0,
         currency,
         productId: availablePlan?.productId,
         interval: interval === 'month' ? _('month') : _('year'),
+        pitch: _('Pour découvrir, sur vos propres livres.'),
         features: [
           {
-            label: _('Votre bibliothèque partout'),
+            label: _('Votre bibliothèque, partout'),
             description: _(
-              'Vos livres, votre progression, vos surlignages et vos notes sur tous vos appareils.',
+              'Vos livres, votre page, vos surlignages et vos notes vous suivent sur tous vos appareils.',
             ),
           },
           {
             label: _('Traduction standard'),
             description: _(
-              'Une traduction automatique classique. Et chaque jour, un avant-goût de la traduction IA.',
+              'Une traduction automatique classique, pour comprendre. Et chaque jour, un avant-goût de la traduction IA.',
             ),
           },
           {
             label: _('Voix standard'),
             description: _(
-              'Des voix de synthèse classiques pour écouter vos livres, et un avant-goût des voix premium.',
+              'Des voix de synthèse pour écouter vos livres, et un avant-goût des voix premium.',
             ),
           },
           {
-            label: _('Un livre offert'),
-            description: _('« Ça marche », dans votre bibliothèque dès l’inscription.'),
+            label: _('« Ça marche », offert'),
+            description: _(
+              'Le petit classique de R. H. Jarrett vous attend dans votre bibliothèque.',
+            ),
           },
         ],
       };
@@ -141,31 +153,40 @@ export function getPlanDetails(
         name: _('Plus'),
         plan: planCode,
         type: 'subscription',
-        color: 'bg-blue-200 text-blue-800',
-        hintColor: 'text-blue-800/75',
+        color: 'bg-[#16241f] text-[#f3ecdd] border-[#e8c06a]/40',
+        hintColor: 'text-[#f3ecdd]/70',
+        checkColor: 'text-[#e8c06a]',
+        buttonColor: 'bg-[#e8c06a] text-[#16241f] hover:bg-[#f3d58f]',
         price: availablePlan?.price || 699,
         currency,
         productId: availablePlan?.productId,
         interval: interval === 'month' ? _('month') : _('year'),
+        pitch: _('Les grands livres du monde, comme s’ils avaient été écrits en français.'),
         features: [
           {
             label: _('Tout le gratuit, et en plus :'),
           },
           {
-            label: _('Traduction IA naturelle'),
+            label: _('Une traduction digne d’un traducteur'),
             description: _(
-              'Les expressions rendues comme par un traducteur humain : « il pleut des cordes », pas « il pleut des chats et des chiens ».',
+              'Le sens, le ton et les expressions : « il pleut des cordes », jamais « il pleut des chats et des chiens ». Du vrai français, du premier chapitre au dernier.',
             ),
           },
           {
-            label: _('Voix naturelles premium'),
+            label: _('Des voix qui donnent vie au livre'),
             description: _(
-              'Des voix expressives, proches d’un vrai lecteur, pour écouter vos livres.',
+              'Des voix premium expressives, qui respirent avec le texte. Vos trajets, votre sport, vos tâches deviennent des heures de lecture.',
             ),
           },
           {
-            label: _('Stockage en ligne'),
-            description: _('De la place pour toute votre bibliothèque.'),
+            label: _('Toute votre bibliothèque en ligne'),
+            description: _('Tous vos livres retrouvés intacts, sur chaque appareil.'),
+          },
+          {
+            label: _('Sans engagement'),
+            description: _(
+              'Vous arrêtez quand vous voulez, depuis votre compte, et Plus reste actif jusqu’au bout de la période payée.',
+            ),
           },
         ],
       };

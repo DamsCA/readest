@@ -32,12 +32,19 @@ const PlanActionButton: React.FC<PlanActionButtonProps> = ({
       );
     }
     return (
-      <button
-        onClick={() => onSubscribe(plan.productId)}
-        className='w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700'
-      >
-        {_('Upgrade to {{plan}}', { plan: _(plan.name) })}
-      </button>
+      <>
+        <button
+          onClick={() => onSubscribe(plan.productId)}
+          className={`w-full rounded-lg px-6 py-3 font-semibold transition-colors ${
+            plan.buttonColor ?? 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {_('Upgrade to {{plan}}', { plan: _(plan.name) })}
+        </button>
+        <p className={`mt-2 text-center text-xs ${plan.hintColor}`}>
+          {_('Sans engagement · paiement sécurisé par Stripe')}
+        </p>
+      </>
     );
   }
 
@@ -45,7 +52,7 @@ const PlanActionButton: React.FC<PlanActionButtonProps> = ({
     return (
       <button
         onClick={() => onSelectPlan(1)}
-        className='w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700'
+        className='w-full rounded-lg bg-[#16241f] px-6 py-3 font-semibold text-[#f3ecdd] transition-colors hover:bg-[#24382f]'
       >
         {_('Upgrade to Plus or Pro')}
       </button>

@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 };
 
 const INSCRIPTION = '/auth?inscription=1';
+// Plus : le compte d'abord, puis la page des offres.
+const INSCRIPTION_PLUS = '/auth?inscription=1&redirect=/user';
 
 const Exemple = ({ vo, classique, nous }: { vo: string; classique: string; nous: string }) => (
   <div className='rounded-2xl bg-white/5 p-5 ring-1 ring-white/10'>
@@ -205,56 +207,85 @@ export default function BienvenuePage() {
         </div>
       </section>
 
-      {/* Prix */}
+      {/* Prix. Les leviers, sans rien inventer : l'autorité (Truman) et l'identité
+          (« les leaders sont des lecteurs »), le prix ramené au mois et au jour,
+          l'ancrage du livre de poche, l'économie réelle de l'année (−28 %), le
+          contraste gratuit / Plus, l'essai sur ses propres livres et la sortie
+          libre. Prix vérifiés sur Stripe le 23/11/2026 : 6,99 € et 59,99 €. */}
       <section className='mx-auto max-w-5xl px-5 py-14 sm:px-8 md:py-20'>
-        <h2 className='text-center font-serif text-3xl font-bold sm:text-4xl'>
-          Commencez gratuitement
+        <figure className='mx-auto max-w-2xl text-center'>
+          <blockquote className='font-serif text-xl italic leading-snug text-[#16241f]/80 sm:text-2xl'>
+            « Tous les lecteurs ne sont pas des leaders, mais tous les leaders sont des lecteurs. »
+          </blockquote>
+          <figcaption className='mt-2 text-sm text-[#16241f]/55'>Harry S. Truman</figcaption>
+        </figure>
+        <h2 className='mt-10 text-center font-serif text-3xl font-bold sm:text-4xl'>
+          Pour moins qu’un livre de poche par mois, chaque livre que vous ouvrez vous parle en
+          français.
         </h2>
-        <p className='mx-auto mt-3 max-w-xl text-center text-lg text-[#16241f]/70'>
-          Passez à Plus quand vous voulez la meilleure traduction et les plus belles voix.
+        <p className='mx-auto mt-3 max-w-2xl text-center text-lg text-[#16241f]/70'>
+          Commencez gratuitement. Passez à Plus le jour où vous voulez la plume d’un vrai traducteur
+          et des voix qui donnent vie à chaque page.
         </p>
         <div className='mx-auto mt-10 grid max-w-3xl gap-5 md:grid-cols-2'>
-          <div className='rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#16241f]/10'>
+          <div className='flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#16241f]/10'>
             <p className='text-lg font-semibold'>Gratuit</p>
             <p className='mt-2 text-4xl font-bold'>0 €</p>
-            <ul className='mt-6 space-y-3 text-[15px]'>
-              <Coche>Lecture de vos livres, sur tous vos appareils</Coche>
+            <p className='mt-2 text-sm text-[#16241f]/60'>
+              Pour découvrir, sur vos propres livres.
+            </p>
+            <ul className='mb-8 mt-6 space-y-3 text-[15px]'>
+              <Coche>Vos livres sur tous vos appareils</Coche>
               <Coche>Traduction standard illimitée</Coche>
-              <Coche>Un avant-goût de la traduction IA chaque jour</Coche>
+              <Coche>Chaque jour, un avant-goût de la traduction IA</Coche>
               <Coche>Voix standard, et un avant-goût des voix premium</Coche>
               <Coche>« Ça marche » offert</Coche>
               <Coche>Bientôt : le classement des meilleurs lecteurs</Coche>
             </ul>
             <LienBibliotheque
               href={INSCRIPTION}
-              className='mt-8 block rounded-full py-3 text-center font-semibold ring-1 ring-[#16241f]/20 hover:bg-[#16241f]/5'
+              className='mt-auto block rounded-full py-3 text-center font-semibold ring-1 ring-[#16241f]/20 hover:bg-[#16241f]/5'
             >
-              Créer mon compte
+              Créer mon compte gratuit
             </LienBibliotheque>
           </div>
 
-          <div className='relative rounded-3xl bg-[#16241f] p-7 text-[#f3ecdd] shadow-xl'>
-            <span className='absolute -top-3 right-6 rounded-full bg-[#d6ebe0] px-3 py-1 text-xs font-bold text-[#16241f]'>
+          <div className='relative flex flex-col rounded-3xl bg-[#16241f] p-7 text-[#f3ecdd] shadow-xl ring-1 ring-[#e8c06a]/40'>
+            <span className='absolute -top-3 right-6 rounded-full bg-[#e8c06a] px-3 py-1 text-xs font-bold text-[#16241f]'>
               Recommandé
             </span>
             <p className='text-lg font-semibold'>Plus</p>
-            <p className='mt-2'>
-              <span className='text-4xl font-bold'>5 €</span>
-              <span className='text-[#f3ecdd]/70'> par mois</span>
+            <p className='mt-2 flex flex-wrap items-center gap-x-2 gap-y-1'>
+              <span>
+                <span className='text-4xl font-bold'>5 €</span>
+                <span className='text-[#f3ecdd]/70'> par mois</span>
+              </span>
+              <span className='rounded-full bg-[#e8c06a]/15 px-2 py-0.5 text-xs font-semibold text-[#e8c06a]'>
+                −28 % avec l’année
+              </span>
             </p>
-            <p className='text-sm text-[#f3ecdd]/60'>59,99 € par an, ou 6,99 € au mois</p>
-            <ul className='mt-6 space-y-3 text-[15px]'>
+            <p className='mt-1 text-sm text-[#f3ecdd]/60'>
+              59,99 € par an, moins de 17 centimes par jour. Ou 6,99 € au mois.
+            </p>
+            <p className='mt-4 font-serif text-lg italic leading-snug text-[#f3ecdd]/90'>
+              Les grands livres du monde, comme s’ils avaient été écrits en français.
+            </p>
+            <ul className='mb-8 mt-6 space-y-3 text-[15px]'>
               <Coche>Tout le gratuit, et en plus :</Coche>
-              <Coche>Traduction IA naturelle, comme par un traducteur humain</Coche>
-              <Coche>Voix premium expressives, proches d’un vrai lecteur</Coche>
-              <Coche>De la place pour toute votre bibliothèque</Coche>
+              <Coche>Une traduction digne d’un traducteur : le sens, le ton, les expressions</Coche>
+              <Coche>Des voix premium qui donnent vie à chaque page</Coche>
+              <Coche>Toute votre bibliothèque en ligne, sur chaque appareil</Coche>
+              <Coche>Sans engagement : vous arrêtez quand vous voulez</Coche>
             </ul>
             <LienBibliotheque
-              href={INSCRIPTION}
-              className='mt-8 block rounded-full bg-[#d6ebe0] py-3 text-center font-bold text-[#16241f] hover:bg-white'
+              href={INSCRIPTION_PLUS}
+              className='mt-auto block rounded-full bg-[#e8c06a] py-3 text-center font-bold text-[#16241f] hover:bg-[#f3d58f]'
             >
-              Essayer gratuitement
+              Je choisis Plus
             </LienBibliotheque>
+            <p className='mt-2 text-center text-xs text-[#f3ecdd]/55'>
+              Paiement sécurisé par Stripe
+            </p>
           </div>
         </div>
       </section>
@@ -283,6 +314,14 @@ export default function BienvenuePage() {
                 politique de confidentialité
               </a>
               .
+            </Question>
+            <Question q='Puis-je essayer Plus avant de payer ?'>
+              Oui, sur vos propres livres : le compte gratuit vous offre chaque jour un avant-goût
+              de la traduction IA et des voix premium. Vous jugez sur pièce, puis vous décidez.
+            </Question>
+            <Question q='Combien coûte Plus ?'>
+              5 € par mois avec l’abonnement annuel (59,99 € par an), ou 6,99 € au mois. Le paiement
+              passe par Stripe : votre carte n’est jamais enregistrée chez nous.
             </Question>
             <Question q='Et si Plus ne me convient pas ?'>
               L’abonnement est sans engagement : vous l’arrêtez quand vous voulez depuis votre

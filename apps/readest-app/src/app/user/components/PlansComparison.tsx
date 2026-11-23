@@ -31,6 +31,12 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const allPlans = userPlans.map((plan) => ({
     ...getPlanDetails(plan, availablePlans, interval),
   }));
+  // What the year saves on twelve months, from the real prices (« −28 % »).
+  const plusPrice = (value: PlanInterval) =>
+    availablePlans.find((p) => p.plan === 'plus' && p.interval === value)?.price;
+  const monthly = plusPrice('month');
+  const yearly = plusPrice('year');
+  const saving = monthly && yearly ? Math.floor((1 - yearly / (monthly * 12)) * 100) : 0;
 
   useEffect(() => {
     if (userPlan) {
@@ -148,7 +154,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
               }`}
               onClick={() => setBillingInterval(value)}
             >
-              {value === 'month' ? 'Mensuel' : 'Annuel · 5 € par mois'}
+              {value === 'month' ? 'Mensuel' : saving > 0 ? `Annuel · −${saving} %` : 'Annuel'}
             </button>
           ))}
         </div>

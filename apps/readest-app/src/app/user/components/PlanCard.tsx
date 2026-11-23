@@ -29,10 +29,19 @@ const PlanCard: React.FC<PlanCardProps> = ({
 }) => {
   const _ = useTranslation();
   const { price, currency } = plan;
-  const formattedPrice = new Intl.NumberFormat(getLocale(), {
-    style: 'currency',
-    currency,
-  }).format(price / 100);
+  const money = (cents: number) =>
+    new Intl.NumberFormat(getLocale(), {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: Math.round(cents) % 100 === 0 ? 0 : 2,
+    }).format(Math.round(cents) / 100);
+  const formattedPrice = money(price);
+  // A paid plan reads by the month, and by the day: « 5 €/mois, moins de
+  // 17 centimes par jour » weighs less than « 59,99 €/an ».
+  const yearly = plan.interval === 'year';
+  const shownPrice = yearly ? money(price / 12) : formattedPrice;
+  // Always strictly above the real figure, so « moins de » stays true.
+  const perDay = Math.floor(price / (yearly ? 365 : 30)) + 1;
 
   return (
     <div
@@ -41,7 +50,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
       style={{ scrollSnapAlign: 'start' }}
     >
       <div
-        className={`rounded-xl border-2 p-4 ${plan.color} ${index === currentPlanIndex ? 'ring-2 ring-blue-500' : ''}`}
+        className={`rounded-xl border-2 p-4 ${plan.color} ${index === currentPlanIndex ? 'ring-2 ring-[#e8c06a]' : ''}`}
       >
         <div className='mb-6 text-center'>
           <h4 className='mb-2 text-2xl font-bold'>{_(plan.name)}</h4>
@@ -51,21 +60,38 @@ const PlanCard: React.FC<PlanCardProps> = ({
               <>0 €</>
             ) : plan.plan !== 'purchase' ? (
               <>
-                {formattedPrice}
-                <span className='text-lg font-normal'>/{_(plan.interval)}</span>
+                {shownPrice}
+                <span className='text-lg font-normal'>/{_('month')}</span>
               </>
             ) : (
               <span className='text-lg font-normal'>{_('On-Demand Purchase')}</span>
             )}
           </div>
+          {plan.plan !== 'purchase' && price > 0 && (
+            <p className={`mt-1 text-sm ${plan.hintColor}`}>
+              {yearly
+                ? _('{{price}} par an, soit moins de {{cents}} centimes par jour', {
+                    price: formattedPrice,
+                    cents: perDay,
+                  })
+                : _('Moins de {{cents}} centimes par jour', { cents: perDay })}
+            </p>
+          )}
+          {plan.pitch && (
+            <p className='mx-auto mt-4 max-w-xs font-serif text-lg italic leading-snug'>
+              {_(plan.pitch)}
+            </p>
+          )}
         </div>
 
         <div role='none' className='mb-6 space-y-3' onClick={() => onSelectPlan(index)}>
           {plan.features.map((feature, featureIndex) => (
             <div key={featureIndex} className='flex flex-col'>
               <div className='flex items-center gap-2'>
-                <IoCheckmark className='h-5 w-5 flex-shrink-0 text-green-500' />
-                <span>{_(feature.label)}</span>
+                <IoCheckmark
+                  className={`h-5 w-5 flex-shrink-0 ${plan.checkColor ?? 'text-green-500'}`}
+                />
+                <span className='font-medium'>{_(feature.label)}</span>
               </div>
               {feature.description && (
                 <div className={`ms-7 text-sm sm:text-xs ${plan.hintColor}`}>

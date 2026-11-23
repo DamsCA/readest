@@ -27,7 +27,7 @@ describe('getPlanDetails', () => {
   describe('free plan', () => {
     it('should return free plan details with no available plans', () => {
       const result = getPlanDetails('free', []);
-      expect(result.name).toBe('Free Plan');
+      expect(result.name).toBe('Gratuit');
       expect(result.plan).toBe('free');
       expect(result.type).toBe('subscription');
       expect(result.price).toBe(0);
@@ -44,14 +44,14 @@ describe('getPlanDetails', () => {
       const result = getPlanDetails('free', []);
       expect(result.features.length).toBeGreaterThan(0);
       const labels = result.features.map((f) => f.label);
-      expect(labels).toContain('Cross-Platform Sync');
-      expect(labels).toContain('AI Read Aloud');
+      expect(labels).toContain('Votre bibliothèque, partout');
+      expect(labels).toContain('« Ça marche », offert');
     });
 
-    it('should include limits', () => {
+    // Lis et Lead shows readers no caps: they are in the CGV (22 Nov 2026).
+    it('shows no limits', () => {
       const result = getPlanDetails('free', []);
-      expect(result.limits).toBeDefined();
-      expect(Object.keys(result.limits!).length).toBeGreaterThan(0);
+      expect(result.limits).toBeUndefined();
     });
 
     it('should use month interval label by default', () => {
@@ -75,7 +75,7 @@ describe('getPlanDetails', () => {
     it('should return plus plan details', () => {
       const plans = [makePlan({ plan: 'plus', price: 499 })];
       const result = getPlanDetails('plus', plans);
-      expect(result.name).toBe('Plus Plan');
+      expect(result.name).toBe('Plus');
       expect(result.plan).toBe('plus');
       expect(result.type).toBe('subscription');
       expect(result.price).toBe(499);
@@ -83,23 +83,21 @@ describe('getPlanDetails', () => {
 
     it('should use default price when no matching plan found', () => {
       const result = getPlanDetails('plus', []);
-      expect(result.price).toBe(499);
+      expect(result.price).toBe(699);
     });
 
     it('should include expected features', () => {
       const result = getPlanDetails('plus', []);
       const labels = result.features.map((f) => f.label);
-      expect(labels).toContain('Includes All Free Plan Benefits');
-      expect(labels).toContain('Unlimited AI Read Aloud Hours');
-      expect(labels).toContain('Priority Support');
+      expect(labels).toContain('Tout le gratuit, et en plus :');
+      expect(labels).toContain('Une traduction digne d’un traducteur');
+      expect(labels).toContain('Sans engagement');
+      expect(result.pitch).toBeTruthy();
     });
 
-    it('should include limits with storage and translation', () => {
+    it('shows no limits', () => {
       const result = getPlanDetails('plus', []);
-      expect(result.limits).toBeDefined();
-      const limitKeys = Object.keys(result.limits!);
-      expect(limitKeys.some((k) => k.includes('Storage'))).toBe(true);
-      expect(limitKeys.some((k) => k.includes('Translation'))).toBe(true);
+      expect(result.limits).toBeUndefined();
     });
 
     it('should match correct plan by interval', () => {
@@ -138,23 +136,11 @@ describe('getPlanDetails', () => {
       expect(labels).toContain('Advanced AI Tools');
     });
 
-    it('should have higher storage limit than plus', () => {
+    it('keeps its storage limit', () => {
       const proResult = getPlanDetails('pro', []);
-      const plusResult = getPlanDetails('plus', []);
-
-      // Both should have limits
-      expect(proResult.limits).toBeDefined();
-      expect(plusResult.limits).toBeDefined();
-
-      // Find storage limit values
-      const proStorageKey = Object.keys(proResult.limits!).find((k) => k.includes('Storage'));
-      const plusStorageKey = Object.keys(plusResult.limits!).find((k) => k.includes('Storage'));
+      const proStorageKey = Object.keys(proResult.limits ?? {}).find((k) => k.includes('Storage'));
       expect(proStorageKey).toBeDefined();
-      expect(plusStorageKey).toBeDefined();
-
-      // Pro should have 20 GB, Plus should have 5 GB
       expect(proResult.limits![proStorageKey!]).toBe('20 GB');
-      expect(plusResult.limits![plusStorageKey!]).toBe('5 GB');
     });
   });
 
@@ -181,8 +167,18 @@ describe('getPlanDetails', () => {
           price: 5000,
           productName: 'Expensive',
         }),
-        makePlan({ plan: 'purchase', productId: 'prod_cheap', price: 1000, productName: 'Cheap' }),
-        makePlan({ plan: 'purchase', productId: 'prod_mid', price: 3000, productName: 'Mid' }),
+        makePlan({
+          plan: 'purchase',
+          productId: 'prod_cheap',
+          price: 1000,
+          productName: 'Cheap',
+        }),
+        makePlan({
+          plan: 'purchase',
+          productId: 'prod_mid',
+          price: 3000,
+          productName: 'Mid',
+        }),
       ];
       const result = getPlanDetails('purchase', plans);
       expect(result.products).toBeDefined();
@@ -265,7 +261,7 @@ describe('getPlanDetails', () => {
     it('should fall back to free plan for unknown plan code', () => {
       const result = getPlanDetails('unknown_plan' as UserPlan, []);
       expect(result.plan).toBe('free');
-      expect(result.name).toBe('Free Plan');
+      expect(result.name).toBe('Gratuit');
     });
   });
 
@@ -295,7 +291,11 @@ describe('getPlanDetails', () => {
     it('should handle plan with no interval specified', () => {
       // A plan with no interval should match any interval request
       const plans = [
-        makePlan({ plan: 'purchase', price: 1999, interval: undefined as unknown as PlanInterval }),
+        makePlan({
+          plan: 'purchase',
+          price: 1999,
+          interval: undefined as unknown as PlanInterval,
+        }),
       ];
       // When interval is not set on available plan, it should still be found
       const result = getPlanDetails('purchase', plans);
