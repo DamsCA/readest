@@ -1,8 +1,10 @@
 import clsx from 'clsx';
 import {
+  IconAI,
   IconAutoTheme,
   IconCloudSync,
   IconMoon,
+  IconNext,
   IconSettings,
   IconSun,
   IconSync,
@@ -195,8 +197,11 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     setIsOpenLastBooks(newValue);
   };
 
+  // Signed in: straight to the offers on the account page. Not yet: create
+  // the account first, then the offers.
   const handleUpgrade = () => {
-    navigateToProfile(router);
+    if (user) navigateToProfile(router);
+    else router.push('/auth?inscription=1&redirect=/user');
     setIsDropdownOpen?.(false);
   };
 
@@ -320,6 +325,20 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
       )}
       onCancel={() => setIsDropdownOpen?.(false)}
     >
+      {/* The owner's ask (23 Nov 2026): the way to Plus must stand out, first
+          and in the logo's gold, for every reader not yet on Plus. */}
+      {PAYMENTS_ENABLED && (!user || userProfilePlan === 'free') && (
+        <button type='button' className='lel-plus-cta' onClick={handleUpgrade}>
+          <IconAI size={22} aria-hidden='true' />
+          <span className='lel-plus-cta-text'>
+            <span className='font-display lel-plus-cta-title'>{_('Passer à Plus')}</span>
+            <span className='lel-plus-cta-sub'>
+              {_('Traduction digne d’un traducteur et voix premium')}
+            </span>
+          </span>
+          <IconNext size={18} aria-hidden='true' />
+        </button>
+      )}
       {READEST_CLOUD_ENABLED && user ? (
         <MenuItem
           label={
@@ -493,9 +512,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         </ul>
       </MenuItem>
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {PAYMENTS_ENABLED && user && userProfilePlan === 'free' && (
-        <MenuItem label={_('Passer à Plus')} onClick={handleUpgrade} />
-      )}
       {READEST_PREMIUM_ENABLED && READEST_CLOUD_ENABLED && isWebAppPlatform() && (
         <MenuItem label={_('Download Readest')} onClick={downloadReadest} />
       )}

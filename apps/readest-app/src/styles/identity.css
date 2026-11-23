@@ -224,3 +224,67 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
 .lel-accent-text {
   color: color-mix(in oklab, #c79a3c 68%, oklch(var(--bc))) !important;
 }
+
+/* ---------- The way to Plus, first in the settings menu ---------- */
+
+.lel-plus-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: calc(100% - 0.5rem);
+  min-height: 3.5rem;
+  margin: 0.25rem 0.25rem 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #f3d48d 0%, #e8c06a 45%, #c79a3c 100%);
+  color: #16241f;
+  text-align: start;
+  box-shadow: 0 8px 20px -10px rgba(199, 154, 60, 0.9);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.lel-plus-cta:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) {
+  .lel-plus-cta:hover {
+    box-shadow: 0 10px 24px -10px rgba(199, 154, 60, 1);
+  }
+}
+.lel-plus-cta svg {
+  flex-shrink: 0;
+  color: #16241f;
+  fill: #16241f;
+}
+/* The gold second layer of the icons would vanish on gold. */
+.lel-plus-cta .lel-icon path[opacity='0.2'] {
+  fill: #16241f !important;
+  opacity: 0.25;
+}
+.lel-plus-cta-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.lel-plus-cta-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.lel-plus-cta-sub {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  opacity: 0.82;
+}
+html[data-eink='true'] .lel-plus-cta {
+  background: none;
+  border: 2px solid currentColor;
+  box-shadow: none;
+  color: inherit;
+}
+html[data-eink='true'] .lel-plus-cta svg {
+  color: inherit;
+  fill: currentColor;
+}

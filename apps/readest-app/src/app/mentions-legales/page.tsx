@@ -5,10 +5,14 @@ export const metadata: Metadata = { title: 'Mentions légales' };
 
 export default function MentionsLegalesPage() {
   return (
-    <LegalPage title='Mentions légales' updated='22 novembre 2026'>
+    <LegalPage title='Mentions légales' updated='23 novembre 2026'>
       <h2>Éditeur</h2>
       <p>
-        Damien Aure
+        Damien Aure, entrepreneur individuel (micro-entreprise)
+        <br />
+        SIREN 103 994 711 · SIRET 103 994 711 00010
+        <br />
+        72 chemin Café, 97419 La Possession, La Réunion, France
         <br />
         Téléphone : 06 67 90 72 53
         <br />
