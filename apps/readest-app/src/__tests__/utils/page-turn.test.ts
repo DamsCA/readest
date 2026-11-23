@@ -29,80 +29,66 @@ vi.mock('@/utils/pageCurl', async (importOriginal) => {
   };
 });
 
-const { archAt, archHeight, archPoint, edgeOf, EDGE_SHARE, halfAngle, preparePageShots } =
-  await import('@/utils/pageCurl');
-const { applyPaginatorSwipe, bookTurnActive, dragPageLikeABook, turnPageLikeABook } = await import(
-  '@/utils/pageTurn'
-);
+const { edgeOf, liftAt, preparePageShots, sheetAt, sheetPoint } = await import('@/utils/pageCurl');
+const { applyPaginatorSwipe, bookTurnActive, dragPageLikeABook, followFinger, turnPageLikeABook } =
+  await import('@/utils/pageTurn');
 
-// The sheet turns as in Google Play Books (23 Nov 2026): whole, arched between
-// the spine and its free edge.
+// The sheet moves as Google Play Books' page does, measured on a recording
+// (23 Nov 2026): it slides away whole towards the spine, lifting as it goes.
 describe('the paper', () => {
   it('lies flat before the turn', () => {
-    expect(halfAngle(1)).toBeCloseTo(0, 6);
-    for (const s of [0, 0.3, 1]) expect(archPoint(s, 1)).toEqual({ x: s, z: 0, back: false });
-    expect(archAt(0)).toMatchObject({ top: 1, bottom: 1, shift: 0 });
+    for (const s of [0, 0.3, 1]) expect(sheetPoint(s, 0)).toEqual({ x: s, scale: 1, z: 0 });
   });
 
-  it('arches up between the spine and the free edge, its length unchanged', () => {
-    const e = 0.6;
-    expect(archPoint(0, e).x).toBeCloseTo(0, 9);
-    expect(archPoint(0, e).z).toBeCloseTo(0, 9);
-    // The free edge lies where it is held, on the page.
-    expect(archPoint(1, e).x).toBeCloseTo(e, 9);
-    expect(archPoint(1, e).z).toBeCloseTo(0, 9);
-    // In between, the paper rises, highest halfway, its text still showing.
-    const mid = archPoint(0.5, e);
-    expect(mid.z).toBeCloseTo(archHeight(e), 9);
-    expect(mid.z).toBeGreaterThan(0.2);
-    expect(mid.back).toBe(false);
-    // Measured along the arch, the sheet is still a page wide.
-    let length = 0;
-    let prev = archPoint(0, e);
-    for (let i = 1; i <= 1000; i++) {
-      const p = archPoint(i / 1000, e);
-      length += Math.hypot(p.x - prev.x, p.z - prev.z);
-      prev = p;
+  it('slides whole, its text never squeezed', () => {
+    for (const p of [0.1, 0.3, 0.6, 0.8]) {
+      // Two points a fifth of a page apart stay about that far apart (on the
+      // recording, at most 3 % closer near the free edge).
+      for (const s of [0.4, 0.6, 0.8]) {
+        expect(sheetPoint(s, p).x - sheetPoint(s - 0.2, p).x).toBeGreaterThanOrEqual(0.19);
+      }
     }
-    expect(length).toBeCloseTo(1, 3);
   });
 
-  it('rises higher as the free edge nears the spine', () => {
-    expect(archHeight(0.4)).toBeGreaterThan(archHeight(0.7));
-    expect(archHeight(0.7)).toBeGreaterThan(archHeight(0.95));
-  });
-
-  it('has the whole sheet past the spine at the end of the turn', () => {
-    const end = archAt(1);
-    expect(end.top).toBe(0);
-    for (let i = 0; i <= 20; i++) {
-      expect(archPoint(i / 20, end.top, end.shift).x).toBeLessThan(0);
+  it('lifts most on the spine’s side, a little at the free edge', () => {
+    for (const p of [0.35, 0.6, 0.8]) {
+      expect(liftAt(0.05, p)).toBeGreaterThan(liftAt(0.5, p));
+      expect(liftAt(0.5, p)).toBeGreaterThan(liftAt(1, p));
+      expect(liftAt(1, p)).toBeGreaterThan(0);
     }
-    expect(edgeOf(end)).toBeLessThan(0);
+    // Up to a fifth larger, as measured.
+    expect(sheetPoint(0.9, 0.8).scale).toBeGreaterThan(1.15);
+    expect(sheetPoint(0.9, 0.8).scale).toBeLessThan(1.25);
   });
 
-  it('goes on without a jump, flat to gone', () => {
-    let last = edgeOf(archAt(0));
+  it('holds the sheet down at the spine as it starts, bulging just past it', () => {
+    expect(liftAt(0, 0.1)).toBeLessThan(0.01);
+    expect(liftAt(0.25, 0.1)).toBeGreaterThan(liftAt(0, 0.1) + 0.03);
+  });
+
+  it('goes from flat to gone past the spine, without a jump', () => {
+    let last = edgeOf(sheetAt(0));
     expect(last).toBe(1);
     for (let i = 1; i <= 100; i++) {
-      const now = edgeOf(archAt(i / 100));
-      expect(now).toBeLessThanOrEqual(last + 1e-12);
+      const now = edgeOf(sheetAt(i / 100));
+      expect(now).toBeLessThan(last);
       expect(last - now).toBeLessThan(0.05);
       last = now;
     }
-    expect(edgeOf(archAt(EDGE_SHARE))).toBeCloseTo(0, 9);
+    // At the end, nothing of the sheet is left on the page.
+    for (const s of [0, 0.5, 1]) expect(sheetPoint(s, 1).x).toBeLessThanOrEqual(1e-9);
   });
 
-  it('leans the free edge round the finger, and not at all at the spine', () => {
-    const leaning = archAt(0.3, false, 0.2, 0.5);
-    expect(leaning.top).toBeLessThan(leaning.bottom);
-    expect((leaning.top + leaning.bottom) / 2).toBeCloseTo(edgeOf(archAt(0.3)), 9);
-    const atSpine = archAt(EDGE_SHARE, false, 0.2, 0.5);
-    expect(atSpine.top).toBeCloseTo(atSpine.bottom, 9);
+  it('follows the finger as on the recording: lifted first, then carried, ahead at the end', () => {
+    expect(followFinger(0)).toBeLessThan(0.02);
+    expect(followFinger(0.1)).toBeLessThan(0.06);
+    expect(followFinger(0.42)).toBeCloseTo(0.35, 1);
+    expect(followFinger(0.64)).toBeCloseTo(0.65, 1);
+    expect(followFinger(0.9)).toBe(1);
   });
 
   it('turns the other way for a right-to-left book', () => {
-    expect(archAt(0.4, true)).toEqual({ ...archAt(0.4), rtl: true });
+    expect(sheetAt(0.4, true)).toEqual({ p: 0.4, rtl: true });
   });
 });
 
@@ -214,7 +200,7 @@ describe('a tap', () => {
     const xs = folds();
     expect(xs.length).toBeGreaterThan(10);
     expect(xs[0]).toBe(1);
-    expect(xs.at(-1)).toBeLessThan(0);
+    expect(xs.at(-1)).toBeLessThanOrEqual(0);
     for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeLessThanOrEqual(xs[i - 1]!);
     expect(log.at(-1)).toBe('hide');
     // The next turn's photographs are taken once this one is done.
@@ -229,7 +215,7 @@ describe('a tap', () => {
     expect((sheet as HTMLCanvasElement).id).toBe('before');
     expect((under as HTMLCanvasElement).id).toBe('shown');
     const xs = folds();
-    expect(xs[0]).toBeLessThan(0);
+    expect(xs[0]).toBeLessThanOrEqual(0);
     expect(xs.at(-1)).toBe(1);
   });
 
@@ -258,17 +244,17 @@ describe('a tap', () => {
 });
 
 describe('a finger', () => {
-  it('holds the free edge, and the page turns when let go far enough', async () => {
+  it('carries the page along, and the page turns when let go far enough', async () => {
     const { view, turns } = makeView();
     const drag = dragPageLikeABook(view, 1, { x: 900, y: 1000 })!;
     drag.move({ x: 450, y: 1000 });
-    // Halfway to the spine, the free edge is halfway too.
-    expect(folds().at(-1)).toBeCloseTo(0.5, 6);
-    expect(drag.progress()).toBeCloseTo(EDGE_SHARE * 0.5, 6);
+    // Halfway to the spine, the sheet has gone as far as on the recording.
+    expect(drag.progress()).toBeCloseTo(followFinger(0.5), 6);
+    expect(folds().at(-1)).toBeLessThan(0.75);
     drag.release(true);
     await vi.waitFor(() => expect(stage.hide).toHaveBeenCalled(), { timeout: 3000 });
     expect(turns).toEqual(['next:jump']);
-    expect(folds().at(-1)).toBeLessThan(0);
+    expect(folds().at(-1)).toBeLessThanOrEqual(0);
   });
 
   // The paginator's own swipe, still on, turned a second page as the finger

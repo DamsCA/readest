@@ -2,14 +2,19 @@ import { snapdom } from '@zumer/snapdom';
 import { FoliateView } from '@/types/view';
 
 // A page that turns like paper, its text on it (asked 22 Nov 2026: « il faudrait
-// qu'on ait l'impression de vraiment tourner une page »). The first sheet rolled
-// its corner round a cylinder and showed its back; on 23 Nov 2026, shown how
-// Google Play Books turns a page: « c'est tellement plus satisfaisant que le
-// nôtre ». The sheet now turns that way: whole, its text always showing, it
-// arches up between the spine and its free edge, which the finger holds; the
-// higher it rises the closer it comes (a little perspective), and at the end it
-// slips away past the spine. The page underneath lies flat beside it, in the
-// arch's soft shadow.
+// qu'on ait l'impression de vraiment tourner une page »). On 23 Nov 2026, shown
+// a recording of Google Play Books: « c'est tellement plus satisfaisant que le
+// nôtre ». A sheet rolled round a cylinder, then an arch closing into a loop,
+// both read as paper rolling up (« la façon dont ça s'enroule, c'est bizarre »).
+//
+// So the sheet now moves as measured, frame by frame, on that recording: it
+// slides away whole towards the spine, its text never squeezed (the drawing on
+// the page kept its width to within 4 %), lifting towards the reader as it goes,
+// most on the spine's side (up to a fifth larger there, barely at the free
+// edge), seen from an eye above the spine's side; it narrows to a strip at the
+// spine and is gone. The finger first lifts it, then carries it, and at the end
+// it goes faster than the finger. The page underneath lies flat beside it, in
+// its soft shadow.
 //
 // The page is photographed ahead of time (snapdom: its chapter whole, the page
 // cut out of it), and the sheet is drawn with WebGL. The paginator jumps to the
@@ -21,85 +26,74 @@ export interface Pt {
 }
 
 /**
- * A turning sheet. Its free edge lies `top` (at the top of the page) to
- * `bottom` (at its foot) page widths from the spine: 1 flat, 0 at the spine.
- * The paper between arches up, its length unchanged. At the end of a turn the
- * sheet slips `shift` page widths past the spine. The spine is on the right in
- * a right-to-left book.
+ * A turning sheet, `p` of the way through its turn: 0 lying flat, 1 gone past
+ * the spine. The spine is on the right in a right-to-left book.
  */
-export interface Arch {
-  top: number;
-  bottom: number;
-  shift: number;
+export interface Sheet {
+  p: number;
   rtl: boolean;
 }
 
 /** No turn: the sheet lies flat. */
-export const FLAT: Arch = { top: 1, bottom: 1, shift: 0, rtl: false };
+export const FLAT: Sheet = { p: 0, rtl: false };
 
-// The share of a turn in which the free edge goes from its place to the spine;
-// in the rest, the sheet, arched up into a loop, slips this far past the spine.
-export const EDGE_SHARE = 0.82;
-export const SLIDE = 0.3;
-// Where the eye is, above the page's middle, in page heights.
-const CAMERA = 2.2;
+// Where the eye is, across the page from the spine (in page widths): measured
+// on the recording, the sheet grows round a point near the spine.
+export const EYE_X = 0.083;
+// How much of that growth shows in height. The recorded page had dark margins
+// round it to grow into; this one fills the screen, and its top lines, grown
+// whole, ran into the chapter title above them.
+export const GROWTH_IN_HEIGHT = 0.4;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-
-/**
- * The arc's half angle when its ends are `e` page widths apart, for a sheet a
- * page width long: sin(a) / a = e (0: flat, π: closed into a loop).
- */
-export const halfAngle = (e: number) => {
-  const k = clamp01(e);
-  let lo = 0;
-  let hi = Math.PI;
-  for (let i = 0; i < 40; i++) {
-    const m = (lo + hi) / 2;
-    if ((m < 1e-9 ? 1 : Math.sin(m) / m) > k) lo = m;
-    else hi = m;
-  }
-  return (lo + hi) / 2;
+const smooth = (a: number, b: number, x: number) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
 };
 
 /**
- * Where the point `s` page widths from the spine goes when the free edge is
- * `e` page widths from it: x from the spine and z towards the reader, in page
- * widths, and whether the back of the sheet shows there.
+ * How far towards the eye the sheet has risen (0: on the page; 1: at the eye),
+ * at `u` of the way from the spine to its free edge, `p` of the way through the
+ * turn. Fitted to the recording: early on the sheet is held down at the spine
+ * and bulges just past it; then it rises most at the spine, less and less
+ * towards the free edge, which lifts too as the turn goes on.
  */
-export const archPoint = (s: number, e: number, shift = 0) => {
-  const a = halfAngle(e);
-  if (a < 1e-6) return { x: s - shift, z: 0, back: false };
-  const r = 0.5 / a;
-  const g = 2 * a * s - a;
-  return {
-    x: e / 2 + r * Math.sin(g) - shift,
-    z: r * (Math.cos(g) - Math.cos(a)),
-    back: Math.cos(g) < 0,
-  };
-};
-
-/** How high the arch rises, in page widths. */
-export const archHeight = (e: number) => {
-  const a = halfAngle(e);
-  return a < 1e-6 ? 0 : (0.5 / a) * (1 - Math.cos(a));
+export const liftAt = (u: number, p: number) => {
+  const q = clamp01(p);
+  const atSpine = 0.168 * (1 - Math.exp(-q / 0.2));
+  const atEdge = Math.min(0.85 * atSpine, 0.012 + 0.05 * q + 0.3 * q ** 4);
+  const pinned = 1 - smooth(0.18, 0.33, q);
+  const crest = 0.22 * (1 - smooth(0.15, 0.33, q));
+  const sharp = 1 + 1.5 * (1 - smooth(0.18, 0.4, q));
+  const uu = clamp01(u);
+  const t = clamp01((uu - crest) / (1 - crest));
+  const shape = atEdge + (atSpine - atEdge) * (0.5 * (1 + Math.cos(Math.PI * t))) ** sharp;
+  return shape * (1 - pinned * Math.exp(-uu / 0.04));
 };
 
 /**
- * The sheet `q` of the way through a turn (0: flat, 1: gone past the spine).
- * `tilt` leans the free edge, its top ahead when positive, round the height
- * `pivot` (0: the top, 1: the foot) where the finger holds it.
+ * Where the point `s` page widths from the spine shows (x from the spine, in
+ * page widths), how much larger it looks there, and how high it has risen.
  */
-export const archAt = (q: number, rtl = false, tilt = 0, pivot = 0.5): Arch => {
-  const t = clamp01(q);
-  const e = t < EDGE_SHARE ? 1 - t / EDGE_SHARE : 0;
-  const shift = t < EDGE_SHARE ? 0 : ((t - EDGE_SHARE) / (1 - EDGE_SHARE)) * SLIDE;
-  const lean = tilt * e;
-  return { top: e - lean * pivot, bottom: e + lean * (1 - pivot), shift, rtl };
+export const sheetPoint = (s: number, p: number) => {
+  const q = clamp01(p);
+  const x = s - q;
+  const z = liftAt(x / Math.max(1 - q, 1e-4), q);
+  const scale = 1 / (1 - z);
+  return { x: EYE_X + (x - EYE_X) * scale, scale, z };
 };
 
-/** How far the sheet has gone, in page widths: 1 flat, below 0 past the spine. */
-export const edgeOf = (a: Arch) => (clamp01(a.top) + clamp01(a.bottom)) / 2 - a.shift;
+/** How dark the sheet's shadow is at its edge (0..1), gone as the sheet leaves. */
+export const shadowAt = (p: number) => {
+  const q = clamp01(p);
+  return 0.36 * (1 - Math.exp(-q / 0.12)) * Math.min(1, (1 - q) / 0.12);
+};
+
+/** Where the free edge shows, in page widths from the spine (1 flat). */
+export const edgeOf = (sheet: Sheet) => sheetPoint(1, sheet.p).x;
+
+/** The sheet `p` of the way through a turn. */
+export const sheetAt = (p: number, rtl = false): Sheet => ({ p: clamp01(p), rtl });
 
 // ---------- The page's photograph ----------
 
@@ -250,53 +244,41 @@ export const preparePageShots = (view: FoliateView) => {
 
 // ---------- The sheet, drawn ----------
 
-// The arch's half angle for a free edge e page widths from the spine, as halfAngle.
-const ARCH_GLSL = `
-float halfAngle(float e) {
-  float lo = 0.0;
-  float hi = 3.14159265;
-  for (int i = 0; i < 26; i++) {
-    float m = 0.5 * (lo + hi);
-    float v = m < 1e-5 ? 1.0 : sin(m) / m;
-    if (v > e) lo = m; else hi = m;
-  }
-  return 0.5 * (lo + hi);
+// liftAt, for the GPU.
+const LIFT_GLSL = `
+float liftAt(float u, float p) {
+  float atSpine = 0.168 * (1.0 - exp(-p / 0.2));
+  float atEdge = min(0.85 * atSpine, 0.012 + 0.05 * p + 0.3 * p * p * p * p);
+  float pinned = 1.0 - smoothstep(0.18, 0.33, p);
+  float crest = 0.22 * (1.0 - smoothstep(0.15, 0.33, p));
+  float sharp = 1.0 + 1.5 * (1.0 - smoothstep(0.18, 0.4, p));
+  float uu = clamp(u, 0.0, 1.0);
+  float t = clamp((uu - crest) / (1.0 - crest), 0.0, 1.0);
+  float shape = atEdge + (atSpine - atEdge) * pow(max(0.5 * (1.0 + cos(3.14159265 * t)), 0.0), sharp);
+  return shape * (1.0 - pinned * exp(-uu / 0.04));
 }`;
 
 const SHEET_VS = `
 attribute vec2 aUV;
-uniform vec2 uSize;
-uniform float uTop;
-uniform float uBottom;
-uniform float uShift;
+uniform float uP;
 uniform float uRtl;
-uniform float uCamera;
+uniform float uEyeX;
+uniform float uGrowthY;
 varying vec2 vUV;
-varying vec2 vN;
-${ARCH_GLSL}
+${LIFT_GLSL}
 void main() {
-  float e = clamp(mix(uTop, uBottom, aUV.y), 0.0, 1.0);
+  // Book coordinates: from the spine across, in page widths; down, in heights.
   float s = uRtl > 0.5 ? 1.0 - aUV.x : aUV.x;
-  float xb = s;
-  float z = 0.0;
-  vec2 n = vec2(0.0, 1.0);
-  if (e < 0.99999) {
-    float a = halfAngle(e);
-    float r = 0.5 / a;
-    float g = 2.0 * a * s - a;
-    xb = 0.5 * e + r * sin(g);
-    z = r * (cos(g) - cos(a));
-    n = vec2(sin(g), cos(g));
-  }
-  xb -= uShift;
-  float x = (uRtl > 0.5 ? 1.0 - xb : xb) * uSize.x;
-  float zp = z * uSize.x;
-  // Seen from above the page's middle: what rises comes closer, and grows.
-  vec2 c = 0.5 * uSize;
-  vec2 p = c + (vec2(x, aUV.y * uSize.y) - c) * (uCamera / max(uCamera - zp, 1.0));
+  float x = s - uP;
+  float span = max(1.0 - uP, 1e-4);
+  float u = x / span;
+  float z = liftAt(u, uP);
+  float scale = 1.0 / (1.0 - z);
+  float xb = uEyeX + (x - uEyeX) * scale;
+  float y = 0.5 + (aUV.y - 0.5) * (1.0 + uGrowthY * (scale - 1.0));
   vUV = aUV;
-  vN = n;
-  gl_Position = vec4(p.x / uSize.x * 2.0 - 1.0, 1.0 - p.y / uSize.y * 2.0, -zp / (2.0 * uSize.x + 1.0), 1.0);
+  float sx = uRtl > 0.5 ? 1.0 - xb : xb;
+  gl_Position = vec4(sx * 2.0 - 1.0, 1.0 - y * 2.0, -z, 1.0);
 }`;
 
 const PRECISION = `
@@ -306,24 +288,12 @@ precision highp float;
 precision mediump float;
 #endif`;
 
+// The sheet as it is: measured on the recording, it keeps its brightness right
+// up to its edge (shading it read as paper rolling up).
 const SHEET_FS = `${PRECISION}
 uniform sampler2D uTex;
-uniform vec3 uPaper;
 varying vec2 vUV;
-varying vec2 vN;
-void main() {
-  vec4 t = texture2D(uTex, vUV);
-  if (vN.y >= 0.0) {
-    // The printed side, a little darker where it turns from the light, most on
-    // the slope that falls towards the free edge.
-    float k = 0.86 + 0.14 * vN.y - 0.07 * max(vN.x, 0.0);
-    gl_FragColor = vec4(t.rgb * k, 1.0);
-  } else {
-    // The back of the sheet: paper, the text faintly through it.
-    vec3 c = mix(uPaper, t.rgb, 0.12);
-    gl_FragColor = vec4(c * (0.88 - 0.08 * vN.y), 1.0);
-  }
-}`;
+void main() { gl_FragColor = vec4(texture2D(uTex, vUV).rgb, 1.0); }`;
 
 const QUAD_VS = `
 attribute vec2 aUV;
@@ -338,23 +308,17 @@ uniform sampler2D uTex;
 varying vec2 vUV;
 void main() { gl_FragColor = vec4(texture2D(uTex, vUV).rgb, 1.0); }`;
 
-// The arch's shadow on the page underneath, past the free edge: wider and
-// darker the higher it rises, gone as the sheet slips away.
+// The sheet's shadow on the page underneath, as measured on the recording: from
+// the free edge, up to a third darker, fading evenly over a tenth of the page.
 const SHADOW_FS = `${PRECISION}
-uniform vec2 uSize;
-uniform float uTop;
-uniform float uBottom;
-uniform float uShift;
 uniform float uRtl;
-uniform float uLift;
+uniform float uEdge;
+uniform float uStrength;
 varying vec2 vUV;
 void main() {
   float xb = uRtl > 0.5 ? 1.0 - vUV.x : vUV.x;
-  float edge = clamp(mix(uTop, uBottom, vUV.y), 0.0, 1.0) - uShift;
-  float d = (xb - edge) * uSize.x;
-  float reach = (0.02 + 0.45 * uLift) * uSize.x + 6.0;
-  float strength = 0.30 * clamp(uLift / 0.2, 0.0, 1.0) * (1.0 - clamp(uShift / ${SLIDE.toFixed(2)}, 0.0, 1.0));
-  float a = d > 0.0 && d < reach ? strength * pow(1.0 - d / reach, 2.0) : 0.0;
+  float d = (xb - uEdge) / 0.095;
+  float a = d > 0.0 && d < 1.0 ? uStrength * (1.0 - d) : 0.0;
   gl_FragColor = vec4(0.0, 0.0, 0.0, a);
 }`;
 
@@ -382,18 +346,6 @@ const compile = (gl: WebGLRenderingContext, vs: string, fs: string) => {
   return program;
 };
 
-const toRGB = (color: string): [number, number, number] => {
-  const probe = document.createElement('canvas').getContext('2d');
-  if (!probe) return [1, 1, 1];
-  probe.fillStyle = '#ffffff';
-  probe.fillStyle = color;
-  const hex = probe.fillStyle as string;
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-  if (m) return [1, 2, 3].map((i) => parseInt(m[i]!, 16) / 255) as [number, number, number];
-  const rgb = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(hex);
-  return rgb ? [+rgb[1]! / 255, +rgb[2]! / 255, +rgb[3]! / 255] : [1, 1, 1];
-};
-
 /** The canvas over the reading area where the turning sheet is drawn. */
 export class CurlStage {
   readonly canvas: HTMLCanvasElement;
@@ -408,9 +360,6 @@ export class CurlStage {
   private sheetTex: WebGLTexture;
   private underTex: WebGLTexture;
   private hasUnder = false;
-  private paper: [number, number, number] = [1, 1, 1];
-  private w = 1;
-  private h = 1;
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -492,14 +441,12 @@ export class CurlStage {
     rect: DOMRect,
     sheet: HTMLCanvasElement,
     under: HTMLCanvasElement | null,
-    paper: string,
+    _paper: string,
     host: Element | null = null,
   ) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const parent = host ?? document.body;
     if (this.canvas.parentElement !== parent) parent.appendChild(this.canvas);
-    this.w = rect.width;
-    this.h = rect.height;
     Object.assign(this.canvas.style, {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
@@ -509,7 +456,6 @@ export class CurlStage {
     });
     this.canvas.width = Math.round(rect.width * dpr);
     this.canvas.height = Math.round(rect.height * dpr);
-    this.paper = toRGB(paper);
     this.upload(this.sheetTex, sheet);
     this.hasUnder = !!under;
     if (under) this.upload(this.underTex, under);
@@ -523,7 +469,7 @@ export class CurlStage {
     return this.gl.isContextLost();
   }
 
-  draw(a: Arch) {
+  draw(sheet: Sheet) {
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -539,13 +485,8 @@ export class CurlStage {
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     };
-    const arch = (program: WebGLProgram) => {
-      gl.uniform2f(gl.getUniformLocation(program, 'uSize'), this.w, this.h);
-      gl.uniform1f(gl.getUniformLocation(program, 'uTop'), a.top);
-      gl.uniform1f(gl.getUniformLocation(program, 'uBottom'), a.bottom);
-      gl.uniform1f(gl.getUniformLocation(program, 'uShift'), a.shift);
-      gl.uniform1f(gl.getUniformLocation(program, 'uRtl'), a.rtl ? 1 : 0);
-    };
+    const uniform = (program: WebGLProgram, name: string, value: number) =>
+      gl.uniform1f(gl.getUniformLocation(program, name), value);
 
     if (this.hasUnder) {
       this.select(this.quad);
@@ -556,11 +497,12 @@ export class CurlStage {
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
+    const edge = sheetPoint(1, sheet.p);
     this.select(this.shadow);
     quadAttrib(this.shadow);
-    arch(this.shadow);
-    const e = (clamp01(a.top) + clamp01(a.bottom)) / 2;
-    gl.uniform1f(gl.getUniformLocation(this.shadow, 'uLift'), archHeight(e));
+    uniform(this.shadow, 'uRtl', sheet.rtl ? 1 : 0);
+    uniform(this.shadow, 'uEdge', edge.x);
+    uniform(this.shadow, 'uStrength', shadowAt(sheet.p));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.enable(gl.DEPTH_TEST);
@@ -574,9 +516,10 @@ export class CurlStage {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.sheetTex);
     gl.uniform1i(gl.getUniformLocation(this.sheet, 'uTex'), 0);
-    arch(this.sheet);
-    gl.uniform1f(gl.getUniformLocation(this.sheet, 'uCamera'), CAMERA * this.h);
-    gl.uniform3f(gl.getUniformLocation(this.sheet, 'uPaper'), ...this.paper);
+    uniform(this.sheet, 'uP', sheet.p);
+    uniform(this.sheet, 'uRtl', sheet.rtl ? 1 : 0);
+    uniform(this.sheet, 'uEyeX', EYE_X);
+    uniform(this.sheet, 'uGrowthY', GROWTH_IN_HEIGHT);
     gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
   }
 }

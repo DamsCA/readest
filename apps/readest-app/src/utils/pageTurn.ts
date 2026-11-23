@@ -1,13 +1,12 @@
 import { ViewSettings } from '@/types/book';
 import { FoliateView } from '@/types/view';
 import {
-  archAt,
   curlStage,
-  EDGE_SHARE,
   pageShot,
   paperOf,
   preparePageShots,
   Pt,
+  sheetAt,
   supportsPageCurl,
 } from './pageCurl';
 
@@ -16,21 +15,19 @@ import {
 // the page whole, like a board (« on dirait que ta page a été congelée »), the
 // second folded a photograph of it flat along a straight line, with a blank
 // flap (22 Nov 2026: « c'est bizarre… ça donne pas l'impression qu'on tourne
-// vraiment une page »); the third rolled the corner round a cylinder.
-// Now it turns as in Google Play Books (23 Nov 2026: « c'est tellement plus
-// satisfaisant que le nôtre »): the whole sheet arches up between the spine and
-// its free edge (utils/pageCurl.ts). A tap carries it over the spine; a finger
-// holds its free edge, and lets it finish turning or lie back down. foliate's
-// paginator is left as it is: it jumps to the other page under the sheet
-// without its slide.
+// vraiment une page »); the third rolled the corner round a cylinder, the
+// fourth arched it into a loop (23 Nov 2026: « la façon dont ça s'enroule,
+// c'est bizarre »). Now it moves as Google Play Books' page does, measured on a
+// recording (utils/pageCurl.ts): the sheet slides away whole towards the spine,
+// lifting towards the reader. A tap sends it; a finger carries it, and lets it
+// finish turning or lie back down. foliate's paginator is left as it is: it
+// jumps to the other page under the sheet without its slide.
 
 export type { Pt };
 export type TurnDir = 1 | -1;
 
 // A tap's turn; a drag let go finishes the rest of its turn in less.
-const TURN_MS = 640;
-// How far a finger drawn up or down leans the free edge (of a page width).
-const MAX_TILT = 0.2;
+const TURN_MS = 560;
 // A drag left without news this long is let go: a touch end that never comes
 // must not leave the sheet over the page.
 const IDLE_RELEASE_MS = 10_000;
@@ -81,6 +78,16 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 // page that did not answer the tap (22 Nov 2026).
 const easeTurn = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
+
+/**
+ * How far the sheet has gone (0..1) when the finger has gone `t` of the way to
+ * the spine. Fitted to Google Play Books: the first stretch lifts the sheet
+ * more than it moves it, then it follows, a little ahead of the finger.
+ */
+export const followFinger = (t: number) => {
+  const a = t - 0.15;
+  return clamp01((Math.sqrt(a * a + 0.004) + a) / 1.5);
+};
 
 const plainTurn = (view: FoliateView, dir: TurnDir) =>
   Promise.resolve(dir > 0 ? view.next() : view.prev());
@@ -198,7 +205,7 @@ export const turnPageLikeABook = (view: FoliateView, dir: TurnDir, rtl = false) 
       return;
     }
     const { stage, whole } = sheet;
-    const at = (q: number) => archAt(q, rtl);
+    const at = (q: number) => sheetAt(q, rtl);
     try {
       // The sheet lies exactly over the page before the paginator moves.
       stage.draw(at(dir > 0 ? 0 : 1));
@@ -249,23 +256,21 @@ export const dragPageLikeABook = (
   // lifts, must not snap to a page of its own as well (it turned two pages
   // at once on 22 Nov 2026 when the flag had not been put).
   view.renderer.setAttribute('no-swipe', '');
-  const { stage, w, h } = sheet;
+  const { stage, w } = sheet;
   let markSettled = () => {};
   occupy(new Promise<void>((resolve) => (markSettled = resolve)));
 
   // In the book's own direction: x grows away from the spine.
   const along = (p: Pt) => (rtl ? w - p.x : p.x);
   const startX = along(start);
-  // How far the turn has gone (archAt's q), and how the finger leans the edge.
-  let q = dir > 0 ? 0 : 1;
-  let tilt = 0;
-  let pivot = Math.min(1, Math.max(0, start.y / h));
+  // How far the turn has gone (sheetAt's p).
+  let p = dir > 0 ? 0 : 1;
   let released: boolean | null = null;
   let idle: ReturnType<typeof setTimeout> | undefined;
 
-  const show = (turn: number, lean: number) => stage.draw(archAt(turn, rtl, lean, pivot));
+  const show = (turn: number) => stage.draw(sheetAt(turn, rtl));
 
-  show(q, 0);
+  show(p);
   // The paginator goes to the other page under the sheet once the sheet shows.
   const moved = nextFrame()
     .then(nextFrame)
@@ -273,12 +278,10 @@ export const dragPageLikeABook = (
 
   const settle = async (commit: boolean) => {
     await moved.catch(() => {});
-    const from = q;
+    const from = p;
     const to = commit === dir > 0 ? 1 : 0;
-    const lean = tilt;
-    await play(Math.max(180, 560 * Math.abs(to - from)), (t) => {
-      const k = easeOut(t);
-      show(from + (to - from) * k, lean * (1 - k));
+    await play(Math.max(180, 520 * Math.abs(to - from)), (t) => {
+      show(from + (to - from) * easeOut(t));
     });
     // Laid back down: the paginator returns to its page under the sheet.
     if (!commit) {
@@ -294,23 +297,18 @@ export const dragPageLikeABook = (
       if (released !== null) return;
       const x = along(finger);
       if (dir > 0) {
-        // The free edge goes where the finger draws it, and reaches the spine
-        // with it, as in Google Play Books.
-        const edge = clamp01(x / Math.max(startX, 0.35 * w));
-        q = EDGE_SHARE * (1 - edge);
+        // As on the recording: the first stretch of the finger lifts the
+        // sheet, then it follows, and nears the spine ahead of the finger.
+        p = followFinger(clamp01((startX - x) / Math.max(startX, 0.35 * w)));
       } else {
-        // The page before comes in from past the spine and lies down under
-        // the finger.
-        q = 1 - clamp01((x - startX) / Math.max(w - startX, 0.35 * w));
+        // The page before comes back from the spine and lies down under it.
+        p = 1 - followFinger(clamp01((x - startX) / Math.max(w - startX, 0.35 * w)));
       }
-      // Drawn upwards, the top of the edge leads.
-      pivot = clamp01(finger.y / h);
-      tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, ((start.y - finger.y) / h) * 0.9));
-      show(q, tilt);
+      show(p);
       clearTimeout(idle);
       idle = setTimeout(() => drag.release(drag.progress() > 0.5), IDLE_RELEASE_MS);
     },
-    progress: () => (dir > 0 ? q : 1 - q),
+    progress: () => (dir > 0 ? p : 1 - p),
     release(commit) {
       if (released !== null) return;
       released = commit;
