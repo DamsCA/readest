@@ -29,68 +29,80 @@ vi.mock('@/utils/pageCurl', async (importOriginal) => {
   };
 });
 
-const { curlAt, curlPoint, preparePageShots } = await import('@/utils/pageCurl');
+const { archAt, archHeight, archPoint, edgeOf, EDGE_SHARE, halfAngle, preparePageShots } =
+  await import('@/utils/pageCurl');
 const { applyPaginatorSwipe, bookTurnActive, dragPageLikeABook, turnPageLikeABook } = await import(
   '@/utils/pageTurn'
 );
 
+// The sheet turns as in Google Play Books (23 Nov 2026): whole, arched between
+// the spine and its free edge.
 describe('the paper', () => {
-  const w = 400;
-  const h = 800;
-  const fold = { at: { x: 200, y: 0 }, n: { x: -1, y: 0 }, r: 10 };
-
-  it('lies flat on the spine’s side of the fold', () => {
-    expect(curlPoint({ x: 150, y: 300 }, fold)).toEqual({ x: 150, y: 300, z: 0, back: false });
+  it('lies flat before the turn', () => {
+    expect(halfAngle(1)).toBeCloseTo(0, 6);
+    for (const s of [0, 0.3, 1]) expect(archPoint(s, 1)).toEqual({ x: s, z: 0, back: false });
+    expect(archAt(0)).toMatchObject({ top: 1, bottom: 1, shift: 0 });
   });
 
-  it('rises round the roll just past the fold, its front still showing', () => {
-    const p = curlPoint({ x: 205, y: 300 }, fold);
-    expect(p.z).toBeGreaterThan(0);
-    expect(p.z).toBeLessThan(fold.r);
-    expect(p.back).toBe(false);
-    // Rolled, it covers less of the page than it did flat.
-    expect(p.x).toBeLessThan(205);
-  });
-
-  it('comes back over, its back showing, once round the roll', () => {
-    const p = curlPoint({ x: 300, y: 300 }, fold);
-    expect(p.back).toBe(true);
-    expect(p.z).toBeCloseTo(2 * fold.r, 6);
-    // What is past the half turn of the roll lies back towards the spine.
-    expect(p.x).toBeCloseTo(200 - (100 - Math.PI * fold.r), 6);
-  });
-
-  it('leaves the page flat before the turn', () => {
-    const c = curlAt(w, h, h, 0, 0.1);
-    expect(curlPoint({ x: w, y: h }, c)).toMatchObject({ x: w, y: h, z: 0 });
-    expect(curlPoint({ x: 0, y: 0 }, c)).toMatchObject({ x: 0, y: 0, z: 0 });
-  });
-
-  it('has the whole page past the spine at the end of the turn', () => {
-    const c = curlAt(w, h, h, 1, 0.1);
-    for (const corner of [
-      { x: 0, y: 0 },
-      { x: w, y: 0 },
-      { x: 0, y: h },
-      { x: w, y: h },
-    ]) {
-      expect(curlPoint(corner, c).x).toBeLessThanOrEqual(1e-6);
+  it('arches up between the spine and the free edge, its length unchanged', () => {
+    const e = 0.6;
+    expect(archPoint(0, e).x).toBeCloseTo(0, 9);
+    expect(archPoint(0, e).z).toBeCloseTo(0, 9);
+    // The free edge lies where it is held, on the page.
+    expect(archPoint(1, e).x).toBeCloseTo(e, 9);
+    expect(archPoint(1, e).z).toBeCloseTo(0, 9);
+    // In between, the paper rises, highest halfway, its text still showing.
+    const mid = archPoint(0.5, e);
+    expect(mid.z).toBeCloseTo(archHeight(e), 9);
+    expect(mid.z).toBeGreaterThan(0.2);
+    expect(mid.back).toBe(false);
+    // Measured along the arch, the sheet is still a page wide.
+    let length = 0;
+    let prev = archPoint(0, e);
+    for (let i = 1; i <= 1000; i++) {
+      const p = archPoint(i / 1000, e);
+      length += Math.hypot(p.x - prev.x, p.z - prev.z);
+      prev = p;
     }
+    expect(length).toBeCloseTo(1, 3);
   });
 
-  it('lifts the corner on the way, the roll wider mid-turn', () => {
-    const mid = curlAt(w, h, h, 0.5, 0.1);
-    // Raised, the corner leads: the fold leans upwards.
-    expect(mid.n.y).toBeLessThan(0);
-    expect(mid.r).toBeGreaterThan(curlAt(w, h, h, 0.1, 0.1).r);
+  it('rises higher as the free edge nears the spine', () => {
+    expect(archHeight(0.4)).toBeGreaterThan(archHeight(0.7));
+    expect(archHeight(0.7)).toBeGreaterThan(archHeight(0.95));
+  });
+
+  it('has the whole sheet past the spine at the end of the turn', () => {
+    const end = archAt(1);
+    expect(end.top).toBe(0);
+    for (let i = 0; i <= 20; i++) {
+      expect(archPoint(i / 20, end.top, end.shift).x).toBeLessThan(0);
+    }
+    expect(edgeOf(end)).toBeLessThan(0);
+  });
+
+  it('goes on without a jump, flat to gone', () => {
+    let last = edgeOf(archAt(0));
+    expect(last).toBe(1);
+    for (let i = 1; i <= 100; i++) {
+      const now = edgeOf(archAt(i / 100));
+      expect(now).toBeLessThanOrEqual(last + 1e-12);
+      expect(last - now).toBeLessThan(0.05);
+      last = now;
+    }
+    expect(edgeOf(archAt(EDGE_SHARE))).toBeCloseTo(0, 9);
+  });
+
+  it('leans the free edge round the finger, and not at all at the spine', () => {
+    const leaning = archAt(0.3, false, 0.2, 0.5);
+    expect(leaning.top).toBeLessThan(leaning.bottom);
+    expect((leaning.top + leaning.bottom) / 2).toBeCloseTo(edgeOf(archAt(0.3)), 9);
+    const atSpine = archAt(EDGE_SHARE, false, 0.2, 0.5);
+    expect(atSpine.top).toBeCloseTo(atSpine.bottom, 9);
   });
 
   it('turns the other way for a right-to-left book', () => {
-    const ltr = curlAt(w, h, h, 0.4, 0.1);
-    const rtl = curlAt(w, h, h, 0.4, 0.1, true);
-    expect(rtl.at.x).toBeCloseTo(w - ltr.at.x, 6);
-    expect(rtl.n.x).toBeCloseTo(-ltr.n.x, 6);
-    expect(rtl.n.y).toBeCloseTo(ltr.n.y, 6);
+    expect(archAt(0.4, true)).toEqual({ ...archAt(0.4), rtl: true });
   });
 });
 
@@ -162,9 +174,9 @@ const makeView = ({ atEnd = false } = {}) => {
 
 const picture = (name: string) => Object.assign(document.createElement('canvas'), { id: name });
 
-// The curls drawn, as how far the page has gone (the fold's x: 1000 flat,
-// below 0 gone over).
-const folds = () => stage.draw.mock.calls.map(([c]) => (c as { at: { x: number } }).at.x);
+// The sheets drawn, as how far the page has gone (1 flat, below 0 gone past
+// the spine).
+const folds = () => stage.draw.mock.calls.map(([a]) => edgeOf(a as Parameters<typeof edgeOf>[0]));
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -190,7 +202,7 @@ afterEach(async () => {
 });
 
 describe('a tap', () => {
-  it('rolls the page over the next one while the paginator jumps underneath', async () => {
+  it('carries the page over the next one while the paginator jumps underneath', async () => {
     const { view, renderer, turns } = makeView();
     await turnPageLikeABook(view, 1);
     expect(turns).toEqual(['next:jump']);
@@ -201,7 +213,7 @@ describe('a tap', () => {
     // From flat to gone past the spine, frame after frame.
     const xs = folds();
     expect(xs.length).toBeGreaterThan(10);
-    expect(xs[0]).toBeGreaterThan(1000);
+    expect(xs[0]).toBe(1);
     expect(xs.at(-1)).toBeLessThan(0);
     for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeLessThanOrEqual(xs[i - 1]!);
     expect(log.at(-1)).toBe('hide');
@@ -218,7 +230,7 @@ describe('a tap', () => {
     expect((under as HTMLCanvasElement).id).toBe('shown');
     const xs = folds();
     expect(xs[0]).toBeLessThan(0);
-    expect(xs.at(-1)).toBeGreaterThan(1000);
+    expect(xs.at(-1)).toBe(1);
   });
 
   it('waits for the paginator when the page underneath is not photographed yet', async () => {
@@ -246,11 +258,13 @@ describe('a tap', () => {
 });
 
 describe('a finger', () => {
-  it('carries the page along, and the page turns when let go far enough', async () => {
+  it('holds the free edge, and the page turns when let go far enough', async () => {
     const { view, turns } = makeView();
     const drag = dragPageLikeABook(view, 1, { x: 900, y: 1000 })!;
     drag.move({ x: 450, y: 1000 });
-    expect(drag.progress()).toBeCloseTo(0.5, 6);
+    // Halfway to the spine, the free edge is halfway too.
+    expect(folds().at(-1)).toBeCloseTo(0.5, 6);
+    expect(drag.progress()).toBeCloseTo(EDGE_SHARE * 0.5, 6);
     drag.release(true);
     await vi.waitFor(() => expect(stage.hide).toHaveBeenCalled(), { timeout: 3000 });
     expect(turns).toEqual(['next:jump']);
@@ -273,7 +287,7 @@ describe('a finger', () => {
     drag.release(false);
     await vi.waitFor(() => expect(stage.hide).toHaveBeenCalled(), { timeout: 3000 });
     expect(turns).toEqual(['next:jump', 'prev:jump']);
-    expect(folds().at(-1)).toBeGreaterThan(1000);
+    expect(folds().at(-1)).toBe(1);
   });
 
   it('waits for a page still turning: the swipe is then a plain one', async () => {

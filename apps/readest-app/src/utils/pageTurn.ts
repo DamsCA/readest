@@ -1,9 +1,9 @@
 import { ViewSettings } from '@/types/book';
 import { FoliateView } from '@/types/view';
 import {
-  curlAt,
+  archAt,
   curlStage,
-  Curl,
+  EDGE_SHARE,
   pageShot,
   paperOf,
   preparePageShots,
@@ -16,21 +16,21 @@ import {
 // the page whole, like a board (« on dirait que ta page a été congelée »), the
 // second folded a photograph of it flat along a straight line, with a blank
 // flap (22 Nov 2026: « c'est bizarre… ça donne pas l'impression qu'on tourne
-// vraiment une page »). Now the page rolls like paper, its text on it
-// (utils/pageCurl.ts): a tap lifts the bottom corner and carries the page over
-// the spine; a finger drawn across the page carries it along, and lets it
-// finish turning or lie back down. foliate's paginator is left as it is: it
-// jumps to the other page under the sheet without its slide.
+// vraiment une page »); the third rolled the corner round a cylinder.
+// Now it turns as in Google Play Books (23 Nov 2026: « c'est tellement plus
+// satisfaisant que le nôtre »): the whole sheet arches up between the spine and
+// its free edge (utils/pageCurl.ts). A tap carries it over the spine; a finger
+// holds its free edge, and lets it finish turning or lie back down. foliate's
+// paginator is left as it is: it jumps to the other page under the sheet
+// without its slide.
 
 export type { Pt };
 export type TurnDir = 1 | -1;
 
 // A tap's turn; a drag let go finishes the rest of its turn in less.
-const TURN_MS = 720;
-// How far the carried corner rises halfway through a tap's turn (of the page's
-// height), and a finger's.
-const TAP_LIFT = 0.1;
-const DRAG_LIFT = 0.05;
+const TURN_MS = 640;
+// How far a finger drawn up or down leans the free edge (of a page width).
+const MAX_TILT = 0.2;
 // A drag left without news this long is let go: a touch end that never comes
 // must not leave the sheet over the page.
 const IDLE_RELEASE_MS = 10_000;
@@ -197,8 +197,8 @@ export const turnPageLikeABook = (view: FoliateView, dir: TurnDir, rtl = false) 
       preparePageTurn(view);
       return;
     }
-    const { stage, w, h, whole } = sheet;
-    const at = (q: number): Curl => curlAt(w, h, h, q, TAP_LIFT, rtl);
+    const { stage, whole } = sheet;
+    const at = (q: number) => archAt(q, rtl);
     try {
       // The sheet lies exactly over the page before the paginator moves.
       stage.draw(at(dir > 0 ? 0 : 1));
@@ -256,24 +256,16 @@ export const dragPageLikeABook = (
   // In the book's own direction: x grows away from the spine.
   const along = (p: Pt) => (rtl ? w - p.x : p.x);
   const startX = along(start);
-  // The page is held at the finger's height; the far half leans the fold the
-  // other way.
-  const y = Math.min(0.92 * h, Math.max(0.08 * h, start.y));
-  const lift = y > h / 2 ? DRAG_LIFT : -DRAG_LIFT;
-  let progress = 0;
-  let rise = 0;
+  // How far the turn has gone (archAt's q), and how the finger leans the edge.
+  let q = dir > 0 ? 0 : 1;
+  let tilt = 0;
+  let pivot = Math.min(1, Math.max(0, start.y / h));
   let released: boolean | null = null;
   let idle: ReturnType<typeof setTimeout> | undefined;
 
-  // Going on, the finger draws the page from its side towards the spine; going
-  // back, it draws the page before from the spine over.
-  const turned = (p: number) => (dir > 0 ? p : 1 - p);
-  const show = (q: number, dy: number) => {
-    const c = curlAt(w, h, y, q, lift, rtl);
-    stage.draw({ ...c, at: { x: c.at.x, y: c.at.y + dy / 2 } });
-  };
+  const show = (turn: number, lean: number) => stage.draw(archAt(turn, rtl, lean, pivot));
 
-  stage.draw(curlAt(w, h, y, turned(0), lift, rtl));
+  show(q, 0);
   // The paginator goes to the other page under the sheet once the sheet shows.
   const moved = nextFrame()
     .then(nextFrame)
@@ -281,12 +273,12 @@ export const dragPageLikeABook = (
 
   const settle = async (commit: boolean) => {
     await moved.catch(() => {});
-    const from = progress;
-    const to = commit ? 1 : 0;
-    const dy = rise;
-    await play(Math.max(160, 520 * Math.abs(to - from)), (t) => {
+    const from = q;
+    const to = commit === dir > 0 ? 1 : 0;
+    const lean = tilt;
+    await play(Math.max(180, 560 * Math.abs(to - from)), (t) => {
       const k = easeOut(t);
-      show(turned(from + (to - from) * k), dy * (1 - k));
+      show(from + (to - from) * k, lean * (1 - k));
     });
     // Laid back down: the paginator returns to its page under the sheet.
     if (!commit) {
@@ -301,16 +293,24 @@ export const dragPageLikeABook = (
     move(finger) {
       if (released !== null) return;
       const x = along(finger);
-      progress =
-        dir > 0
-          ? clamp01((startX - x) / Math.max(startX, 0.5 * w))
-          : clamp01((x - startX) / Math.max(w - startX, 0.5 * w));
-      rise = (finger.y - start.y) * 0.6;
-      show(turned(progress), rise);
+      if (dir > 0) {
+        // The free edge goes where the finger draws it, and reaches the spine
+        // with it, as in Google Play Books.
+        const edge = clamp01(x / Math.max(startX, 0.35 * w));
+        q = EDGE_SHARE * (1 - edge);
+      } else {
+        // The page before comes in from past the spine and lies down under
+        // the finger.
+        q = 1 - clamp01((x - startX) / Math.max(w - startX, 0.35 * w));
+      }
+      // Drawn upwards, the top of the edge leads.
+      pivot = clamp01(finger.y / h);
+      tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, ((start.y - finger.y) / h) * 0.9));
+      show(q, tilt);
       clearTimeout(idle);
-      idle = setTimeout(() => drag.release(progress > 0.5), IDLE_RELEASE_MS);
+      idle = setTimeout(() => drag.release(drag.progress() > 0.5), IDLE_RELEASE_MS);
     },
-    progress: () => progress,
+    progress: () => (dir > 0 ? q : 1 - q),
     release(commit) {
       if (released !== null) return;
       released = commit;
@@ -318,6 +318,6 @@ export const dragPageLikeABook = (
       void settle(commit);
     },
   };
-  idle = setTimeout(() => drag.release(progress > 0.5), IDLE_RELEASE_MS);
+  idle = setTimeout(() => drag.release(drag.progress() > 0.5), IDLE_RELEASE_MS);
   return drag;
 };
