@@ -23,6 +23,15 @@ interface Stats {
     clics_inscription: number;
     inscriptions: number;
   };
+  bio?: {
+    visiteurs_24h: number;
+    visiteurs: number;
+    kevin: number;
+    liseuse: number;
+    cadeau: number;
+    telegram: number;
+    arrivee: number;
+  };
   par_jour: Ligne[];
   provenances: { provenance: string; visiteurs: number }[];
   pays: { pays: string; visiteurs: number }[];
@@ -41,6 +50,12 @@ const NOMS: Record<string, string> = {
   invitation_google: 'a cliqué « Recevoir mon livre avec Google »',
   invitation_email: 'a cliqué « Avec mon adresse e-mail »',
   invitation_fermee: 'a fermé la fenêtre',
+  bio_vue: 'a ouvert la page de la bio',
+  bio_kevin: 'a cliqué « Recevoir le livre gratuit » (Kevin)',
+  bio_liseuse: 'a cliqué « Ouvrir Lis et Lead »',
+  bio_cadeau: 'a cliqué « Recevoir Ça marche »',
+  bio_telegram: 'a cliqué la communauté Telegram',
+  bio_arrivee: 'est arrivé au bout du chemin',
 };
 
 const jourCourt = (iso: string) => {
@@ -131,6 +146,33 @@ export default function StatsPage() {
             </div>
           </div>
           <p className='lel-stats__petit'>{h.pages} pages ouvertes par des visiteurs sans compte</p>
+
+          {stats.bio && (
+            <>
+              <h2>Page de la bio TikTok (7 jours)</h2>
+              <div className='lel-stats__cartes'>
+                <div>
+                  <strong>{stats.bio.visiteurs}</strong>
+                  <span>visiteurs ({stats.bio.visiteurs_24h} en 24 h)</span>
+                </div>
+                <div>
+                  <strong>{stats.bio.kevin}</strong>
+                  <span>clics sur le livre de Kevin</span>
+                </div>
+                <div>
+                  <strong>{stats.bio.liseuse + stats.bio.cadeau}</strong>
+                  <span>clics vers Lis et Lead</span>
+                </div>
+                <div>
+                  <strong>{stats.bio.arrivee}</strong>
+                  <span>arrivés au bout du chemin</span>
+                </div>
+              </div>
+              {stats.bio.telegram > 0 && (
+                <p className='lel-stats__petit'>{stats.bio.telegram} clics vers Telegram</p>
+              )}
+            </>
+          )}
 
           <h2>Jour par jour (heure de La Réunion)</h2>
           <table>

@@ -17,6 +17,13 @@ const EVENEMENTS = new Set([
   'invitation_google',
   'invitation_email',
   'invitation_fermee',
+  // The TikTok bio page (legenieendormi.web.app, ktaffilliate/bio-genie-endormi).
+  'bio_vue',
+  'bio_kevin',
+  'bio_liseuse',
+  'bio_cadeau',
+  'bio_telegram',
+  'bio_arrivee',
 ]);
 
 // Link previews and crawlers are not visitors. « lel-verif » marks our own

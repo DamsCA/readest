@@ -59,6 +59,18 @@ as $$
       'inscriptions', (select count(*) from auth.users
         where created_at > now() - interval '24 hours' and id not in (select user_id from admins))
     ),
+    -- The TikTok bio page (legenieendormi.web.app), over 24 hours and over
+    -- the whole period asked for.
+    'bio', (select json_build_object(
+      'visiteurs_24h', count(distinct visiteur) filter (
+        where evenement = 'bio_vue' and at > now() - interval '24 hours'),
+      'visiteurs', count(distinct visiteur) filter (where evenement = 'bio_vue'),
+      'kevin', count(*) filter (where evenement = 'bio_kevin'),
+      'liseuse', count(*) filter (where evenement = 'bio_liseuse'),
+      'cadeau', count(*) filter (where evenement = 'bio_cadeau'),
+      'telegram', count(*) filter (where evenement = 'bio_telegram'),
+      'arrivee', count(distinct visiteur) filter (where evenement = 'bio_arrivee')
+    ) from v),
     'par_jour', coalesce((select json_agg(d order by d.jour desc) from (
       select j.jour,
         (select count(distinct visiteur) from v
