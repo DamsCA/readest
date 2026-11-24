@@ -58,6 +58,16 @@ export const AUTH_OAUTH_PROVIDERS: OAuthProvider[] = (
 export const GOOGLE_WEB_CLIENT_ID = process.env['NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID'] || '';
 
 /**
+ * Apple's Services ID for web sign-in (24 Nov 2026), public. Apple sends the
+ * reader back to <our domain>/api/auth/apple, which hands the ID token to
+ * /auth/apple; Supabase checks it with signInWithIdToken. No client secret, so
+ * nothing expires every six months (app/auth/utils/appleWeb.ts). The Services
+ * ID must list that return URL in the Apple Developer account.
+ */
+export const APPLE_WEB_CLIENT_ID =
+  process.env['NEXT_PUBLIC_APPLE_WEB_CLIENT_ID'] || 'com.lisetlead.web';
+
+/**
  * The voice that reads first. Fish Audio's free model is meant for personal
  * use, so a voice sold on the stores cannot lean on it: the apps read with
  * Edge's voices (or the phone's own) by default, and Fish stays one tap away in

@@ -56,7 +56,7 @@ as $$
       'invitations_vues', (select count(*) from v
         where evenement = 'invitation_vue' and at > now() - interval '24 hours'),
       'clics_inscription', (select count(*) from v
-        where evenement in ('invitation_google', 'invitation_email')
+        where evenement in ('invitation_google', 'invitation_apple', 'invitation_email')
           and at > now() - interval '24 hours'),
       'inscriptions', (select count(*) from auth.users
         where created_at > now() - interval '24 hours' and id not in (select user_id from admins))
@@ -78,7 +78,7 @@ as $$
         (select count(distinct visiteur) from v
           where v.jour = j.jour and evenement = 'vue' and not connecte) as visiteurs,
         (select count(*) from v
-          where v.jour = j.jour and evenement in ('invitation_google', 'invitation_email'))
+          where v.jour = j.jour and evenement in ('invitation_google', 'invitation_apple', 'invitation_email'))
           as clics_inscription,
         (select count(*) from ins where ins.jour = j.jour) as inscriptions
       from (

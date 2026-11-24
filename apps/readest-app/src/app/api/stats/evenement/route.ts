@@ -15,6 +15,7 @@ const EVENEMENTS = new Set([
   'vue',
   'invitation_vue',
   'invitation_google',
+  'invitation_apple',
   'invitation_email',
   'invitation_fermee',
   'invitation_navigateur',

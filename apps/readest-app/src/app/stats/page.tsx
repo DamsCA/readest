@@ -50,6 +50,7 @@ const NOMS: Record<string, string> = {
   invitation_vue: 'a vu la fenêtre du livre offert',
   invitation_google: 'a cliqué « Recevoir mon livre avec Google »',
   invitation_email: 'a cliqué « Avec mon adresse e-mail »',
+  invitation_apple: 'a cliqué « Recevoir mon livre avec Apple »',
   invitation_fermee: 'a fermé la fenêtre',
   invitation_navigateur: 'a touché « Ouvrir dans mon navigateur »',
   bio_vue: 'a ouvert la page de la bio',

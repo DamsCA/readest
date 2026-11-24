@@ -31,6 +31,7 @@ import {
 } from '@/services/features';
 import { getAppleIdAuth, Scope } from './utils/appleIdAuth';
 import { startGoogleSignIn } from './utils/googleWeb';
+import { startAppleSignIn } from './utils/appleWeb';
 import { authWithCustomTab, authWithSafari } from './utils/nativeAuth';
 import WindowButtons from '@/components/WindowButtons';
 
@@ -86,9 +87,14 @@ const USE_APPLE_SIGN_IN = process.env['NEXT_PUBLIC_USE_APPLE_SIGN_IN'] === 'true
 // On the web, Google sign-in goes through our own domain when the client ID is
 // known (see utils/googleWeb.ts); Supabase's form keeps the other providers.
 const GOOGLE_ON_OUR_DOMAIN = !!GOOGLE_WEB_CLIENT_ID && AUTH_OAUTH_PROVIDERS.includes('google');
-const WEB_FORM_PROVIDERS = GOOGLE_ON_OUR_DOMAIN
-  ? AUTH_OAUTH_PROVIDERS.filter((provider) => provider !== 'google')
-  : AUTH_OAUTH_PROVIDERS;
+// Apple goes through our own domain too (utils/appleWeb.ts), never through
+// Supabase's form, which would need a client secret renewed every six months.
+const APPLE_ON_OUR_DOMAIN = AUTH_OAUTH_PROVIDERS.includes('apple');
+const WEB_FORM_PROVIDERS = AUTH_OAUTH_PROVIDERS.filter(
+  (provider) =>
+    !(provider === 'google' && GOOGLE_ON_OUR_DOMAIN) &&
+    !(provider === 'apple' && APPLE_ON_OUR_DOMAIN),
+);
 
 const ProviderLogin: React.FC<ProviderLoginProp> = ({ provider, handleSignIn, Icon, label }) => {
   return (
@@ -536,6 +542,26 @@ export default function AuthPage() {
           >
             <FcGoogle className='h-5 w-5' />
             <span>{_('Sign in with {{provider}}', { provider: 'Google' })}</span>
+          </button>
+          {!APPLE_ON_OUR_DOMAIN && (
+            <div className='divider text-base-content/60 my-4 text-xs'>{_('or')}</div>
+          )}
+        </>
+      )}
+      {APPLE_ON_OUR_DOMAIN && (
+        <>
+          <button
+            type='button'
+            onClick={() =>
+              startAppleSignIn(new URLSearchParams(window.location.search).get('redirect'))
+            }
+            className={clsx(
+              'mt-3 flex w-full items-center justify-center gap-2 rounded-full px-4 py-3',
+              'bg-black text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800',
+            )}
+          >
+            <FaApple className='h-5 w-5' />
+            <span>{_('Sign in with {{provider}}', { provider: 'Apple' })}</span>
           </button>
           <div className='divider text-base-content/60 my-4 text-xs'>{_('or')}</div>
         </>

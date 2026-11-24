@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FcGoogle } from 'react-icons/fc';
+import { FaApple } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import { isWebAppPlatform } from '@/services/environment';
-import { GOOGLE_WEB_CLIENT_ID } from '@/services/features';
+import { AUTH_OAUTH_PROVIDERS, GOOGLE_WEB_CLIENT_ID } from '@/services/features';
 import { startGoogleSignIn } from '@/app/auth/utils/googleWeb';
+import { startAppleSignIn } from '@/app/auth/utils/appleWeb';
 import { mesurer } from '@/utils/mesure';
 
 // The owner's ask (23 Nov 2026): a visitor lands in the app itself, then a
@@ -42,6 +44,11 @@ const lienNavigateur = () => {
   return `https://${page}`;
 };
 
+// Sign in with Apple (owner's ask, 24 Nov 2026: not everyone has a Google
+// account, and iPhone readers sign in with Face ID in Safari). Shown once Apple
+// is on in NEXT_PUBLIC_AUTH_PROVIDERS; first on an iPhone.
+const APPLE = AUTH_OAUTH_PROVIDERS.includes('apple');
+
 const doitInviter = () => {
   if (!isWebAppPlatform()) return false;
   try {
@@ -55,6 +62,7 @@ export default function InvitationInscription() {
   const { user } = useAuth();
   const [ouverte, setOuverte] = useState(false);
   const [appli, setAppli] = useState<string | null>(null);
+  const [iphone, setIphone] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -64,6 +72,7 @@ export default function InvitationInscription() {
     const t = setTimeout(() => {
       if (doitInviter()) {
         setAppli(appliHote());
+        setIphone(/iPhone|iPad|iPod/i.test(navigator.userAgent));
         setOuverte(true);
         mesurer('invitation_vue');
       }
@@ -81,6 +90,11 @@ export default function InvitationInscription() {
     }
     mesurer('invitation_fermee');
     setOuverte(false);
+  };
+
+  const avecApple = () => {
+    mesurer('invitation_apple');
+    void startAppleSignIn('/library');
   };
 
   const avecGoogle = () => {
@@ -127,10 +141,26 @@ export default function InvitationInscription() {
             </p>
           </div>
         )}
+        {APPLE && iphone && (
+          <button
+            type='button'
+            className='lel-invite__apple lel-invite__apple--haut'
+            onClick={avecApple}
+          >
+            <FaApple size={20} aria-hidden='true' />
+            Recevoir mon livre avec Apple
+          </button>
+        )}
         <button type='button' className='lel-invite__google' onClick={avecGoogle}>
           <FcGoogle size={22} aria-hidden='true' />
           Recevoir mon livre avec Google
         </button>
+        {APPLE && !iphone && (
+          <button type='button' className='lel-invite__apple' onClick={avecApple}>
+            <FaApple size={20} aria-hidden='true' />
+            Recevoir mon livre avec Apple
+          </button>
+        )}
         <a
           className='lel-invite__email'
           href={INSCRIPTION_EMAIL}
@@ -218,6 +248,14 @@ const STYLES = `
   font-weight: 700; font-size: 0.98rem; text-decoration: none;
 }
 .lel-invite__secours { margin-top: 0.55rem; font-size: 0.76rem; opacity: 0.7; }
+.lel-invite__apple {
+  margin-top: 0.7rem; width: 100%; min-height: 3.25rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+  border-radius: 999px; background: #000; color: #fff; font-size: 1rem; font-weight: 700;
+  border: 1px solid rgba(243, 236, 221, 0.25);
+}
+.lel-invite__apple--haut { margin-top: 1.25rem; }
+.lel-invite__apple:active { transform: scale(0.98); }
 .lel-invite__email {
   margin-top: 0.85rem; font-size: 0.92rem; font-weight: 600;
   color: #f3ecdd; text-decoration: underline; text-underline-offset: 3px;
