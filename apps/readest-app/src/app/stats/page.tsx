@@ -61,6 +61,7 @@ interface Stats {
   bio?: {
     visiteurs_24h: number;
     visiteurs: number;
+    guide?: number;
     kevin: number;
     liseuse: number;
     cadeau: number;
@@ -92,7 +93,8 @@ const NOMS: Record<string, string> = {
   invitation_fermee: 'a fermé la fenêtre',
   invitation_navigateur: 'a touché « Ouvrir dans mon navigateur »',
   bio_vue: 'a ouvert la page de la bio',
-  bio_kevin: 'a cliqué « Recevoir le livre gratuit » (Kevin)',
+  bio_guide: 'a ouvert le guide en français',
+  bio_kevin: 'a cliqué « Recevoir le livre de Kevin »',
   bio_liseuse: 'a cliqué « Ouvrir Lis et Lead »',
   bio_cadeau: 'a cliqué « Recevoir Ça marche »',
   bio_telegram: 'a cliqué la communauté Telegram',
@@ -353,6 +355,10 @@ export default function StatsPage() {
                   <span>visiteurs ({stats.bio.visiteurs_24h} en 24 h)</span>
                 </div>
                 <div>
+                  <strong>{stats.bio.guide ?? 0}</strong>
+                  <span>ont ouvert le guide en français</span>
+                </div>
+                <div>
                   <strong>{stats.bio.kevin}</strong>
                   <span>clics sur le livre de Kevin</span>
                 </div>
@@ -360,14 +366,11 @@ export default function StatsPage() {
                   <strong>{stats.bio.liseuse + stats.bio.cadeau}</strong>
                   <span>clics vers Lis et Lead</span>
                 </div>
-                <div>
-                  <strong>{stats.bio.arrivee}</strong>
-                  <span>arrivés au bout du chemin</span>
-                </div>
               </div>
-              {stats.bio.telegram > 0 && (
-                <p className='lel-stats__petit'>{stats.bio.telegram} clics vers Telegram</p>
-              )}
+              <p className='lel-stats__petit'>
+                {stats.bio.arrivee} arrivés au bout du chemin
+                {stats.bio.telegram > 0 ? ` · ${stats.bio.telegram} clics vers Telegram` : ''}
+              </p>
             </>
           )}
 

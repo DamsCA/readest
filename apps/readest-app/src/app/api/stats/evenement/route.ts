@@ -25,6 +25,8 @@ const EVENEMENTS = new Set([
   'invitation_navigateur',
   // The TikTok bio page (legenieendormi.web.app, ktaffilliate/bio-genie-endormi).
   'bio_vue',
+  // Our French guide to Kevin's book, opened at legenieendormi.web.app/guide.
+  'bio_guide',
   'bio_kevin',
   'bio_liseuse',
   'bio_cadeau',

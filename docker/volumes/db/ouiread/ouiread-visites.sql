@@ -86,6 +86,8 @@ as $$
       'visiteurs_24h', count(distinct visiteur) filter (
         where evenement = 'bio_vue' and at > now() - interval '24 hours'),
       'visiteurs', count(distinct visiteur) filter (where evenement = 'bio_vue'),
+      -- Our French guide (legenieendormi.web.app/guide), added 24 Nov 2026.
+      'guide', count(distinct visiteur) filter (where evenement = 'bio_guide'),
       'kevin', count(*) filter (where evenement = 'bio_kevin'),
       'liseuse', count(*) filter (where evenement = 'bio_liseuse'),
       'cadeau', count(*) filter (where evenement = 'bio_cadeau'),
