@@ -73,6 +73,40 @@ as $$
       'telegram', count(*) filter (where evenement = 'bio_telegram'),
       'arrivee', count(distinct visiteur) filter (where evenement = 'bio_arrivee')
     ) from v),
+    -- The dashboard (24 Nov 2026): the funnel over the period asked for,
+    -- one visitor counted once per step.
+    'entonnoir', json_build_object(
+      'visiteurs', (select count(distinct visiteur) from v where evenement = 'vue' and not connecte),
+      'invitation', (select count(distinct visiteur) from v where evenement = 'invitation_vue'),
+      'clic', (select count(distinct visiteur) from v
+        where evenement in ('invitation_google', 'invitation_apple', 'invitation_email')),
+      'inscrits', (select count(*) from ins)
+    ),
+    'appareils', coalesce((select json_agg(p) from (
+      select coalesce(appareil, '?') as appareil, count(distinct visiteur) as visiteurs
+      from v where evenement = 'vue' and not connecte
+      group by 1 order by 2 desc limit 8
+    ) p), '[]'::json),
+    -- Who signed up: the owner's own accounts are marked « vous ».
+    'inscrits', coalesce((select json_agg(x) from (
+      select u.email,
+        coalesce(u.raw_app_meta_data->>'provider', 'email') as via,
+        to_char(u.created_at at time zone 'Indian/Reunion', 'DD/MM HH24:MI') as le,
+        to_char(u.last_sign_in_at at time zone 'Indian/Reunion', 'DD/MM HH24:MI') as derniere,
+        coalesce(pl.plan, 'free') as plan,
+        (select count(*) from public.books b where b.user_id = u.id and b.deleted_at is null) as livres,
+        u.id in (select user_id from admins) as vous
+      from auth.users u
+      left join public.plans pl on pl.user_id = u.id
+      order by u.created_at desc limit 50
+    ) x), '[]'::json),
+    -- Stripe customers of Lis et Lead (the Stripe account also serves other
+    -- products): the route keeps only their subscriptions and payments.
+    'clients_stripe', coalesce((select json_agg(x) from (
+      select c.stripe_customer_id, u.email, c.user_id in (select user_id from admins) as vous
+      from public.customers c join auth.users u on u.id = c.user_id
+      where c.stripe_customer_id is not null
+    ) x), '[]'::json),
     'par_jour', coalesce((select json_agg(d order by d.jour desc) from (
       select j.jour,
         (select count(distinct visiteur) from v
