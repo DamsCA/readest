@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { CLE_PROPRIETAIRE } from '@/utils/mesure';
 import { supabase } from '@/utils/supabase';
 
 // The owner's dashboard (23-24 Nov 2026: « c'est pas normal de pas savoir s'il
@@ -149,6 +150,12 @@ export default function StatsPage() {
       if (res.status === 403) return setEtat('interdit');
       if (!res.ok) return setEtat('erreur');
       setStats((await res.json()) as Stats);
+      // This device is the owner's: never count it again (utils/mesure.ts).
+      try {
+        localStorage.setItem(CLE_PROPRIETAIRE, '1');
+      } catch {
+        // The server-side cookie still covers it.
+      }
       setMaj(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
       setEtat('ok');
     } catch {
@@ -181,7 +188,10 @@ export default function StatsPage() {
       <header className='lel-stats__haut'>
         <div>
           <h1>Tableau de bord</h1>
-          <p>Lis et Lead · {maj ? `mis à jour à ${maj}` : 'chargement…'}</p>
+          <p>
+            Lis et Lead · {maj ? `mis à jour à ${maj}` : 'chargement…'}
+            {maj && ' · vos visites ne sont pas comptées'}
+          </p>
         </div>
         <button type='button' onClick={() => void charger()}>
           Actualiser

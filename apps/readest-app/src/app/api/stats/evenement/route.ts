@@ -1,12 +1,16 @@
 import { NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/utils/supabase';
+import { COOKIE_PROPRIETAIRE, empreinteReseau, empreinteVisiteur } from '@/utils/empreinte';
 
 // Audience of the web reader (owner's ask, 23 Nov 2026: « c'est pas normal de
 // pas savoir s'il y a des visiteurs »). Each page shown, and each step of the
 // sign-up invitation, sends one small event here (utils/mesure.ts). Nothing is
 // stored on the device and no IP is kept: a visitor is a hash of the day, the
 // IP, the browser and a server secret, which counts unique visitors per day
-// without following anyone from one day to the next.
+// without following anyone from one day to the next (utils/empreinte.ts).
+// The owner is not counted: devices that opened /stats carry a cookie and are
+// dropped here, and the network the owner opened /stats from is left out of
+// that day's figures by stats_visites.
 // Table public.visites (docker/volumes/db/ouiread/ouiread-visites.sql).
 
 export const dynamic = 'force-dynamic';
@@ -63,13 +67,6 @@ const appareil = (navigateur: string) => {
   return appli ? `${sorte} · ${appli}` : sorte;
 };
 
-const sha256Hex = async (value: string) => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-};
-
 const rien = () => new Response(null, { status: 204 });
 
 export async function POST(req: NextRequest) {
@@ -84,14 +81,11 @@ export async function POST(req: NextRequest) {
 
   const navigateur = req.headers.get('user-agent') || '';
   if (!navigateur || ROBOTS.test(navigateur)) return rien();
+  // The owner's own devices (marked when they open /stats).
+  if (req.cookies.get(COOKIE_PROPRIETAIRE)?.value === '1') return rien();
 
-  const ip =
-    req.headers.get('cf-connecting-ip') ||
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    '';
-  const jour = new Date().toISOString().slice(0, 10);
-  const secret = process.env['SUPABASE_ADMIN_KEY'] || '';
-  const visiteur = (await sha256Hex(`${jour}|${ip}|${navigateur}|${secret}`)).slice(0, 16);
+  const visiteur = await empreinteVisiteur(req);
+  const reseau = await empreinteReseau(req);
 
   const chemin = texte(corps?.p, 200)?.split('?')[0] ?? null;
   const { error } = await createSupabaseAdminClient()
@@ -104,6 +98,7 @@ export async function POST(req: NextRequest) {
       visiteur,
       appareil: appareil(navigateur),
       connecte: corps?.c === true,
+      reseau,
     });
   if (error) console.error('visites:', error.message);
   return rien();

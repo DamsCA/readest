@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { validateUserAndToken } from '@/utils/access';
 import { createSupabaseAdminClient } from '@/utils/supabase';
 import { getStripe } from '@/libs/payment/stripe/server';
+import { COOKIE_PROPRIETAIRE, empreinteReseau } from '@/utils/empreinte';
 
 // The owner's dashboard (/stats), for the accounts listed in public.admins_stats
 // only. Audience and sign-ups come from the database (stats_visites,
@@ -10,6 +11,9 @@ import { getStripe } from '@/libs/payment/stripe/server';
 // come from Stripe itself, since the database keeps no payment. The Stripe
 // account also serves other products: only Lis et Lead's customers (table
 // customers) are kept.
+// Opening this page also stops counting the owner (24 Nov 2026): the device
+// gets a cookie the audience route obeys, and today's network is listed in
+// reseaux_proprietaire, which stats_visites leaves out.
 
 export const dynamic = 'force-dynamic';
 
@@ -121,6 +125,11 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
   if (!autorise) return json({ error: 'FORBIDDEN' }, 403);
 
+  const { error: erreurReseau } = await admin
+    .from('reseaux_proprietaire')
+    .upsert({ reseau: await empreinteReseau(req) }, { onConflict: 'reseau' });
+  if (erreurReseau) console.error('reseaux_proprietaire:', erreurReseau.message);
+
   const demande = Number(new URL(req.url).searchParams.get('jours')) || 7;
   const jours = Math.min(90, Math.max(1, Math.round(demande)));
   const { data, error } = await admin.rpc('stats_visites', { jours });
@@ -136,5 +145,12 @@ export async function GET(req: NextRequest) {
     console.error('stats stripe:', e);
     paye = { erreur: 'Stripe ne répond pas pour le moment.' };
   }
-  return json({ ...stats, jours, argent: paye });
+  const reponse = json({ ...stats, jours, argent: paye });
+  // Five years; SameSite=None so the bio page's events (sent from
+  // legenieendormi.web.app) carry it too where the browser allows.
+  reponse.headers.append(
+    'Set-Cookie',
+    `${COOKIE_PROPRIETAIRE}=1; Path=/; Max-Age=157680000; Secure; SameSite=None`,
+  );
+  return reponse;
 }

@@ -20,14 +20,28 @@ alter table public.visites add column if not exists appareil text;
 alter table public.visites enable row level security;
 revoke all on public.visites from anon, authenticated;
 
+-- The owner is not counted (24 Nov 2026: « il faut arrêter de me compter
+-- moi »). « reseau » is a hash of the day, the network (IPv4 address or IPv6
+-- /64) and a server secret. When the owner opens /stats, today's network is
+-- listed here and stats_visites leaves it out, the owner's phone on the same
+-- connection included (utils/empreinte.ts).
+alter table public.visites add column if not exists reseau text;
+create table if not exists public.reseaux_proprietaire (
+  reseau text primary key,
+  le timestamptz not null default now()
+);
+alter table public.reseaux_proprietaire enable row level security;
+revoke all on public.reseaux_proprietaire from anon, authenticated;
+
 -- Who may read the figures on /stats. Filled by hand in the SQL editor.
 create table if not exists public.admins_stats (user_id uuid primary key);
 alter table public.admins_stats enable row level security;
 revoke all on public.admins_stats from anon, authenticated;
 
 -- The figures shown on /stats, in Réunion time. Readers who are signed in
--- (the owner included) are left out of the visitor counts; the owner's own
--- accounts are left out of the sign-ups.
+-- (the owner included) are left out of the visitor counts, and so is every
+-- network listed in reseaux_proprietaire; the owner's own accounts are left
+-- out of the sign-ups.
 create or replace function public.stats_visites(jours integer default 7)
 returns json
 language sql
@@ -35,9 +49,14 @@ stable
 security definer
 set search_path = public
 as $$
-  with v as (
+  with toutes as (
+    select * from public.visites
+    where reseau is null
+       or reseau not in (select reseau from public.reseaux_proprietaire)
+  ),
+  v as (
     select (at at time zone 'Indian/Reunion')::date as jour, *
-    from public.visites
+    from toutes
     where at > now() - make_interval(days => jours)
   ),
   admins as (select user_id from public.admins_stats),
@@ -136,7 +155,7 @@ as $$
     'derniers', coalesce((select json_agg(x) from (
       select to_char(at at time zone 'Indian/Reunion', 'DD/MM HH24:MI') as heure,
         evenement, chemin, provenance, pays, appareil
-      from public.visites where not connecte
+      from toutes where not connecte
       order by at desc limit 20
     ) x), '[]'::json)
   );
