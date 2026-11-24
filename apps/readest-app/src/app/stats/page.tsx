@@ -34,6 +34,7 @@ interface Abonnement {
   devise: string;
   debut: string | null;
   fin: string | null;
+  termine: string | null;
   resilie: boolean;
 }
 interface Paiement {
@@ -309,7 +310,11 @@ export default function StatsPage() {
                 </div>
                 <p>
                   Plus {s.formule} · {euros(s.montant, s.devise)} · depuis le {s.debut}
-                  {s.fin ? ` · ${s.resilie ? 'se termine' : 'renouvelé'} le ${s.fin}` : ''}
+                  {s.termine
+                    ? ` · terminé le ${s.termine}`
+                    : s.fin
+                      ? ` · ${s.resilie ? 'se termine' : 'renouvelé'} le ${s.fin}`
+                      : ''}
                 </p>
               </div>
             ))}

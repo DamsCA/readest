@@ -64,6 +64,7 @@ const argent = async (clients: ClientStripe[], jours: number) => {
         devise: (prix?.currency ?? 'eur').toUpperCase(),
         debut: date(s.start_date),
         fin: date(fin),
+        termine: date(s.ended_at),
         resilie: s.cancel_at_period_end || !!s.canceled_at,
       };
     });
