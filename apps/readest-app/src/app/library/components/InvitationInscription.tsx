@@ -17,6 +17,8 @@ import { mesurer } from '@/utils/mesure';
 // reader. Closed, it stays closed until the next visit.
 
 const COVER = '/images/ca-marche-couverture.webp';
+// 25/11 : the second welcome book, our French guide (src/libs/ouiread/welcomeGift.ts).
+const COVER_GUIDE = '/images/guide-formule-couverture.webp';
 const FERMEE = 'lel-invitation-fermee';
 const DELAI_MS = 1500;
 const INSCRIPTION_EMAIL = '/auth?inscription=1';
@@ -114,14 +116,23 @@ export default function InvitationInscription() {
         <button type='button' className='lel-invite__croix' aria-label='Fermer' onClick={fermer}>
           ×
         </button>
-        <img className='lel-invite__livre' src={COVER} alt='« Ça marche »' draggable={false} />
+        <div className='lel-invite__livres'>
+          <img className='lel-invite__livre' src={COVER} alt='« Ça marche »' draggable={false} />
+          <img
+            className='lel-invite__livre lel-invite__livre--guide'
+            src={COVER_GUIDE}
+            alt='« La formule de Kevin Trudeau »'
+            draggable={false}
+          />
+        </div>
         <p className='lel-invite__sur'>Cadeau de bienvenue</p>
         <h2 id='lel-invite-titre' className='lel-invite__titre'>
-          Un livre spectaculaire vous attend
+          Deux livres vous attendent
         </h2>
         <p className='lel-invite__texte'>
-          « Ça marche », le célèbre petit livre rouge de 1926, en français. Créez votre compte
-          gratuit : il arrive aussitôt dans votre bibliothèque.
+          « Ça marche », le célèbre petit livre rouge de 1926, et « La formule de Kevin Trudeau », 6
+          ingrédients sur 45. En français. Créez votre compte gratuit : ils arrivent aussitôt dans
+          votre bibliothèque.
         </p>
         {appli && (
           <div className='lel-invite__appli'>
@@ -148,17 +159,17 @@ export default function InvitationInscription() {
             onClick={avecApple}
           >
             <FaApple size={20} aria-hidden='true' />
-            Recevoir mon livre avec Apple
+            Recevoir mes livres avec Apple
           </button>
         )}
         <button type='button' className='lel-invite__google' onClick={avecGoogle}>
           <FcGoogle size={22} aria-hidden='true' />
-          Recevoir mon livre avec Google
+          Recevoir mes livres avec Google
         </button>
         {APPLE && !iphone && (
           <button type='button' className='lel-invite__apple' onClick={avecApple}>
             <FaApple size={20} aria-hidden='true' />
-            Recevoir mon livre avec Apple
+            Recevoir mes livres avec Apple
           </button>
         )}
         <a
@@ -206,6 +217,12 @@ const STYLES = `
   width: 2.25rem; height: 2.25rem; border-radius: 999px;
   font-size: 1.6rem; line-height: 1; color: #f3ecdd; opacity: 0.7;
   background: rgba(243, 236, 221, 0.08);
+}
+.lel-invite__livres { display: flex; justify-content: center; align-items: flex-end; }
+.lel-invite__livres .lel-invite__livre { width: 6.4rem; }
+.lel-invite__livres .lel-invite__livre--guide {
+  margin-left: -1.4rem; position: relative;
+  animation-name: lel-invite-livre-guide; animation-delay: 0.3s;
 }
 .lel-invite__livre {
   width: 7.5rem; height: auto; border-radius: 0.5rem;
@@ -267,6 +284,7 @@ const STYLES = `
 @keyframes lel-invite-fondu { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lel-invite-monte { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes lel-invite-livre { from { transform: translateY(16px) rotate(-6deg) scale(0.9); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
+@keyframes lel-invite-livre-guide { from { transform: translateY(16px) rotate(8deg) scale(0.9); opacity: 0; } to { transform: translateY(0.3rem) rotate(5deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .lel-invite__fond, .lel-invite__carte, .lel-invite__livre { animation: none; }
 }

@@ -1,0 +1,214 @@
+<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='theme-color' content='#0b0e24'><meta name='description' content="La formule de Kevin Trudeau : 6 ingrédients sur 45, en français, avec un exercice pour chacun. Gratuit."><meta property='og:title' content="La formule de Kevin Trudeau : 6 ingrédients sur 45, en français"><meta property='og:description' content="Le guide gratuit du Génie Endormi."><link rel='preconnect' href='https://fonts.googleapis.com'><link rel='preconnect' href='https://fonts.gstatic.com' crossorigin><link href='https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap' rel='stylesheet'><title>La formule de Kevin Trudeau : 6 ingrédients sur 45, en français</title><style>
+@page { size: 148mm 210mm; margin: 0; }
+:root { --encre:#161513; --papier:#ffffff; --or:#b8860b; --or-vif:#e8b923; --nuit:#0d0d0e; --voile:#f6f1e4; --gris:#6b6760; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:#888; }
+body { font-family: Georgia, 'Times New Roman', serif; color: var(--encre); font-size: 11.8pt; line-height: 1.45; }
+.page { width:148mm; height:210mm; padding:14mm 13mm 12mm; background:var(--papier); position:relative; overflow:hidden;
+        page-break-after: always; break-after: page; display:flex; flex-direction:column; gap:3.2mm; }
+.page:last-child { page-break-after: auto; break-after: auto; }
+.etiquette { font-family:'Segoe UI', Arial, sans-serif; font-size:7.4pt; letter-spacing:.14em; text-transform:uppercase; color:var(--or); font-weight:600; }
+h1, h2 { font-family:'Archivo Black', Impact, sans-serif; font-weight:400; text-transform:uppercase; line-height:1.08; margin:0; text-wrap:balance; }
+h2 { font-size:19pt; letter-spacing:.01em; }
+h2 .or { color: var(--or); }
+p { margin:0 0 2.4mm; text-wrap: pretty; }
+.cit { border-left: 1.2mm solid var(--or-vif); padding: 2mm 0 2mm 4mm; margin: 1mm 0; }
+.cit .vo { font-style: italic; color: var(--gris); font-size: 10.6pt; margin-bottom: 1.2mm; }
+.cit .vf { font-size: 12.4pt; }
+.cit .src { font-family:'Segoe UI', Arial, sans-serif; font-size:7pt; color: var(--gris); letter-spacing:.06em; margin-top:1mm; }
+.faire { background: var(--voile); border-radius: 1.5mm; padding: 3.2mm 4mm; margin-top: auto; }
+.faire .etiquette { color: var(--encre); margin-bottom: 1.2mm; display:block; }
+.faire ol { margin:0; padding-left: 5mm; } .faire li { margin-bottom: 1mm; }
+.pied { font-family:'Segoe UI', Arial, sans-serif; font-size:7pt; color: var(--gris); display:flex; justify-content:space-between; border-top: .3mm solid #e6e1d6; padding-top: 2mm; }
+.couv { background: var(--nuit); color:#fff; justify-content: center; text-align:center; padding: 18mm 13mm; gap: 6mm; }
+.couv h1 { font-size: 27pt; color:#fff; }
+.couv h1 .or { color: var(--or-vif); }
+.couv .sous { font-style: italic; font-size: 11.5pt; color:#e9e4d8; }
+.couv .bas { position:absolute; bottom: 12mm; left:0; right:0; font-family:'Segoe UI', Arial, sans-serif; font-size:7.6pt; letter-spacing:.16em; text-transform:uppercase; color:#bdb6a6; }
+.lampe { width: 26mm; height: 1mm; background: var(--or-vif); margin: 0 auto; border-radius: 1mm; }
+.etapes { font-size: 10.6pt; counter-reset: n; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:2.2mm; }
+.etapes li { counter-increment:n; display:grid; grid-template-columns: 7mm 1fr; gap: 2.5mm; align-items:start; }
+.etapes li::before { content: counter(n); font-family:'Archivo Black', Impact, sans-serif; color:#fff; background: var(--encre); border-radius: 50%;
+        width:6.5mm; height:6.5mm; display:flex; align-items:center; justify-content:center; font-size:8.5pt; margin-top:.4mm; }
+.en { font-family:'Segoe UI', Arial, sans-serif; font-size: 8.6pt; background:#efefef; padding:.2mm 1.2mm; border-radius:.8mm; }
+.qr { width: 62mm; height: 62mm; margin: 2mm auto 0; display:block; }
+.lien { font-family:'Segoe UI', Arial, sans-serif; font-size:8pt; text-align:center; color: var(--gris); word-break: break-all; }
+.centre { text-align:center; }
+.sommaire { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:1.6mm; }
+.sommaire li { display:grid; grid-template-columns: 9mm 1fr; gap: 2mm; }
+.sommaire .num { font-family:'Archivo Black', Impact, sans-serif; color: var(--or); }
+.mentions { font-family:'Segoe UI', Arial, sans-serif; font-size:7.2pt; color: var(--gris); line-height:1.45; }
+.sommaire .reste { color: var(--gris); font-style: italic; }
+.sommaire .reste .num { color: var(--gris); }
+.faire a { color: var(--or); font-weight: bold; text-decoration: none; }
+.teasers { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:2.4mm; font-size:11pt; }
+.teasers li { display:grid; grid-template-columns: 7mm 1fr; gap: 2.5mm; align-items:start; }
+.teasers li::before { content:'?'; font-family:'Archivo Black', Impact, sans-serif; color: var(--encre); background: var(--or-vif);
+        border-radius: 50%; width:6.5mm; height:6.5mm; display:flex; align-items:center; justify-content:center; font-size:9pt; margin-top:.3mm; }
+.stop-fin { font-weight: bold; margin-top: auto; }
+.atouts { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:3mm; font-size:11pt; }
+.atouts li { display:grid; grid-template-columns: 7mm 1fr; gap: 2.5mm; align-items:start; }
+.atouts li::before { content:'✓'; font-family:'Segoe UI Symbol', 'Segoe UI', Arial, sans-serif; font-weight:700; color: var(--encre);
+        background: var(--or-vif); border-radius: 50%; width:6.5mm; height:6.5mm; display:flex; align-items:center; justify-content:center;
+        font-size:9pt; margin-top:.3mm; }
+.atouts b { display:block; }
+.plus-lel { background: var(--voile); border-radius: 1.5mm; padding: 3mm 4mm; font-size: 10.4pt; }
+.bouton-lel { display:block; margin: auto auto 0; padding: 3.2mm 7mm; border-radius: 99mm; background: var(--or-vif); color: var(--encre);
+        font-family:'Segoe UI', Arial, sans-serif; font-weight:700; font-size: 11pt; text-decoration:none; text-align:center; }
+.bouton-lel small { display:block; font-weight:400; font-size: 8.4pt; }
+
+@media screen {
+  html, body { background:#0b0e24; }
+  body { font-size:17px; line-height:1.55; -webkit-text-size-adjust:100%; }
+  .barre-guide { position:sticky; top:0; z-index:5; display:flex; justify-content:space-between; align-items:center; gap:12px;
+    max-width:600px; margin:0 auto; padding:10px 14px; background:rgba(11,14,36,.94); backdrop-filter:blur(6px);
+    font-family:'Segoe UI', Arial, sans-serif; font-size:14px; }
+  .barre-guide a { color:#ffe6a8; text-decoration:none; }
+  .barre-guide .pdf { border:1px solid rgba(255,230,168,.55); border-radius:999px; padding:6px 12px; white-space:nowrap; }
+  .page { width:auto; max-width:600px; height:auto; margin:0 auto 14px; padding:30px 22px 20px; border-radius:14px; gap:14px; overflow:visible; }
+  .page:first-of-type { margin-top:6px; }
+  .etiquette { font-size:11px; }
+  h2 { font-size:27px; }
+  p { margin:0 0 10px; }
+  .couv { min-height:74vh; padding:52px 22px 70px; gap:22px; }
+  .couv h1 { font-size:38px; }
+  .couv .sous { font-size:17px; }
+  .couv .bas { bottom:24px; font-size:11px; }
+  .lampe { width:96px; height:4px; border-radius:4px; }
+  .cit { border-left-width:4px; padding:8px 0 8px 14px; margin:4px 0; }
+  .cit .vo { font-size:15px; margin-bottom:4px; }
+  .cit .vf { font-size:18px; }
+  .cit .src { font-size:11px; margin-top:4px; }
+  .faire { padding:14px 16px; border-radius:10px; margin-top:8px; }
+  .faire .etiquette { margin-bottom:6px; }
+  .faire ol { padding-left:20px; } .faire li { margin-bottom:6px; }
+  .pied { font-size:11px; padding-top:8px; border-top-width:1px; }
+  .pied span:last-child { display:none; }
+  .etapes { font-size:16px; gap:12px; }
+  .etapes li { grid-template-columns:28px 1fr; gap:10px; }
+  .etapes li::before { width:26px; height:26px; font-size:13px; margin-top:1px; }
+  .en { font-size:13px; padding:1px 5px; border-radius:4px; overflow-wrap:anywhere; }
+  .qr { width:220px; height:220px; margin:8px auto 0; }
+  .lien { font-size:13px; }
+  .gros-bouton { display:block; margin:6px auto 4px; max-width:340px; padding:15px 18px; border-radius:999px; text-align:center;
+    font-family:'Segoe UI', Arial, sans-serif; font-weight:700; font-size:17px; color:#161513; text-decoration:none;
+    background:linear-gradient(180deg,#ffe6a8,#e8b923); box-shadow:0 6px 18px rgba(232,185,35,.35); }
+  .sommaire { gap:8px; } .sommaire li { grid-template-columns:36px 1fr; gap:8px; }
+  .mentions { font-size:11px; }
+  .fin-guide { max-width:600px; margin:0 auto 30px; padding:0 14px; text-align:center; font-family:'Segoe UI', Arial, sans-serif; font-size:14px; }
+  .fin-guide a { color:#ffe6a8; }
+}
+@media screen and (max-width: 700px) { .qr { display:none; } }
+</style></head><body><header class='barre-guide'><a href='/'>← Ma liseuse</a><a class='pdf' href='/la-formule-de-kevin-trudeau.pdf' download>Télécharger le PDF</a></header><section class="page couv">
+  <div class="etiquette" style="color:#e8b923">Guide offert, en français</div>
+  <h1>La formule<br>de Kevin Trudeau<br><span class="or">6 ingrédients<br>sur 45</span></h1>
+  <div class="lampe"></div>
+  <div class="sous">Son livre donne la formule complète du succès. Voici les premiers ingrédients, en français, avec l'exercice de chacun.</div>
+  <div class="bas">Offert par Le Génie Endormi</div>
+</section>
+<section class="page">
+  <div class="etiquette">Avant de commencer</div>
+  <h2>45 ingrédients.<br><span class="or">En voici 6.</span></h2>
+  <p>Dans « Your Wish Is Your Command », Kevin Trudeau réunit toute sa formule du succès en 45 ingrédients. Le livre n'existe qu'en anglais.</p><p>Ce guide t'en donne six, en français, avec l'exercice que Kevin demande pour chacun. Un par jour : lis-le, fais l'exercice, passe au suivant.</p><p>Les 39 autres sont dans le livre. À la fin du guide : comment le recevoir gratuitement, et ta liseuse en français.</p>
+  <ul class="sommaire"><li><span class="num">02</span><span>Choisis bien qui tu écoutes</span></li><li><span class="num">04</span><span>La pensée avant le comment</span></li><li><span class="num">11</span><span>Décide. Point final.</span></li><li><span class="num">13</span><span>Écris ce que tu veux</span></li><li><span class="num">22</span><span>Ressens-le comme si c'était fait</span></li><li><span class="num">26</span><span>Lis chaque jour</span></li><li class="reste"><span class="num">…</span><span>Et 39 autres, dans le livre</span></li></ul>
+  <div class="pied"><span>Le Génie Endormi</span><span>2</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 2 sur 45 · Leçon 2</div>
+  <h2>Choisis bien<br><span class="or">qui tu écoutes</span></h2>
+  <p>Pour Kevin, c'est la base de tout, avant la moindre technique. Beaucoup de gens parlent de réussite sans l'avoir jamais vécue.</p><p>Le bon conseiller, c'est quelqu'un qui a déjà ce que tu veux, et qui est passé par là où tu es aujourd'hui. Les deux à la fois.</p>
+  <div class="cit"><div class="src" style="margin:0 0 1mm">CE QUE DIT LE LIVRE</div><div class="vf">Écoute les gens qui ont ce que tu veux, mais qui ont aussi connu ta situation.</div><div class="src">Leçon 2</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Pense à un domaine de ta vie que tu veux changer.</li><li>Trouve une personne qui y a réussi en partant de là où tu es.</li><li>Observe-la : ce qu'elle fait, comment elle parle, comment elle pense. Imite un de ses gestes cette semaine.</li><li>Lis la biographie de quelqu'un qui a réussi dans ce domaine.</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>3</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 4 sur 45 · Leçon 4</div>
+  <h2>La pensée<br><span class="or">avant le comment</span></h2>
+  <p>Imagine une balance. D'un côté, la pensée : ce que tu veux, ton attitude, tes émotions. De l'autre, l'action : les techniques, les plans.</p><p>On croit souvent qu'il faut moitié-moitié. Pour Kevin, la pensée pèse 90 % du succès. Quand ton état d'esprit est juste, le « comment » finit par se présenter.</p>
+  <div class="cit"><div class="src" style="margin:0 0 1mm">CE QUE DIT LE LIVRE</div><div class="vf">Ton attitude représente 90 % de ta réussite.</div><div class="src">Leçon 4</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Lis ou écoute chaque jour, même 10 minutes.</li><li>Le rythme idéal selon Kevin : 20 minutes de lecture, 5 à 10 minutes de pause (un verre d'eau, une petite marche), et on recommence.</li><li>Fixe-toi la marche suivante, jamais un saut trop raide.</li><li>Quand tu te demandes « comment je vais faire ? », reviens d'abord à ce que tu veux.</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>4</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 11 sur 45 · Leçon 14</div>
+  <h2>Décide.<br><span class="or">Point final.</span></h2>
+  <p>Pour Kevin, tout commence par une décision ferme : « je le fais, point ». Pas « j'essaie », pas « on verra ».</p><p>Un échec, un refus, une critique ? Ils servent un instant à préciser ce que tu veux, puis tu te recentres. Tu gagnes, ou tu apprends.</p>
+  <div class="cit"><div class="vo">« Success is really just a decision away. »</div><div class="vf">La réussite n'est vraiment qu'à une décision de toi.</div><div class="src">Kevin Trudeau, Your Wish Is Your Command, leçon 14</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Choisis un seul but principal, et pense-y une grande partie de la journée.</li><li>Dis à voix haute : « Je le fais, point. »</li><li>Quand tu te sens mal, prends la posture d'une personne heureuse : redresse-toi, épaules en arrière, souris.</li><li>Finis ce que tu commences.</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>5</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 13 sur 45 · Leçon 9</div>
+  <h2>Écris<br><span class="or">ce que tu veux</span></h2>
+  <p>Premier pas : savoir ce que tu veux. Ensuite, il te faut un désir brûlant (passer de « j'aimerais » à « il me le faut ») et la conviction forte que tu l'obtiendras.</p><p>L'objectif idéal est assez grand pour t'enthousiasmer, et assez proche pour que tu y croies vraiment.</p>
+  <div class="cit"><div class="src" style="margin:0 0 1mm">CE QUE DIT LE LIVRE</div><div class="vf">Définis ton rêve, désire-le ardemment, et crois fermement que tu l'auras.</div><div class="src">Leçon 9</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Prends une feuille blanche et un stylo à encre bleue. Pas de téléphone, pas d'ordinateur.</li><li>Pendant 10 minutes, écris tout ce que tu voudrais être, faire ou avoir, si l'argent n'était pas un problème et que tu ne pouvais pas échouer.</li><li>Donne à chaque souhait une note de 1 à 10 : ta confiance de l'obtenir dans les 12 prochains mois.</li><li>Garde ceux qui allient désir brûlant et forte confiance. Range ta liste dans un cahier : ton « carnet de rêves ».</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>6</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 22 sur 45 · Leçons 10, 12 et 16</div>
+  <h2>Ressens-le<br><span class="or">comme si c'était fait</span></h2>
+  <p>Le cœur de la méthode : te voir déjà en possession de ce que tu veux, et goûter dès maintenant un peu de ce que tu ressentiras ce jour-là.</p><p>Tes émotions sont ta boussole. Si tu te sens bien en y pensant, tu es sur la bonne voie. Si tu te sens mal, soit ce souhait ne te sert pas, soit tu doutes en cherchant le « comment ». Pas de grand saut : un cran au-dessus suffit.</p>
+  <div class="cit"><div class="src" style="margin:0 0 1mm">CE QUE DIT LE LIVRE</div><div class="vf">Ton but numéro un : te sentir le mieux possible, maintenant. Tes sentiments sont ton indicateur : fie-toi à eux.</div><div class="src">Leçon 16</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Choisis un souhait de ta liste.</li><li>Yeux ouverts ou fermés, vois-toi avec : une image nette, les couleurs, les sons, les odeurs.</li><li>Goûte la joie comme si c'était fait, autant que tu peux sans forcer, au moins 90 secondes.</li><li>Refais-le plusieurs fois par jour : sous la douche, en voiture, au coucher, au réveil.</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>7</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Ingrédient n° 26 sur 45 · Leçon 16</div>
+  <h2>Lis<br><span class="or">chaque jour</span></h2>
+  <p>Kevin le met dans sa formule : lire des livres positifs chaque jour. Même un seul paragraphe.</p><p>Une minute de lecture par jour vaut mieux que rien du tout. Plus tu lis, mieux c'est, mais ce qui compte, c'est de lire chaque jour, jusqu'à ce que ça devienne une habitude.</p>
+  <div class="cit"><div class="src" style="margin:0 0 1mm">CE QUE DIT LE LIVRE</div><div class="vf">Les leaders sont toujours des lecteurs.</div><div class="src">Leçon 16</div></div>
+  <div class="faire"><span class="etiquette">À faire</span><ol><li>Choisis un livre positif et garde-le toujours à portée de main.</li><li>Lis au moins un paragraphe chaque jour. Une minute suffit pour commencer.</li><li>Pour commencer : « Ça marche », le petit livre rouge de 1926 qui figure parmi les lectures que Kevin recommande. Il t'attend en français, offert, sur <a href="https://lisetlead.com">lisetlead.com</a>.</li></ol></div>
+  <div class="pied"><span>Le Génie Endormi</span><span>8</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">La suite est dans le livre</div>
+  <h2>Il te manque<br><span class="or">39 ingrédients</span></h2>
+  <p>Tu as maintenant 6 ingrédients sur 45. Commence par eux, dès aujourd'hui.</p><p>Mais une formule ne marche qu'entière. Kevin le dit lui-même : sauter directement à la liste ne sert à rien. C'est le livre lu en entier qui change ta façon de penser.</p>
+  <div class="etiquette" style="color:var(--encre)">Dans le livre, tu découvriras aussi</div>
+  <ul class="teasers"><li><div>Pourquoi tu es né pour gagner, mais programmé pour échouer. Et comment effacer ce programme.</div></li><li><div>L'onde du cerveau des milliardaires, et celle qui te garde dans le manque.</div></li><li><div>Pourquoi il faut lâcher le résultat… pour l'obtenir.</div></li><li><div>Pourquoi tes revenus ressemblent à ceux de tes cinq meilleurs amis.</div></li><li><div>Le piège des mots que tu ne comprends pas, et comment les « activer ».</div></li><li><div>L'habitude de Rockefeller que partagent toutes les grandes fortunes.</div></li></ul>
+  <p class="stop-fin">Ta prochaine étape : lire le livre en entier. Il est gratuit, et voici comment le recevoir.</p>
+  <div class="pied"><span>Le Génie Endormi</span><span>9</span></div>
+</section>
+<section class="page">
+  <div class="etiquette">Le livre complet, gratuit</div>
+  <h2>Récupère le livre<br><span class="or">en 5 minutes</span></h2>
+  <p>La page est en anglais. Voici exactement quoi faire, case par case.</p>
+  <ol class="etapes"><li><div>Sur ton téléphone, touche le lien de la page suivante (sur papier, scanne son QR code). La page « Your Wish Is Your Command » s'ouvre. Un compte à rebours de 10 minutes s'affiche : prends quand même le temps de lire.</div></li><li><div>Écris ton prénom dans <span class="en">First Name</span>, ton nom dans <span class="en">Last Name</span> et ton adresse <span style="white-space:nowrap">e-mail</span> dans <span class="en">Email</span>.</div></li><li><div>La première case (<span class="en">Yes, send me news, offers…</span>) veut dire : tu acceptes de recevoir des nouvelles, des offres et des formations gratuites par <span style="white-space:nowrap">e-mail</span> et par SMS de Trustar Publishing, du Fan Club de Kevin, de Worlds Best Nutritionals, de Trudeau Consulting, de Naturalcures.com et de GIN Unite. Tu peux te désabonner quand tu veux : réponds STOP à un SMS, ou clique sur « unsubscribe » en bas d'un <span style="white-space:nowrap">e-mail</span>.</div></li><li><div>La deuxième case (<span class="en">I agree to the Terms and Conditions…</span>) veut dire : tu acceptes les conditions et la politique de confidentialité. Elle est obligatoire.</div></li><li><div>Appuie sur <span class="en">GIVE ME INSTANT ACCESS</span>. L'étape suivante te demande ton numéro de mobile. C'est fait : l'e-book « Your Wish Is Your Command » (0 $) et l'enregistrement « Swiss Alps Meeting » (affiché 500 $, offert) sont à toi.</div></li><li><div>Pour le lire, ouvre <span class="en">freeyourwish.kevintrudeau.com/training</span>, écris la même adresse <span style="white-space:nowrap">e-mail</span> et appuie sur <span class="en">Send login code</span>. Tape le code reçu par <span style="white-space:nowrap">e-mail</span> : ton livre s'ouvre. Tu peux aussi le lire dans l'appli Teachable (Google Play ou App Store), avec la même adresse <span style="white-space:nowrap">e-mail</span>.</div></li></ol>
+  <div class="pied"><span>Le Génie Endormi</span><span>10</span></div>
+</section>
+<section class="page centre">
+  <div class="etiquette">Touche le lien ou scanne le QR code</div>
+  <h2>La formule complète,<br><span class="or">gratuite</span></h2>
+  <img class="qr" src="guide-qr.svg" alt="QR code vers la page du livre gratuit">
+  <a class="gros-bouton" data-mesure="bio_kevin" href="https://freeyourwish.kevintrudeau.com/?ref=dv8x7b" target="_blank" rel="noopener">Recevoir le livre de Kevin</a>
+  <div class="lien"><a href="https://freeyourwish.kevintrudeau.com/?ref=dv8x7b" data-mesure="bio_kevin" target="_blank" rel="noopener" style="color:inherit">freeyourwish.kevintrudeau.com/?ref=dv8x7b</a></div>
+  <p>Le livre est en anglais. Pour lire en français chaque jour : page suivante.</p>
+  
+</section>
+<section class="page">
+  <div class="etiquette">Ta liseuse, en français</div>
+  <h2>Tout à gagner,<br><span class="or">rien à perdre</span></h2>
+  <p>Ingrédient n° 26 : lire chaque jour. Avec Lis et Lead, l'anglais ne t'arrête plus.</p>
+  <ul class="atouts"><li><div><b>« Ça marche » et ce guide, offerts.</b>Le petit livre rouge de 1926 que Kevin recommande, et ce guide, en français, dans ta bibliothèque dès ton inscription.</div></li><li><div><b>L'anglais ne t'arrête plus.</b>Touche « Traduire » : chaque paragraphe apparaît en français, juste sous l'original.</div></li><li><div><b>Tes livres te lisent à voix haute.</b>En voiture, au sport, avant de dormir : la phrase lue s'allume sur la page.</div></li><li><div><b>Gratuit pour commencer.</b>Lire, traduire, écouter : sans carte bancaire, sur ton téléphone comme sur ton ordinateur.</div></li></ul>
+  <div class="plus-lel">Envie d'aller plus loin ? Lis et Lead Plus : une traduction digne d'un traducteur et des voix premium. Sans engagement.</div>
+  <a class="bouton-lel" data-mesure="bio_liseuse" href="/">Recevoir mes 2 livres offerts<small>lisetlead.com</small></a>
+</section><p class='fin-guide'><a href='/'>Ouvrir ma liseuse</a> · <a href='https://www.tiktok.com/@the.genie.within' target='_blank' rel='noopener'>@the.genie.within</a></p><script>
+(() => {
+  // Ouvertures du guide et clics vers le livre de Kevin : chiffres du propriétaire (lisetlead.com/stats).
+  const STATS = 'https://lisetlead.com/api/stats/evenement';
+  // Le propriétaire a marqué ce navigateur sur la page de bio (5 touches sur « Le Génie Endormi ») : jamais compté.
+  // Sur lisetlead.com, c'est la marque de /stats (« lel-moi ») qui compte.
+  const estMoi = () => { try { return localStorage.getItem('genie-moi') === '1' || localStorage.getItem('lel-moi') === '1'; } catch (_) { return false; } };
+  const mesurer = (e) => {
+    if (estMoi()) return;
+    try {
+      const corps = JSON.stringify({ e, p: '/guide', r: document.referrer, c: false });
+      if (navigator.sendBeacon && navigator.sendBeacon(STATS, corps)) return;
+      fetch(STATS, { method: 'POST', body: corps, keepalive: true, mode: 'no-cors' }).catch(() => {});
+    } catch (_) {}
+  };
+  mesurer('bio_guide');
+  document.querySelectorAll('[data-mesure]').forEach((a) => a.addEventListener('click', () => mesurer(a.dataset.mesure)));
+})();
+</script></body></html>
