@@ -3,6 +3,7 @@ import { corsAllMethods, runMiddleware } from '@/utils/cors';
 import { createSupabaseAdminClient } from '@/utils/supabase';
 import { validateUserAndToken } from '@/utils/access';
 import { deleteObject } from '@/utils/object';
+import { appleRevoke, appleSignInConfigured } from '@/utils/appleSignIn';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await runMiddleware(req, res, corsAllMethods);
@@ -79,6 +80,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (stripeError) {
       console.error('Account deletion: could not cancel the subscription', stripeError);
       return res.status(500).json({ error: 'Could not cancel the subscription' });
+    }
+
+    // Sign in with Apple: revoke the authorization (App Store rule 5.1.1(v)).
+    // A failure must not keep the reader from deleting the account.
+    try {
+      const { data: apple } = await supabaseAdmin
+        .from('apple_tokens')
+        .select('refresh_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (apple?.refresh_token && appleSignInConfigured()) {
+        await appleRevoke(apple.refresh_token);
+      }
+    } catch (appleError) {
+      console.error('Account deletion: could not revoke Sign in with Apple', appleError);
     }
 
     // The public avatar (api/profile/avatar) is not in the files table.
