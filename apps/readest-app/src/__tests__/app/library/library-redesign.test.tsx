@@ -63,14 +63,14 @@ describe('ContinueReadingCard', () => {
     expect(onListen).toHaveBeenCalledWith(alice);
   });
 
-  it('uses the deeper green at night', () => {
+  it('uses the deeper blue at night', () => {
     const props = { book: alice, onOpen: vi.fn(), onListen: vi.fn() };
     const { container, rerender } = render(<ContinueReadingCard {...props} />);
-    expect(container.querySelector('section')!.className).toContain('bg-[#1E6B57]');
+    expect(container.querySelector('section')!.className).toContain('bg-[#223B78]');
 
     themeState.isDarkMode = true;
     rerender(<ContinueReadingCard {...props} />);
-    expect(container.querySelector('section')!.className).toContain('bg-[#163A31]');
+    expect(container.querySelector('section')!.className).toContain('bg-[#061741]');
   });
 });
 

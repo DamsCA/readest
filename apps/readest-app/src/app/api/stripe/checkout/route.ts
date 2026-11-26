@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       // account's name until Lis et Lead has its own account).
       branding_settings: {
         display_name: 'Lis et Lead',
-        button_color: '#16241f',
+        button_color: '#101728',
         border_style: 'rounded',
       },
       // The terms of sale, accepted with the subscription (shown above the

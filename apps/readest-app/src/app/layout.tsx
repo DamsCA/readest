@@ -28,9 +28,9 @@ export const metadata: Metadata = {
   },
   description,
   generator: 'Next.js',
-  // « ?v=2 » (23/11/2026) : une adresse neuve, que l'ancien cache hors ligne ne connaît
+  // « ?v=3 » (26/11/2026, icônes bleu nuit ; ?v=2 le 23/11) : une adresse neuve, que l'ancien cache hors ligne ne connaît
   // pas ; un visiteur qui revient voit le logo Lis et Lead dès sa première visite.
-  manifest: '/manifest.json?v=2',
+  manifest: '/manifest.json?v=3',
   keywords: ['liseuse', 'livres', 'traduction', 'lecture à voix haute', 'epub', 'pdf', 'ouiread'],
   authors: [
     {
@@ -40,11 +40,11 @@ export const metadata: Metadata = {
   ],
   icons: {
     icon: [
-      { url: '/favicon.ico?v=2', sizes: '48x48' },
-      { url: '/icon-192.png?v=2', type: 'image/png', sizes: '192x192' },
-      { url: '/icon.png?v=2', type: 'image/png', sizes: '512x512' },
+      { url: '/favicon.ico?v=3', sizes: '48x48' },
+      { url: '/icon-192.png?v=3', type: 'image/png', sizes: '192x192' },
+      { url: '/icon.png?v=3', type: 'image/png', sizes: '512x512' },
     ],
-    apple: [{ url: '/apple-touch-icon.png?v=2', sizes: '180x180' }],
+    apple: [{ url: '/apple-touch-icon.png?v=3', sizes: '180x180' }],
   },
   appleWebApp: {
     capable: true,

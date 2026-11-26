@@ -431,10 +431,10 @@ export default function StatsPage() {
 const STYLES = `
 .lel-stats {
   min-height: 100vh; padding: 1.25rem 1rem 3rem; max-width: 46rem; margin: 0 auto;
-  color: #f3ecdd; background: #16241f;
+  color: #f3ecdd; background: #101728;
   font-family: 'DM Sans Variable', ui-sans-serif, sans-serif;
 }
-html, body { background: #16241f; }
+html, body { background: #101728; }
 .lel-stats h1 {
   font-family: 'Bricolage Grotesque Variable', ui-sans-serif, sans-serif;
   font-size: 1.75rem; font-weight: 800; color: #f3d48d;
@@ -448,7 +448,7 @@ html, body { background: #16241f; }
 .lel-stats__periodes { display: flex; gap: 0.4rem; margin: 1rem 0 0.9rem; }
 .lel-stats__periodes button { padding: 0.45rem 0.9rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
   background: rgba(243,236,221,0.07); color: #f3ecdd; }
-.lel-stats__periodes button.actif { background: #e8c06a; color: #16241f; }
+.lel-stats__periodes button.actif { background: #e8c06a; color: #101728; }
 .lel-stats__info { margin-top: 1.5rem; padding: 1rem; border-radius: 1rem; background: rgba(243,236,221,0.06); }
 .lel-stats__info a { color: #e8c06a; text-decoration: underline; }
 .lel-stats__cartes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
@@ -458,7 +458,7 @@ html, body { background: #16241f; }
 .lel-stats__cartes strong { font-size: 1.9rem; font-weight: 800; line-height: 1; color: #f3ecdd; }
 .lel-stats__cartes span { font-size: 0.8rem; opacity: 0.75; }
 .lel-stats__cartes .lel-stats__or { background: linear-gradient(135deg, #f3d48d, #c79a3c); }
-.lel-stats__cartes .lel-stats__or strong, .lel-stats__cartes .lel-stats__or span { color: #16241f; opacity: 1; }
+.lel-stats__cartes .lel-stats__or strong, .lel-stats__cartes .lel-stats__or span { color: #101728; opacity: 1; }
 .lel-stats__petit { font-size: 0.82rem; opacity: 0.65; margin-top: 0.5rem; }
 .lel-stats__entonnoir { display: flex; flex-direction: column; gap: 0.7rem; }
 .lel-stats__etape-haut { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.3rem; }
@@ -473,7 +473,7 @@ html, body { background: #16241f; }
 .lel-stats__colonne i { width: 100%; max-width: 2.4rem; border-radius: 0.4rem 0.4rem 0 0;
   background: rgba(243,236,221,0.28); min-height: 2px; }
 .lel-stats__colonne em { position: absolute; top: 0; font-style: normal; font-size: 0.75rem; font-weight: 800;
-  color: #16241f; background: #e8c06a; border-radius: 999px; padding: 0 0.35rem; }
+  color: #101728; background: #e8c06a; border-radius: 999px; padding: 0 0.35rem; }
 .lel-stats__colonne small { position: absolute; bottom: -1.3rem; font-size: 0.68rem; opacity: 0.6; white-space: nowrap; }
 .lel-stats__valeur { font-size: 0.72rem; opacity: 0.8; margin-bottom: 0.15rem; }
 .lel-stats__graphe + .lel-stats__petit { margin-top: 1.6rem; }
@@ -485,7 +485,7 @@ html, body { background: #16241f; }
 .lel-stats .vous { opacity: 0.55; }
 .lel-stats__tag { font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px;
   background: rgba(243,236,221,0.14); text-transform: uppercase; letter-spacing: 0.04em; }
-.lel-stats__tag.or { background: #e8c06a; color: #16241f; }
+.lel-stats__tag.or { background: #e8c06a; color: #101728; }
 .lel-stats__trois { display: grid; grid-template-columns: 1fr; gap: 0 1rem; }
 @media (min-width: 640px) { .lel-stats__trois { grid-template-columns: 1fr 1fr 1fr; } }
 .lel-stats__ligne { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem;

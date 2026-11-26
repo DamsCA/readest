@@ -28,7 +28,7 @@ const Exemple = ({ vo, classique, nous }: { vo: string; classique: string; nous:
         <span className='text-[#f3ecdd]/55 line-through decoration-[#e07a6b]/70'>{classique}</span>
       </p>
       <p className='flex gap-3'>
-        <span className='mt-0.5 shrink-0 self-start whitespace-nowrap rounded-full bg-[#d6ebe0] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#16241f]'>
+        <span className='mt-0.5 shrink-0 self-start whitespace-nowrap rounded-full bg-[#e8efff] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#101728]'>
           Lis et Lead
         </span>
         <span className='font-semibold text-[#f3ecdd]'>{nous}</span>
@@ -39,19 +39,19 @@ const Exemple = ({ vo, classique, nous }: { vo: string; classique: string; nous:
 
 const Etape = ({ n, titre, texte }: { n: number; titre: string; texte: string }) => (
   <li className='flex gap-4'>
-    <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#16241f] text-sm font-bold text-[#f3ecdd]'>
+    <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#101728] text-sm font-bold text-[#f3ecdd]'>
       {n}
     </span>
     <div>
       <p className='font-semibold'>{titre}</p>
-      <p className='mt-1 text-[15px] text-[#16241f]/70'>{texte}</p>
+      <p className='mt-1 text-[15px] text-[#101728]/70'>{texte}</p>
     </div>
   </li>
 );
 
 const Coche = ({ children }: { children: React.ReactNode }) => (
   <li className='flex gap-3'>
-    <span aria-hidden className='mt-0.5 text-[#2f7a57]'>
+    <span aria-hidden className='mt-0.5 text-[#354e89]'>
       ✓
     </span>
     <span>{children}</span>
@@ -59,20 +59,20 @@ const Coche = ({ children }: { children: React.ReactNode }) => (
 );
 
 const Question = ({ q, children }: { q: string; children: React.ReactNode }) => (
-  <details className='group border-b border-[#16241f]/10 py-4'>
+  <details className='group border-b border-[#101728]/10 py-4'>
     <summary className='flex cursor-pointer list-none items-center justify-between gap-4 font-semibold'>
       {q}
-      <span className='text-xl text-[#16241f]/40 transition group-open:rotate-45'>+</span>
+      <span className='text-xl text-[#101728]/40 transition group-open:rotate-45'>+</span>
     </summary>
-    <div className='mt-3 text-[15px] leading-relaxed text-[#16241f]/75'>{children}</div>
+    <div className='mt-3 text-[15px] leading-relaxed text-[#101728]/75'>{children}</div>
   </details>
 );
 
 export default function BienvenuePage() {
   return (
-    <main className='h-screen overflow-y-auto bg-[#faf6ee] text-[#16241f] antialiased'>
+    <main className='h-screen overflow-y-auto bg-[#faf6ee] text-[#101728] antialiased'>
       {/* En-tête + promesse */}
-      <section className='bg-[radial-gradient(120%_80%_at_80%_0%,#24382f_0%,#16241f_55%,#101a16_100%)] text-[#f3ecdd]'>
+      <section className='bg-[radial-gradient(120%_80%_at_80%_0%,#1d273f_0%,#101728_55%,#0b1120_100%)] text-[#f3ecdd]'>
         <header className='mx-auto flex max-w-5xl items-center justify-between px-5 py-4 sm:px-8'>
           <a href='/bienvenue' className='flex items-center gap-2 text-lg font-bold tracking-tight'>
             <img src='/icon.png' alt='' width={28} height={28} className='rounded-lg' />
@@ -88,7 +88,7 @@ export default function BienvenuePage() {
 
         <div className='mx-auto grid max-w-5xl items-center gap-10 px-5 pb-14 pt-6 sm:px-8 md:grid-cols-[1.15fr_0.85fr] md:pb-20 md:pt-10'>
           <div>
-            <p className='text-sm font-semibold uppercase tracking-[0.18em] text-[#d6ebe0]/80'>
+            <p className='text-sm font-semibold uppercase tracking-[0.18em] text-[#e8efff]/80'>
               Les leaders sont des lecteurs
             </p>
             <h1 className='mt-4 font-serif text-[2.6rem] font-bold leading-[1.05] sm:text-6xl'>
@@ -101,7 +101,7 @@ export default function BienvenuePage() {
             <div className='mt-8 flex flex-col gap-3 sm:flex-row sm:items-center'>
               <LienBibliotheque
                 href={INSCRIPTION}
-                className='inline-flex items-center justify-center rounded-full bg-[#d6ebe0] px-7 py-4 text-base font-bold text-[#16241f] shadow-lg shadow-black/20 transition hover:bg-white'
+                className='inline-flex items-center justify-center rounded-full bg-[#e8efff] px-7 py-4 text-base font-bold text-[#101728] shadow-lg shadow-black/20 transition hover:bg-white'
               >
                 Commencer gratuitement
               </LienBibliotheque>
@@ -131,7 +131,7 @@ export default function BienvenuePage() {
         <h2 className='font-serif text-3xl font-bold sm:text-4xl'>
           Le livre que vous vouliez lire n’existe pas en français ?
         </h2>
-        <p className='mt-4 max-w-2xl text-lg leading-relaxed text-[#16241f]/75'>
+        <p className='mt-4 max-w-2xl text-lg leading-relaxed text-[#101728]/75'>
           Beaucoup de grands livres ne sont jamais traduits. Avec Lis et Lead, vous n’attendez
           plus : vous les lisez maintenant, dans votre langue.
         </p>
@@ -150,9 +150,9 @@ export default function BienvenuePage() {
               d: 'Commencez sur l’ordinateur, continuez sur le téléphone : votre page, vos surlignages et vos notes vous suivent.',
             },
           ].map(({ t, d }) => (
-            <div key={t} className='rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#16241f]/5'>
+            <div key={t} className='rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#101728]/5'>
               <p className='text-lg font-semibold'>{t}</p>
-              <p className='mt-2 text-[15px] leading-relaxed text-[#16241f]/70'>{d}</p>
+              <p className='mt-2 text-[15px] leading-relaxed text-[#101728]/70'>{d}</p>
             </div>
           ))}
         </div>
@@ -185,7 +185,7 @@ export default function BienvenuePage() {
           </div>
 
           {/* Le cadeau */}
-          <div className='flex flex-col items-center gap-6 rounded-3xl bg-[#16241f] p-6 text-center text-[#f3ecdd] sm:flex-row sm:p-8 sm:text-left'>
+          <div className='flex flex-col items-center gap-6 rounded-3xl bg-[#101728] p-6 text-center text-[#f3ecdd] sm:flex-row sm:p-8 sm:text-left'>
             <img
               src='/images/ca-marche-couverture.webp'
               alt='Couverture de « Ça marche », R. H. Jarrett'
@@ -194,7 +194,7 @@ export default function BienvenuePage() {
               className='w-36 shrink-0 rounded-lg shadow-2xl shadow-black/40'
             />
             <div>
-              <p className='text-xs font-semibold uppercase tracking-[0.16em] text-[#d6ebe0]/80'>
+              <p className='text-xs font-semibold uppercase tracking-[0.16em] text-[#e8efff]/80'>
                 Offert à l’inscription
               </p>
               <p className='mt-2 font-serif text-2xl font-bold'>« Ça marche »</p>
@@ -214,24 +214,24 @@ export default function BienvenuePage() {
           libre. Prix vérifiés sur Stripe le 23/11/2026 : 6,99 € et 59,99 €. */}
       <section className='mx-auto max-w-5xl px-5 py-14 sm:px-8 md:py-20'>
         <figure className='mx-auto max-w-2xl text-center'>
-          <blockquote className='font-serif text-xl italic leading-snug text-[#16241f]/80 sm:text-2xl'>
+          <blockquote className='font-serif text-xl italic leading-snug text-[#101728]/80 sm:text-2xl'>
             « Tous les lecteurs ne sont pas des leaders, mais tous les leaders sont des lecteurs. »
           </blockquote>
-          <figcaption className='mt-2 text-sm text-[#16241f]/55'>Harry S. Truman</figcaption>
+          <figcaption className='mt-2 text-sm text-[#101728]/55'>Harry S. Truman</figcaption>
         </figure>
         <h2 className='mt-10 text-center font-serif text-3xl font-bold sm:text-4xl'>
           Pour moins qu’un livre de poche par mois, chaque livre que vous ouvrez vous parle en
           français.
         </h2>
-        <p className='mx-auto mt-3 max-w-2xl text-center text-lg text-[#16241f]/70'>
+        <p className='mx-auto mt-3 max-w-2xl text-center text-lg text-[#101728]/70'>
           Commencez gratuitement. Passez à Plus le jour où vous voulez la plume d’un vrai traducteur
           et des voix qui donnent vie à chaque page.
         </p>
         <div className='mx-auto mt-10 grid max-w-3xl gap-5 md:grid-cols-2'>
-          <div className='flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#16241f]/10'>
+          <div className='flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#101728]/10'>
             <p className='text-lg font-semibold'>Gratuit</p>
             <p className='mt-2 text-4xl font-bold'>0 €</p>
-            <p className='mt-2 text-sm text-[#16241f]/60'>
+            <p className='mt-2 text-sm text-[#101728]/60'>
               Pour découvrir, sur vos propres livres.
             </p>
             <ul className='mb-8 mt-6 space-y-3 text-[15px]'>
@@ -244,14 +244,14 @@ export default function BienvenuePage() {
             </ul>
             <LienBibliotheque
               href={INSCRIPTION}
-              className='mt-auto block rounded-full py-3 text-center font-semibold ring-1 ring-[#16241f]/20 hover:bg-[#16241f]/5'
+              className='mt-auto block rounded-full py-3 text-center font-semibold ring-1 ring-[#101728]/20 hover:bg-[#101728]/5'
             >
               Créer mon compte gratuit
             </LienBibliotheque>
           </div>
 
-          <div className='relative flex flex-col rounded-3xl bg-[#16241f] p-7 text-[#f3ecdd] shadow-xl ring-1 ring-[#e8c06a]/40'>
-            <span className='absolute -top-3 right-6 rounded-full bg-[#e8c06a] px-3 py-1 text-xs font-bold text-[#16241f]'>
+          <div className='relative flex flex-col rounded-3xl bg-[#101728] p-7 text-[#f3ecdd] shadow-xl ring-1 ring-[#e8c06a]/40'>
+            <span className='absolute -top-3 right-6 rounded-full bg-[#e8c06a] px-3 py-1 text-xs font-bold text-[#101728]'>
               Recommandé
             </span>
             <p className='text-lg font-semibold'>Plus</p>
@@ -279,7 +279,7 @@ export default function BienvenuePage() {
             </ul>
             <LienBibliotheque
               href={INSCRIPTION_PLUS}
-              className='mt-auto block rounded-full bg-[#e8c06a] py-3 text-center font-bold text-[#16241f] hover:bg-[#f3d58f]'
+              className='mt-auto block rounded-full bg-[#e8c06a] py-3 text-center font-bold text-[#101728] hover:bg-[#f3d58f]'
             >
               Je choisis Plus
             </LienBibliotheque>
@@ -332,7 +332,7 @@ export default function BienvenuePage() {
       </section>
 
       {/* Dernier appel */}
-      <section className='bg-[#16241f] text-[#f3ecdd]'>
+      <section className='bg-[#101728] text-[#f3ecdd]'>
         <div className='mx-auto max-w-3xl px-5 py-16 text-center sm:px-8'>
           <h2 className='font-serif text-3xl font-bold sm:text-4xl'>
             Votre prochain livre vous attend.
@@ -340,14 +340,14 @@ export default function BienvenuePage() {
           <p className='mt-3 text-lg text-[#f3ecdd]/75'>Et le premier est offert.</p>
           <LienBibliotheque
             href={INSCRIPTION}
-            className='mt-8 inline-flex rounded-full bg-[#d6ebe0] px-8 py-4 font-bold text-[#16241f] hover:bg-white'
+            className='mt-8 inline-flex rounded-full bg-[#e8efff] px-8 py-4 font-bold text-[#101728] hover:bg-white'
           >
             Commencer gratuitement
           </LienBibliotheque>
         </div>
       </section>
 
-      <footer className='mx-auto flex max-w-5xl flex-col gap-3 px-5 py-8 text-sm text-[#16241f]/60 sm:flex-row sm:justify-between sm:px-8'>
+      <footer className='mx-auto flex max-w-5xl flex-col gap-3 px-5 py-8 text-sm text-[#101728]/60 sm:flex-row sm:justify-between sm:px-8'>
         <p>© 2026 Lis et Lead</p>
         <nav className='flex flex-wrap gap-x-5 gap-y-2'>
           <a href='/mentions-legales' className='underline'>

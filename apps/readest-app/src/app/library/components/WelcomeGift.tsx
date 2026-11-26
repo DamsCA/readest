@@ -9,7 +9,7 @@ import { WELCOME_GIFT_EVENT } from '@/libs/sync';
 // Played once, when the server has just put the book in the library; it can be
 // replayed with /library?cadeau (for a demo or a video).
 //
-// The scene: a green and gold parcel drops in and wriggles; a tap opens it (or
+// The scene: a midnight-blue and gold parcel drops in and wriggles; a tap opens it (or
 // it opens by itself after a few seconds): the lid flies off, light and
 // confetti burst out, and the book rises from the box.
 
@@ -17,7 +17,7 @@ type Stage = 'hidden' | 'arrive' | 'waiting' | 'open' | 'revealed';
 
 const COVER = '/images/ca-marche-couverture.webp';
 const AUTO_OPEN_MS = 4200;
-const CONFETTI_COLORS = ['#e8c06a', '#f3ecdd', '#d6ebe0', '#e07a6b', '#b8862f', '#9fd3b6'];
+const CONFETTI_COLORS = ['#e8c06a', '#f3ecdd', '#e8efff', '#e07a6b', '#b8862f', '#b2c4ec'];
 
 // Same scatter on every render, without Math.random in render.
 const confettiPieces = () => {
@@ -191,7 +191,7 @@ const STYLES = `
   position: fixed; inset: 0; z-index: 1000;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
-  background: radial-gradient(120% 90% at 50% 30%, #24382f 0%, #16241f 55%, #0c1411 100%);
+  background: radial-gradient(120% 90% at 50% 30%, #1d273f 0%, #101728 55%, #090d16 100%);
   color: #f3ecdd; overflow: hidden;
   animation: lel-gift-fade .45s ease-out both;
   -webkit-tap-highlight-color: transparent;
@@ -241,12 +241,12 @@ const STYLES = `
 .lel-gift--revealed .lel-gift__parcel { animation: lel-gift-sink .45s ease-in both; }
 .lel-gift__box {
   position: absolute; left: 10px; right: 10px; bottom: 0; height: 128px; border-radius: 6px 6px 12px 12px;
-  background: linear-gradient(180deg, #2a4a3c 0%, #1d362c 55%, #16241f 100%);
+  background: linear-gradient(180deg, #243253 0%, #121f3c 55%, #101728 100%);
   box-shadow: 0 22px 40px rgba(0,0,0,.45), inset 0 -10px 18px rgba(0,0,0,.25), inset 0 2px 0 rgba(255,255,255,.06);
 }
 .lel-gift__lid {
   position: absolute; left: 0; right: 0; bottom: 122px; height: 44px; border-radius: 6px;
-  background: linear-gradient(180deg, #34594a 0%, #24402f 100%);
+  background: linear-gradient(180deg, #344364 0%, #1b2948 100%);
   box-shadow: 0 6px 12px rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.08);
   transform-origin: 30% 100%;
 }
@@ -301,7 +301,7 @@ const STYLES = `
   opacity: 1; transform: none; pointer-events: auto; transition: opacity .6s ease-out .55s, transform .6s ease-out .55s;
 }
 .lel-gift__kicker {
-  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: rgba(214,235,224,.85);
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: rgba(232,239,255,.85);
 }
 .lel-gift__title {
   margin: 6px 0 8px; font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 40px; font-weight: 700; line-height: 1.05; color: #f3ecdd;
@@ -309,7 +309,7 @@ const STYLES = `
 .lel-gift__by { margin: 0 0 4px; font-size: 15px; line-height: 1.45; color: rgba(243,236,221,.8); }
 .lel-gift__cta {
   margin-top: 18px; padding: 13px 26px; border: 0; border-radius: 999px; cursor: pointer;
-  background: #f3ecdd; color: #16241f; font-size: 16px; font-weight: 700;
+  background: #f3ecdd; color: #101728; font-size: 16px; font-weight: 700;
   box-shadow: 0 10px 24px rgba(0,0,0,.3); transition: transform .15s ease, background .15s ease;
 }
 .lel-gift__cta:hover { background: #fff8ea; transform: translateY(-1px); }

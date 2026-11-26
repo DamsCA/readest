@@ -60,11 +60,11 @@ const AnnotationPopup: React.FC<AnnotationPopupProps> = ({
         minHeight={isVertical ? popupWidth : popupHeight}
         position={position}
         trianglePosition={trianglePosition}
-        // Lis et Lead's capsule: the deep green of the logo, its icons in gold.
+        // Lis et Lead's capsule: the midnight blue of the logo, its icons in gold.
         // No pointer: the capsule floats by itself.
         className={clsx(
           'selection-popup !rounded-full !text-[#f3ecdd]',
-          notes.length > 0 ? '!bg-transparent' : '!bg-[#16241f]',
+          notes.length > 0 ? '!bg-transparent' : '!bg-[#101728]',
         )}
         triangleClassName='!hidden'
         onDismiss={onDismiss}

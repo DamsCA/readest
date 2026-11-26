@@ -116,30 +116,30 @@ export const generateDarkPalette = ({ bg, fg, primary }: BaseColor) => {
 
 const _ = (stubKey: string) => stubKey;
 
-// The app's own look ("C"): a forest green, a butter yellow, paper-white pages.
+// The app's own look ("C"): a midnight blue, a butter yellow, paper-white pages.
 // Hand-tuned instead of generated, so every text/background pair keeps at least
 // a 4.5:1 contrast. The dark side never uses pure black or pure white: a very
-// dark green ground and an off-white text are easier on the eyes at night.
+// dark midnight-blue ground and an off-white text are easier on the eyes at night.
 const signatureLight: Palette = {
   'base-100': '#FFFDF8', // the page
-  'base-200': '#EEF4F0', // panels, the library ground
-  'base-300': '#DCE8E0', // borders, pressed states
-  'base-content': '#15201B',
-  neutral: '#CFE6DC',
-  'neutral-content': '#4E6159', // secondary text
-  primary: '#1E6B57',
+  'base-200': '#EEF1F8', // panels, the library ground
+  'base-300': '#DCE3F0', // borders, pressed states
+  'base-content': '#111624',
+  neutral: '#E6EDFF',
+  'neutral-content': '#565D6D', // secondary text
+  primary: '#223B78',
   secondary: '#F2C14E',
   accent: '#F2C14E',
 };
 
 const signatureDark: Palette = {
-  'base-100': '#101614',
-  'base-200': '#17231F',
-  'base-300': '#23302B',
-  'base-content': '#DCE5DF',
-  neutral: '#24443A',
-  'neutral-content': '#9DB3A9',
-  primary: '#5CC2A0',
+  'base-100': '#0E1119',
+  'base-200': '#121927',
+  'base-300': '#1F2636',
+  'base-content': '#DCE2EC',
+  neutral: '#1B2A4C',
+  'neutral-content': '#B0B7C8',
+  primary: '#6789D9',
   secondary: '#F2C14E',
   accent: '#F2C14E',
 };
@@ -152,7 +152,7 @@ const sepiaLight: Palette = {
   'base-content': '#3B2F22',
   neutral: '#E0D2B8',
   'neutral-content': '#5C4D3B',
-  primary: '#185A49',
+  primary: '#112A65',
   secondary: '#B8862B',
   accent: '#B8862B',
 };
@@ -173,11 +173,11 @@ const sepiaDark: Palette = {
 const blackDark: Palette = {
   'base-100': '#000000',
   'base-200': '#0C0F0E',
-  'base-300': '#18201D',
-  'base-content': '#C9D2CD',
-  neutral: '#1B2925',
-  'neutral-content': '#8FA39A',
-  primary: '#5CC2A0',
+  'base-300': '#161A24',
+  'base-content': '#C9CED8',
+  neutral: '#161D2E',
+  'neutral-content': '#A0A7B7',
+  primary: '#6789D9',
   secondary: '#F2C14E',
   accent: '#F2C14E',
 };

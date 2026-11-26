@@ -16,7 +16,7 @@ interface ContinueReadingCardProps {
 /**
  * The big card at the top of the library: the book being read, its cover
  * tilted on the side, how far the reader got, and one tap to go back in.
- * The green is deeper at night so the card never glows in a dark room.
+ * The blue is deeper at night so the card never glows in a dark room.
  */
 const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen, onListen }) => {
   const _ = useTranslation();
@@ -29,8 +29,8 @@ const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen,
       aria-label={_('Continue Reading')}
       className={clsx(
         'relative mx-4 mb-2 mt-2 flex h-64 flex-col overflow-hidden rounded-[2rem] p-5',
-        'text-[#F4FBF7]',
-        isDarkMode ? 'border border-white/5 bg-[#163A31]' : 'bg-[#1E6B57]',
+        'text-[#F4F7FD]',
+        isDarkMode ? 'border border-white/5 bg-[#061741]' : 'bg-[#223B78]',
       )}
     >
       <span className='self-start rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold'>
@@ -40,7 +40,7 @@ const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen,
         {book.title}
       </h2>
       {authors && (
-        <p className='mt-1.5 line-clamp-1 max-w-[58%] text-sm text-[#CFE6DC]'>{authors}</p>
+        <p className='mt-1.5 line-clamp-1 max-w-[58%] text-sm text-[#E6EDFF]'>{authors}</p>
       )}
       <div className='mt-auto flex max-w-[50%] flex-col gap-2'>
         <div
@@ -56,7 +56,7 @@ const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen,
             style={{ width: `${Math.max(percent, 4)}%` }}
           />
         </div>
-        <span className='text-xs font-semibold text-[#CFE6DC]'>
+        <span className='text-xs font-semibold text-[#E6EDFF]'>
           {_('{{percent}}% read', { percent })}
         </span>
       </div>
@@ -81,7 +81,7 @@ const ContinueReadingCard: React.FC<ContinueReadingCardProps> = ({ book, onOpen,
         <button
           type='button'
           onClick={() => onOpen(book)}
-          className='flex h-12 items-center rounded-full bg-white px-6 text-[15px] font-bold text-[#0F241C] transition-transform active:scale-95'
+          className='flex h-12 items-center rounded-full bg-white px-6 text-[15px] font-bold text-[#040F28] transition-transform active:scale-95'
         >
           {_('Read')}
         </button>

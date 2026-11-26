@@ -52,7 +52,7 @@ const PlanActionButton: React.FC<PlanActionButtonProps> = ({
     return (
       <button
         onClick={() => onSelectPlan(1)}
-        className='w-full rounded-lg bg-[#16241f] px-6 py-3 font-semibold text-[#f3ecdd] transition-colors hover:bg-[#24382f]'
+        className='w-full rounded-lg bg-[#101728] px-6 py-3 font-semibold text-[#f3ecdd] transition-colors hover:bg-[#1d273f]'
       >
         {_('Upgrade to Plus or Pro')}
       </button>

@@ -26,7 +26,7 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
       }}
       onClick={onClick}
     >
-      {/* The app's green, with a soft ring that breathes while the voice reads. */}
+      {/* The app's midnight blue, with a soft ring that breathes while the voice reads. */}
       <div
         className='absolute inset-0 overflow-hidden rounded-full bg-[#e8c06a] shadow-[0_10px_26px_-6px_rgba(150,110,30,0.6)]'
         style={{
@@ -49,7 +49,7 @@ const TTSIcon: React.FC<TTSIconProps> = ({ isPlaying, ttsInited, onClick }) => {
           {bars.map((bar) => (
             <div
               key={bar}
-              className='w-1 rounded-full bg-[#16241f]'
+              className='w-1 rounded-full bg-[#101728]'
               style={{
                 height: '16px',
                 animationName: isPlaying ? 'bounce' : 'none',

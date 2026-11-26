@@ -14,15 +14,15 @@
 :root {
   --lel-gold: #e8c06a;
   --lel-gold-soft: #f3d58f;
-  --lel-ink: #16241f;
+  --lel-ink: #101728;
   --lel-ease: cubic-bezier(0.2, 0.9, 0.25, 1);
   /* Glass, but always readable: over a page of text a lighter one let the words
      behind show through the menu's own. */
   --lel-glass: oklch(var(--b1) / 0.86);
   --lel-glass-strong: oklch(var(--b1) / 0.95);
   --lel-hairline: oklch(var(--bc) / 0.09);
-  --lel-shadow: 0 18px 48px -14px rgba(6, 12, 9, 0.32), 0 4px 12px -6px rgba(6, 12, 9, 0.18);
-  --lel-shadow-up: 0 -18px 48px -16px rgba(6, 12, 9, 0.3);
+  --lel-shadow: 0 18px 48px -14px rgba(3, 6, 13, 0.32), 0 4px 12px -6px rgba(3, 6, 13, 0.18);
+  --lel-shadow-up: 0 -18px 48px -16px rgba(3, 6, 13, 0.3);
 }
 
 /* ---------- Frosted glass for everything that floats ---------- */
@@ -92,7 +92,7 @@ html:not([data-eink='true']) .footerbar-progress-mobile {
 /* ---------- Sheets: deep rounded tops over a blurred page ---------- */
 
 html:not([data-eink='true']) .dialog-overlay {
-  background-color: rgba(10, 18, 14, 0.38) !important;
+  background-color: rgba(6, 10, 20, 0.38) !important;
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
@@ -209,8 +209,8 @@ html:not([data-eink='true']) .popup-container:not(.selection-popup) {
   box-shadow: var(--lel-shadow) !important;
 }
 
-html:not([data-eink='true']) .popup-triangle-inner:not([class*='16241f']),
-html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
+html:not([data-eink='true']) .popup-triangle-inner:not([class*='101728']),
+html:not([data-eink='true']) .popup-triangle-outer:not([class*='101728']) {
   color: oklch(var(--b1) / 0.95);
 }
 
@@ -237,7 +237,7 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
   padding: 0.75rem 0.875rem;
   border-radius: 1rem;
   background: linear-gradient(135deg, #f3d48d 0%, #e8c06a 45%, #c79a3c 100%);
-  color: #16241f;
+  color: #101728;
   text-align: start;
   box-shadow: 0 8px 20px -10px rgba(199, 154, 60, 0.9);
   transition:
@@ -254,12 +254,12 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
 }
 .lel-plus-cta svg {
   flex-shrink: 0;
-  color: #16241f;
-  fill: #16241f;
+  color: #101728;
+  fill: #101728;
 }
 /* The gold second layer of the icons would vanish on gold. */
 .lel-plus-cta .lel-icon path[opacity='0.2'] {
-  fill: #16241f !important;
+  fill: #101728 !important;
   opacity: 0.25;
 }
 .lel-plus-cta-text {
@@ -278,7 +278,7 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
   line-height: 1.3;
   opacity: 0.82;
 }
-/* A Plus reader's card: the same place, the house green with the logo's gold. */
+/* A Plus reader's card: the same place, the house midnight blue with the logo's gold. */
 .lel-plus-member {
   display: flex;
   align-items: center;
@@ -289,7 +289,7 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
   padding: 0.75rem 0.875rem;
   border: 1px solid rgba(232, 192, 106, 0.55);
   border-radius: 1rem;
-  background: linear-gradient(135deg, #1e6b57 0%, #16241f 100%);
+  background: linear-gradient(135deg, #223b78 0%, #101728 100%);
   color: #f3d48d;
   text-align: start;
 }
@@ -309,7 +309,7 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='16241f']) {
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   background: #e8c06a;
-  color: #16241f;
+  color: #101728;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.02em;

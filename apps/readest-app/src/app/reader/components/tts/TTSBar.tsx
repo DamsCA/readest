@@ -107,7 +107,7 @@ const TTSBar = ({
           </button>
           <button
             onClick={onTogglePlay}
-            className='flex h-14 w-14 items-center justify-center rounded-full bg-[#e8c06a] text-[#16241f] shadow-[0_8px_22px_-8px_rgba(150,110,30,0.55)] transition-transform duration-200 active:scale-95'
+            className='flex h-14 w-14 items-center justify-center rounded-full bg-[#e8c06a] text-[#101728] shadow-[0_8px_22px_-8px_rgba(150,110,30,0.55)] transition-transform duration-200 active:scale-95'
             title={isPlaying ? _('Pause') : _('Play')}
             aria-label={isPlaying ? _('Pause') : _('Play')}
           >

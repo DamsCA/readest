@@ -17,7 +17,7 @@ const PlanIndicators: React.FC<PlanIndicatorsProps> = ({
         key={index}
         onClick={() => onSelectPlan(index)}
         className={`h-2 w-2 rounded-full transition-colors ${
-          index === currentPlanIndex ? 'bg-[#16241f]' : 'bg-gray-300'
+          index === currentPlanIndex ? 'bg-[#101728]' : 'bg-gray-300'
         }`}
       />
     ))}

@@ -259,7 +259,7 @@ const TTSPanel = ({
           <RoundButton
             label={isPlaying ? _('Pause') : _('Play')}
             onClick={onTogglePlay}
-            className='mx-2 h-16 w-16 bg-[#e8c06a] text-[#16241f] shadow-[0_10px_28px_-8px_rgba(150,110,30,0.55)]'
+            className='mx-2 h-16 w-16 bg-[#e8c06a] text-[#101728] shadow-[0_10px_28px_-8px_rgba(150,110,30,0.55)]'
           >
             {isPlaying ? <IconPause size={36} /> : <IconPlay size={38} />}
           </RoundButton>
@@ -307,7 +307,7 @@ const TTSPanel = ({
               className={clsx(
                 'rounded-full px-3 py-1 text-sm tabular-nums transition-colors',
                 preset === rate
-                  ? 'bg-[#e8c06a] font-semibold text-[#16241f]'
+                  ? 'bg-[#e8c06a] font-semibold text-[#101728]'
                   : 'bg-base-content/[0.07]',
               )}
             >
@@ -449,7 +449,7 @@ const TTSPanel = ({
                   className={clsx(
                     'rounded-full px-3 py-1 text-sm transition-colors',
                     seconds === timeoutOption
-                      ? 'bg-[#e8c06a] font-semibold text-[#16241f]'
+                      ? 'bg-[#e8c06a] font-semibold text-[#101728]'
                       : 'bg-base-content/[0.07]',
                   )}
                 >

@@ -36,17 +36,17 @@ import { authWithCustomTab, authWithSafari } from './utils/nativeAuth';
 import WindowButtons from '@/components/WindowButtons';
 
 // Lis et Lead's colours for the sign-in form (its default was a mint green):
-// the deep green of the logo, gold in the dark theme, rounded like the site.
+// the midnight blue of the logo, gold in the dark theme, rounded like the site.
 const BRAND_AUTH = {
   default: {
     colors: {
-      brand: '#16241f',
-      brandAccent: '#24382f',
+      brand: '#101728',
+      brandAccent: '#1d273f',
       brandButtonText: '#f3ecdd',
-      inputBorderFocus: '#16241f',
-      inputBorderHover: '#16241f66',
-      anchorTextColor: '#16241fb3',
-      anchorTextHoverColor: '#16241f',
+      inputBorderFocus: '#101728',
+      inputBorderHover: '#10172866',
+      anchorTextColor: '#101728b3',
+      anchorTextHoverColor: '#101728',
     },
     radii: {
       borderRadiusButton: '9999px',
@@ -59,7 +59,7 @@ const BRAND_AUTH = {
     colors: {
       brand: '#e8c06a',
       brandAccent: '#f3d58f',
-      brandButtonText: '#16241f',
+      brandButtonText: '#101728',
       inputBorderFocus: '#e8c06a',
       anchorTextColor: '#f3ecddb3',
       anchorTextHoverColor: '#f3ecdd',

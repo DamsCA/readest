@@ -197,7 +197,7 @@ const STYLES = `
 @media (min-width: 640px) { .lel-invite { align-items: center; } }
 .lel-invite__fond {
   position: absolute; inset: 0; border: 0; cursor: default;
-  background: rgba(10, 18, 14, 0.5);
+  background: rgba(6, 10, 20, 0.5);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   animation: lel-invite-fondu 0.3s ease both;
 }
@@ -206,9 +206,9 @@ const STYLES = `
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 1.75rem 1.5rem calc(1.25rem + env(safe-area-inset-bottom));
   border-radius: 2rem 2rem 0 0;
-  background: linear-gradient(180deg, #1e6b57 0%, #16241f 58%);
+  background: linear-gradient(180deg, #223b78 0%, #101728 58%);
   color: #f3ecdd;
-  box-shadow: 0 -18px 48px -16px rgba(6, 12, 9, 0.5);
+  box-shadow: 0 -18px 48px -16px rgba(3, 6, 13, 0.5);
   animation: lel-invite-monte 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 @media (min-width: 640px) { .lel-invite__carte { border-radius: 1.75rem; padding-bottom: 1.5rem; } }
@@ -246,7 +246,7 @@ const STYLES = `
 .lel-invite__google {
   margin-top: 1.25rem; width: 100%; min-height: 3.25rem;
   display: flex; align-items: center; justify-content: center; gap: 0.6rem;
-  border-radius: 999px; background: #e8c06a; color: #16241f;
+  border-radius: 999px; background: #e8c06a; color: #101728;
   font-size: 1rem; font-weight: 700;
   box-shadow: 0 10px 24px -10px rgba(232, 192, 106, 0.9);
 }
@@ -261,7 +261,7 @@ const STYLES = `
 }
 .lel-invite__navigateur {
   margin-top: 0.7rem; display: flex; align-items: center; justify-content: center;
-  min-height: 3rem; border-radius: 999px; background: #f3ecdd; color: #16241f;
+  min-height: 3rem; border-radius: 999px; background: #f3ecdd; color: #101728;
   font-weight: 700; font-size: 0.98rem; text-decoration: none;
 }
 .lel-invite__secours { margin-top: 0.55rem; font-size: 0.76rem; opacity: 0.7; }
