@@ -23,15 +23,18 @@ interface NavigationBarProps {
 
 interface TabProps {
   label: string;
+  /** Lit by the reader's tour (VisiteLecteur). */
+  tuto?: string;
   icon: React.ReactNode;
   active: boolean;
   onClick: () => void;
 }
 
 /** One tool of the bar: an icon in a pill that fills when its panel is open. */
-const Tab: React.FC<TabProps> = ({ label, icon, active, onClick }) => (
+const Tab: React.FC<TabProps> = ({ label, tuto, icon, active, onClick }) => (
   <button
     type='button'
+    data-tuto={tuto}
     aria-label={label}
     aria-pressed={active}
     onClick={onClick}
@@ -93,6 +96,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       {isSideBarVisible && isSideBarPinned ? null : (
         <Tab
           label={_('Contents')}
+          tuto='sommaire'
           icon={<IconContents aria-hidden='true' className={iconClass} />}
           active={actionTab === 'toc'}
           onClick={() => onSetActionTab('toc')}
@@ -112,12 +116,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       />
       <Tab
         label={_('Text')}
+        tuto='texte'
         icon={<IconText aria-hidden='true' className={iconClass} />}
         active={actionTab === 'font'}
         onClick={() => onSetActionTab('font')}
       />
       <Tab
         label={_('Listen')}
+        tuto='ecouter'
         icon={<IconListen aria-hidden='true' className={iconClass} />}
         active={!!viewState?.ttsEnabled}
         onClick={() => onSetActionTab('tts')}

@@ -64,6 +64,7 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
         />
       }
       aria-label={_('Toggle Translation')}
+      className='lel-tuto-traduire'
       disabled={!translationAvailable && !translationEnabled}
       onClick={() => setTranslationEnabled(!translationEnabled)}
       label={
