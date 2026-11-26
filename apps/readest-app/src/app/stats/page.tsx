@@ -68,6 +68,19 @@ interface Stats {
     telegram: number;
     arrivee: number;
   };
+  tutoriel?: {
+    vu: number;
+    traduire: number;
+    difference: number;
+    ecouter: number;
+    voix_telephone: number;
+    cadeau: number;
+    plus: number;
+    gratuit: number;
+    passe: number;
+    rappels: number;
+    rappels_plus: number;
+  };
   par_jour: Ligne[];
   inscrits: Inscrit[];
   provenances: { provenance: string; visiteurs: number }[];
@@ -99,6 +112,19 @@ const NOMS: Record<string, string> = {
   bio_cadeau: 'a cliqué « Recevoir Ça marche »',
   bio_telegram: 'a cliqué la communauté Telegram',
   bio_arrivee: 'est arrivé au bout du chemin',
+  tuto_vu: 'a ouvert le tutoriel de l’appli',
+  tuto_traduire: 'a touché « Traduire » dans le tutoriel',
+  tuto_difference: 'a comparé les deux traductions',
+  tuto_ecouter: 'a écouté la voix Plus',
+  tuto_voix_telephone: 'a écouté la voix du téléphone',
+  tuto_cadeau: 'a touché « Recevoir mon livre »',
+  tuto_plus: 'a touché « Découvrir Plus » à la fin du tutoriel',
+  tuto_gratuit: 'a choisi « Continuer gratuitement »',
+  rappel_traduction: 'a vu le rappel de la traduction Plus',
+  rappel_voix: 'a vu le rappel de la voix Plus',
+  rappel_chapitre: 'a fini son premier chapitre',
+  rappel_plus_clic: 'a ouvert Plus depuis un rappel',
+  app_inscription_email: 's’est inscrit par e-mail dans l’appli',
 };
 
 const VIA: Record<string, string> = { google: 'Google', apple: 'Apple', email: 'E-mail' };
@@ -370,6 +396,37 @@ export default function StatsPage() {
               <p className='lel-stats__petit'>
                 {stats.bio.arrivee} arrivés au bout du chemin
                 {stats.bio.telegram > 0 ? ` · ${stats.bio.telegram} clics vers Telegram` : ''}
+              </p>
+            </>
+          )}
+
+          {stats.tutoriel && (
+            <>
+              <h2>Tutoriel de l’appli · {periode}</h2>
+              <div className='lel-stats__cartes'>
+                <div>
+                  <strong>{stats.tutoriel.vu}</strong>
+                  <span>ont ouvert le tutoriel</span>
+                </div>
+                <div>
+                  <strong>{stats.tutoriel.traduire}</strong>
+                  <span>ont touché « Traduire »</span>
+                </div>
+                <div>
+                  <strong>{stats.tutoriel.ecouter}</strong>
+                  <span>ont écouté la voix Plus</span>
+                </div>
+                <div>
+                  <strong>{stats.tutoriel.plus}</strong>
+                  <span>ont touché « Découvrir Plus »</span>
+                </div>
+              </div>
+              <p className='lel-stats__petit'>
+                {stats.tutoriel.gratuit} « Continuer gratuitement » · {stats.tutoriel.cadeau} «
+                Recevoir mon livre » · {stats.tutoriel.passe} ont passé · {stats.tutoriel.rappels}{' '}
+                rappels vus, {stats.tutoriel.rappels_plus} ouvertures de Plus depuis un rappel. Les
+                testeurs des boutiques ne sont pas comptés : les chiffres démarrent à la sortie de
+                l’appli sur Google Play et l’App Store.
               </p>
             </>
           )}

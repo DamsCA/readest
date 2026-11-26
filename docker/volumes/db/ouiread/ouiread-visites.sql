@@ -58,6 +58,10 @@ create table if not exists public.stats_reglages (
   id boolean primary key default true check (id),
   sortie_android timestamptz
 );
+-- 26 Nov 2026: the same for the iPhone app (TestFlight until the App Store
+-- release). The phone apps' events (tutorial, reminders) are left out of
+-- every figure until the store release of their platform.
+alter table public.stats_reglages add column if not exists sortie_ios timestamptz;
 alter table public.stats_reglages enable row level security;
 revoke all on public.stats_reglages from anon, authenticated;
 insert into public.stats_reglages (id) values (true) on conflict do nothing;
@@ -75,8 +79,12 @@ set search_path = public
 as $$
   with toutes as (
     select * from public.visites
-    where reseau is null
-       or reseau not in (select reseau from public.reseaux_proprietaire)
+    where (reseau is null
+       or reseau not in (select reseau from public.reseaux_proprietaire))
+      and not (coalesce(appareil, '') = 'Android · appli'
+        and at < coalesce((select sortie_android from public.stats_reglages), 'infinity'::timestamptz))
+      and not (coalesce(appareil, '') = 'iPhone · appli'
+        and at < coalesce((select sortie_ios from public.stats_reglages), 'infinity'::timestamptz))
   ),
   v as (
     select (at at time zone 'Indian/Reunion')::date as jour, *
@@ -127,6 +135,21 @@ as $$
       'cadeau', count(*) filter (where evenement = 'bio_cadeau'),
       'telegram', count(*) filter (where evenement = 'bio_telegram'),
       'arrivee', count(distinct visiteur) filter (where evenement = 'bio_arrivee')
+    ) from v),
+    -- The phone app's welcome tour and reminders (26 Nov 2026), one reader
+    -- counted once per step. Store testers are already out (see « toutes »).
+    'tutoriel', (select json_build_object(
+      'vu', count(distinct visiteur) filter (where evenement = 'tuto_vu'),
+      'traduire', count(distinct visiteur) filter (where evenement = 'tuto_traduire'),
+      'difference', count(distinct visiteur) filter (where evenement = 'tuto_difference'),
+      'ecouter', count(distinct visiteur) filter (where evenement = 'tuto_ecouter'),
+      'voix_telephone', count(distinct visiteur) filter (where evenement = 'tuto_voix_telephone'),
+      'cadeau', count(distinct visiteur) filter (where evenement = 'tuto_cadeau'),
+      'plus', count(distinct visiteur) filter (where evenement = 'tuto_plus'),
+      'gratuit', count(distinct visiteur) filter (where evenement = 'tuto_gratuit'),
+      'passe', count(distinct visiteur) filter (where evenement like 'tuto_passe_%'),
+      'rappels', count(*) filter (where evenement in ('rappel_traduction', 'rappel_voix', 'rappel_chapitre')),
+      'rappels_plus', count(*) filter (where evenement = 'rappel_plus_clic')
     ) from v),
     -- The dashboard (24 Nov 2026): the funnel over the period asked for,
     -- one visitor counted once per step.

@@ -32,6 +32,27 @@ const EVENEMENTS = new Set([
   'bio_cadeau',
   'bio_telegram',
   'bio_arrivee',
+  // The phone app (26 Nov 2026, the owner's « active maintenant »): its welcome
+  // tour with the bookmark mascot, the reminders in the reader, and sign-ups.
+  'tuto_vu',
+  'tuto_traduire',
+  'tuto_difference',
+  'tuto_ecouter',
+  'tuto_voix_telephone',
+  'tuto_cadeau',
+  'tuto_plus',
+  'tuto_gratuit',
+  'tuto_passe_1',
+  'tuto_passe_2',
+  'tuto_passe_3',
+  'tuto_passe_4',
+  'tuto_passe_5',
+  'tuto_passe_6',
+  'rappel_traduction',
+  'rappel_voix',
+  'rappel_chapitre',
+  'rappel_plus_clic',
+  'app_inscription_email',
 ]);
 
 // Link previews and crawlers are not visitors. « lel-verif » marks our own
@@ -54,6 +75,16 @@ const domaine = (referrer: string | null) => {
 // The kind of phone and the app whose browser opened the page, read from the
 // user agent: « iPhone · TikTok », « Android », « ordinateur »…
 const appareil = (navigateur: string) => {
+  // The phone app itself (no browser): React Native on Android sends okhttp,
+  // the iPhone app « LisetLead/<build> CFNetwork… ». Until the app is public,
+  // these are the store testers, left out by stats_visites (stats_reglages).
+  if (/okhttp/i.test(navigateur)) return 'Android · appli';
+  if (
+    /LisetLead\//i.test(navigateur) ||
+    (/CFNetwork/i.test(navigateur) && !/Mozilla/i.test(navigateur))
+  ) {
+    return 'iPhone · appli';
+  }
   const sorte = /iPhone|iPad|iPod/i.test(navigateur)
     ? 'iPhone'
     : /Android/i.test(navigateur)
