@@ -78,7 +78,7 @@ export default function CguPage() {
       <p>
         Si ces conditions changent de façon importante, nous vous prévenons dans l’application ou
         par e-mail. Pour toute question :{' '}
-        <a href='mailto:genie.endormi@gmail.com'>genie.endormi@gmail.com</a>. Ces conditions sont
+        <a href='mailto:contact@lisetlead.com'>contact@lisetlead.com</a>. Ces conditions sont
         soumises au droit français.
       </p>
     </LegalPage>

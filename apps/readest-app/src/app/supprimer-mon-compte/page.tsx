@@ -28,8 +28,8 @@ export default function SupprimerMonComptePage() {
       <h2>Par e-mail</h2>
       <p>
         Si vous ne pouvez plus vous connecter, écrivez à{' '}
-        <a href='mailto:genie.endormi@gmail.com' className='underline'>
-          genie.endormi@gmail.com
+        <a href='mailto:contact@lisetlead.com' className='underline'>
+          contact@lisetlead.com
         </a>{' '}
         depuis l’adresse de votre compte, avec pour objet « Supprimer mon compte ». Nous supprimons
         le compte dans les 7 jours et vous le confirmons par e-mail.

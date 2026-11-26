@@ -71,8 +71,8 @@ export default function CgvPage() {
       </p>
       <p>
         Pour vous rétracter, écrivez à{' '}
-        <a href='mailto:genie.endormi@gmail.com'>genie.endormi@gmail.com</a> depuis l’adresse de
-        votre compte, par exemple : « Je me rétracte de mon abonnement Lis et Lead Plus souscrit le
+        <a href='mailto:contact@lisetlead.com'>contact@lisetlead.com</a> depuis l’adresse de votre
+        compte, par exemple : « Je me rétracte de mon abonnement Lis et Lead Plus souscrit le
         [date]. » Le remboursement est fait sous 14 jours, sur le moyen de paiement utilisé.
       </p>
 
@@ -101,7 +101,7 @@ export default function CgvPage() {
       <h2>9. Réclamations et droit applicable</h2>
       <p>
         Pour toute question ou réclamation, écrivez à{' '}
-        <a href='mailto:genie.endormi@gmail.com'>genie.endormi@gmail.com</a> : nous répondons sous 7
+        <a href='mailto:contact@lisetlead.com'>contact@lisetlead.com</a> : nous répondons sous 7
         jours. Ces conditions sont soumises au droit français. Si vous êtes consommateur, vous
         gardez la protection des règles impératives du pays où vous résidez.
       </p>
