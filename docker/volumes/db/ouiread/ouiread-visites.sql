@@ -38,10 +38,34 @@ create table if not exists public.admins_stats (user_id uuid primary key);
 alter table public.admins_stats enable row level security;
 revoke all on public.admins_stats from anon, authenticated;
 
+-- Test accounts kept off /stats (26 Nov 2026, the owner's request: « je veux
+-- plus voir les community testeurs sur mon tracker »). Filled by hand, plus
+-- the rule in stats_visites: until the Android app is public on Google Play,
+-- only closed-test testers (Testers Community) can install it, so any account
+-- with an Android-app session (user agent okhttp) is a tester.
+create table if not exists public.comptes_testeurs (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  raison text,
+  ajoute timestamptz not null default now()
+);
+alter table public.comptes_testeurs enable row level security;
+revoke all on public.comptes_testeurs from anon, authenticated;
+
+-- One row. sortie_android = when the Android app went public in production;
+-- empty while it is still in closed test. Accounts created after that date are
+-- no longer taken for testers.
+create table if not exists public.stats_reglages (
+  id boolean primary key default true check (id),
+  sortie_android timestamptz
+);
+alter table public.stats_reglages enable row level security;
+revoke all on public.stats_reglages from anon, authenticated;
+insert into public.stats_reglages (id) values (true) on conflict do nothing;
+
 -- The figures shown on /stats, in Réunion time. Readers who are signed in
 -- (the owner included) are left out of the visitor counts, and so is every
 -- network listed in reseaux_proprietaire; the owner's own accounts are left
--- out of the sign-ups.
+-- out of the sign-ups, and test accounts are left out of everything.
 create or replace function public.stats_visites(jours integer default 7)
 returns json
 language sql
@@ -60,11 +84,20 @@ as $$
     where at > now() - make_interval(days => jours)
   ),
   admins as (select user_id from public.admins_stats),
+  testeurs as (
+    select user_id from public.comptes_testeurs
+    union
+    select u.id from auth.users u
+    where u.id not in (select user_id from admins)
+      and u.created_at < coalesce((select sortie_android from public.stats_reglages), 'infinity'::timestamptz)
+      and exists (select 1 from auth.sessions s where s.user_id = u.id and s.user_agent like 'okhttp%')
+  ),
   ins as (
     select (created_at at time zone 'Indian/Reunion')::date as jour, id
     from auth.users
     where created_at > now() - make_interval(days => jours)
       and id not in (select user_id from admins)
+      and id not in (select user_id from testeurs)
   )
   select json_build_object(
     'depuis_24h', json_build_object(
@@ -78,7 +111,8 @@ as $$
         where evenement in ('invitation_google', 'invitation_apple', 'invitation_email')
           and at > now() - interval '24 hours'),
       'inscriptions', (select count(*) from auth.users
-        where created_at > now() - interval '24 hours' and id not in (select user_id from admins))
+        where created_at > now() - interval '24 hours' and id not in (select user_id from admins)
+          and id not in (select user_id from testeurs))
     ),
     -- The TikTok bio page (legenieendormi.web.app), over 24 hours and over
     -- the whole period asked for.
@@ -119,6 +153,7 @@ as $$
         u.id in (select user_id from admins) as vous
       from auth.users u
       left join public.plans pl on pl.user_id = u.id
+      where u.id not in (select user_id from testeurs)
       order by u.created_at desc limit 50
     ) x), '[]'::json),
     -- Stripe customers of Lis et Lead (the Stripe account also serves other
