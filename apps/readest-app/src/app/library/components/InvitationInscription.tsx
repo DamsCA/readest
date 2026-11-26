@@ -10,11 +10,15 @@ import { AUTH_OAUTH_PROVIDERS, GOOGLE_WEB_CLIENT_ID } from '@/services/features'
 import { startGoogleSignIn } from '@/app/auth/utils/googleWeb';
 import { startAppleSignIn } from '@/app/auth/utils/appleWeb';
 import { mesurer } from '@/utils/mesure';
+import { type FinTutoriel, TUTORIEL_FERME, tutorielOuvert } from '../utils/tutoriel';
 
 // The owner's ask (23 Nov 2026): a visitor lands in the app itself, then a
 // window invites them to sign up with the gift book as the reason; they may
 // close it and look around without an account. Web only, never for a signed-in
 // reader. Closed, it stays closed until the next visit.
+// Since 26 Nov 2026 the welcome tour comes first (Tutoriel.tsx): this window
+// waits for it, opens at once from its « Recevoir mon livre », and does not pop
+// up again in a visit that has shown the tour's gift step.
 
 const COVER = '/images/ca-marche-couverture.webp';
 // 25/11 : the second welcome book, our French guide (src/libs/ouiread/welcomeGift.ts).
@@ -52,11 +56,19 @@ const lienNavigateur = () => {
 const APPLE = AUTH_OAUTH_PROVIDERS.includes('apple');
 
 const doitInviter = () => {
-  if (!isWebAppPlatform()) return false;
+  if (!isWebAppPlatform() || tutorielOuvert()) return false;
   try {
     return !localStorage.getItem('token') && !sessionStorage.getItem(FERMEE);
   } catch {
     return false;
+  }
+};
+
+const marquerFermee = () => {
+  try {
+    sessionStorage.setItem(FERMEE, '1');
+  } catch {
+    // Private browsing: it simply shows again next time.
   }
 };
 
@@ -71,25 +83,35 @@ export default function InvitationInscription() {
       setOuverte(false);
       return undefined;
     }
-    const t = setTimeout(() => {
-      if (doitInviter()) {
-        setAppli(appliHote());
-        setIphone(/iPhone|iPad|iPod/i.test(navigator.userAgent));
-        setOuverte(true);
-        mesurer('invitation_vue');
-      }
-    }, DELAI_MS);
-    return () => clearTimeout(t);
+    const montrer = () => {
+      setAppli(appliHote());
+      setIphone(/iPhone|iPad|iPod/i.test(navigator.userAgent));
+      setOuverte(true);
+      mesurer('invitation_vue');
+    };
+    const attendre = () =>
+      setTimeout(() => {
+        if (doitInviter()) montrer();
+      }, DELAI_MS);
+    let t = attendre();
+    const apresTutoriel = (e: Event) => {
+      clearTimeout(t);
+      const fin = (e as CustomEvent<FinTutoriel>).detail;
+      if (fin?.inscription) montrer();
+      else if (fin?.cadeauVu) marquerFermee();
+      else t = attendre();
+    };
+    window.addEventListener(TUTORIEL_FERME, apresTutoriel);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener(TUTORIEL_FERME, apresTutoriel);
+    };
   }, [user]);
 
   if (!ouverte) return null;
 
   const fermer = () => {
-    try {
-      sessionStorage.setItem(FERMEE, '1');
-    } catch {
-      // Private browsing: it simply shows again next time.
-    }
+    marquerFermee();
     mesurer('invitation_fermee');
     setOuverte(false);
   };

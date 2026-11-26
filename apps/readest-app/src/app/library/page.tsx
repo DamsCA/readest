@@ -86,6 +86,7 @@ import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import WelcomeGift from './components/WelcomeGift';
 import InvitationInscription from './components/InvitationInscription';
+import Tutoriel from './components/Tutoriel';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
 import ImportFromFolderDialog, {
@@ -1612,6 +1613,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       />
       <WelcomeGift />
       <InvitationInscription />
+      <Tutoriel />
       <Toast />
     </div>
   );

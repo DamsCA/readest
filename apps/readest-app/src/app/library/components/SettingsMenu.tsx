@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import {
   IconAI,
   IconAutoTheme,
+  IconBookmark,
   IconCloudSync,
   IconMoon,
   IconNext,
@@ -52,6 +53,7 @@ import MenuItem from '@/components/MenuItem';
 import Quota from '@/components/Quota';
 import Menu from '@/components/Menu';
 import { type AppLockDialogMode, useAppLockStore } from '@/store/appLockStore';
+import { TUTORIEL_REVOIR } from '@/app/library/utils/tutoriel';
 
 interface SettingsMenuProps {
   onPullLibrary: (fullRefresh?: boolean, verbose?: boolean) => void;
@@ -254,6 +256,12 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         setRefreshMetadataProgress('');
       }, 2000);
     }
+  };
+
+  // The welcome tour of the web reader (Tutoriel.tsx), shown again on demand.
+  const revoirTutoriel = () => {
+    setIsDropdownOpen?.(false);
+    window.dispatchEvent(new Event(TUTORIEL_REVOIR));
   };
 
   const openSettingsDialog = () => {
@@ -472,6 +480,9 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         onClick={cycleThemeMode}
       />
       <MenuItem label={_('Settings')} Icon={IconSettings} onClick={openSettingsDialog} />
+      {isWebAppPlatform() && (
+        <MenuItem label={_('Revoir le tutoriel')} Icon={IconBookmark} onClick={revoirTutoriel} />
+      )}
       <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('Advanced Settings')}>
         <ul className='ms-0 flex flex-col ps-0 before:hidden'>
