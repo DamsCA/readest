@@ -239,6 +239,8 @@ const STYLES = `
 .lel-gift--arrive .lel-gift__parcel { animation: lel-gift-drop .95s cubic-bezier(.3,1.4,.5,1) both; }
 .lel-gift--waiting .lel-gift__parcel { animation: lel-gift-wiggle 1.6s ease-in-out .2s infinite; }
 .lel-gift--revealed .lel-gift__parcel { animation: lel-gift-sink .45s ease-in both; }
+/* Opened, the parcel sinks out of sight onto the button: it must not take its taps (26 Nov 2026). */
+.lel-gift--open .lel-gift__parcel, .lel-gift--revealed .lel-gift__parcel { pointer-events: none; }
 .lel-gift__box {
   position: absolute; left: 10px; right: 10px; bottom: 0; height: 128px; border-radius: 6px 6px 12px 12px;
   background: linear-gradient(180deg, #243253 0%, #121f3c 55%, #101728 100%);
@@ -287,7 +289,7 @@ const STYLES = `
 
 /* Text */
 .lel-gift__text {
-  position: relative; width: 100%; max-width: 380px; min-height: 196px; text-align: center;
+  position: relative; z-index: 4; width: 100%; max-width: 380px; min-height: 196px; text-align: center;
   transition: margin-top .7s cubic-bezier(.2,.8,.2,1) .3s;
 }
 .lel-gift--revealed .lel-gift__text { margin-top: -150px; }
