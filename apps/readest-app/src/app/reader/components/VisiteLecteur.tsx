@@ -29,7 +29,7 @@ import { garderSonCoupe, lireSonCoupe, POSES, type Pose } from '@/app/library/ut
 export const CLE_VISITE_VUE = 'lel-visite-lecteur-vue';
 
 // Non-breaking space: French punctuation (« », ?, !, :) never starts a line.
-const E = ' ';
+const E = ' ';
 const VOIX = '/tutoriel/voix';
 
 type Cible = 'traduire' | 'ecouter' | 'sommaire' | 'texte' | 'pages';

@@ -177,6 +177,20 @@ const detectMediaTarget = (target: HTMLElement | null): MediaTarget | null => {
   return null;
 };
 
+/**
+ * A picture that fills most of the page (a cover, a full-page plate): on a
+ * phone a tap on it is meant to turn the page, as the reader's tour says, not
+ * to zoom (Lis et Lead, 27 Nov 2026: tapping the right of « Ça marche »'s cover
+ * opened the zoom viewer). A long press still opens the viewer.
+ */
+const fillsThePage = (element: HTMLElement | null) => {
+  if (!element) return false;
+  const picture = element.localName === 'img' ? element : element.closest('svg');
+  if (!picture) return false;
+  const pageHeight = element.ownerDocument?.defaultView?.innerHeight ?? 0;
+  return pageHeight > 0 && picture.getBoundingClientRect().height >= pageHeight * 0.6;
+};
+
 export const handleClick = (
   bookKey: string,
   doubleClickDisabled: React.MutableRefObject<boolean>,
@@ -220,7 +234,8 @@ export const handleClick = (
     // its full-resolution image) should still zoom rather than follow the link,
     // matching long-press (#4757). Footnotes are excluded so footnote links keep
     // their popup/navigation behavior.
-    const media = !isFixedLayout && !footnote ? detectMediaTarget(element) : null;
+    const media =
+      !isFixedLayout && !footnote && !fillsThePage(element) ? detectMediaTarget(element) : null;
     if (
       !media &&
       element?.closest('sup, a, audio, video') &&

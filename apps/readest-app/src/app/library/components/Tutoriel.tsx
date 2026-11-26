@@ -507,7 +507,13 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
   const grande = Math.round(Math.min(largeur - padX * 2 - 40, hauteur * 0.42, 340));
   const moyenne = Math.round(Math.min(largeur * 0.5, hauteur * 0.25, 230));
   const petite = Math.round(Math.max(92, Math.min(124, hauteur * 0.15)));
-  const taille = compact ? petite : etape === 6 ? moyenne : grande;
+  // On a short screen the gift step's line would slide under its two buttons:
+  // she is smaller there (27 Nov 2026, 360 × 640).
+  const taille = compact
+    ? petite
+    : etape === 6 || (etape === 5 && hauteur < 760)
+      ? moyenne
+      : grande;
   const etroit = largeur < 360;
 
   const textePage =
@@ -541,7 +547,8 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
 
   const contenu = (
     <>
-      {etape === 3 && <Bascule valeur={version} onChange={choisir} etroit={etroit} />}
+      {/* « Traduction standard » was cut at 360 px: the narrow toggle up to 380. */}
+      {etape === 3 && <Bascule valeur={version} onChange={choisir} etroit={largeur < 380} />}
 
       {etape >= 2 && etape <= 4 && (
         <Page

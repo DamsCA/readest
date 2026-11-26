@@ -141,11 +141,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     );
   }, []);
 
-  // What the buttons need, gaps included (Lis et Lead's capsule, 23 Nov 2026):
-  // all of them 368 px; without the font button 320 px; then the quick action
-  // leaves too.
-  const isHeaderCompact = headerWidth > 0 && headerWidth < 368;
-  const isHeaderTight = headerWidth > 0 && headerWidth < 320;
+  // What the buttons need, gaps included (Lis et Lead's capsule, measured on
+  // lisetlead.com 27 Nov 2026): with the font button they overflowed a 412 px
+  // phone by 4 px and a 430 px one by 34 px (the close button cut off), so it
+  // stays for wide screens; under 330 px the quick action leaves too (a 360 px
+  // phone overflowed by 8 px). The font settings stay in the bottom bar's Texte.
+  const isHeaderCompact = headerWidth > 0 && headerWidth < 460;
+  const isHeaderTight = headerWidth > 0 && headerWidth < 330;
   const insets = window.innerWidth < 640 ? screenInsets : gridInsets;
   const isHeaderVisible = hoveredBookKey === bookKey || isDropdownOpen;
 
