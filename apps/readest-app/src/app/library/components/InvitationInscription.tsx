@@ -10,20 +10,26 @@ import { AUTH_OAUTH_PROVIDERS, GOOGLE_WEB_CLIENT_ID } from '@/services/features'
 import { startGoogleSignIn } from '@/app/auth/utils/googleWeb';
 import { startAppleSignIn } from '@/app/auth/utils/appleWeb';
 import { mesurer } from '@/utils/mesure';
-import { type FinTutoriel, TUTORIEL_FERME, tutorielOuvert } from '../utils/tutoriel';
+import {
+  type FinTutoriel,
+  INVITATION_FERMEE,
+  TUTORIEL_FERME,
+  tutorielOuvert,
+} from '../utils/tutoriel';
 
 // The owner's ask (23 Nov 2026): a visitor lands in the app itself, then a
 // window invites them to sign up with the gift book as the reason; they may
 // close it and look around without an account. Web only, never for a signed-in
 // reader. Closed, it stays closed until the next visit.
-// Since 26 Nov 2026 the welcome tour comes first (Tutoriel.tsx): this window
-// waits for it, opens at once from its « Recevoir mon livre », and does not pop
-// up again in a visit that has shown the tour's gift step.
+// Since 27 Nov 2026 this window comes first, and the welcome tour after it
+// (owner's ask: « lorsqu'il fait plus tard, je vais d'abord, il a le droit à son
+// onboarding »): closing it brings the tour (Tutoriel.tsx, INVITATION_FERMEE);
+// a sign-up brings it after the account is made. While the tour is on screen
+// this window waits; the tour's « Recevoir mon livre » opens it again.
 
 const COVER = '/images/ca-marche-couverture.webp';
 // 25/11 : the second welcome book, our French guide (src/libs/ouiread/welcomeGift.ts).
 const COVER_GUIDE = '/images/guide-formule-couverture.webp';
-const FERMEE = 'lel-invitation-fermee';
 const DELAI_MS = 1500;
 const INSCRIPTION_EMAIL = '/auth?inscription=1';
 
@@ -58,7 +64,7 @@ const APPLE = AUTH_OAUTH_PROVIDERS.includes('apple');
 const doitInviter = () => {
   if (!isWebAppPlatform() || tutorielOuvert()) return false;
   try {
-    return !localStorage.getItem('token') && !sessionStorage.getItem(FERMEE);
+    return !localStorage.getItem('token') && !sessionStorage.getItem(INVITATION_FERMEE);
   } catch {
     return false;
   }
@@ -66,7 +72,7 @@ const doitInviter = () => {
 
 const marquerFermee = () => {
   try {
-    sessionStorage.setItem(FERMEE, '1');
+    sessionStorage.setItem(INVITATION_FERMEE, '1');
   } catch {
     // Private browsing: it simply shows again next time.
   }
@@ -114,6 +120,8 @@ export default function InvitationInscription() {
     marquerFermee();
     mesurer('invitation_fermee');
     setOuverte(false);
+    // « Plus tard, je visite d'abord »: the visitor's tour starts (Tutoriel.tsx).
+    window.dispatchEvent(new Event(INVITATION_FERMEE));
   };
 
   const avecApple = () => {

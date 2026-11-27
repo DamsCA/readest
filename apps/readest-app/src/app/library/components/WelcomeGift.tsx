@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAuth } from '@/context/AuthContext';
 import { WELCOME_GIFT_EVENT } from '@/libs/sync';
+import {
+  type FinTutoriel,
+  TUTORIEL_FERME,
+  tutorielAMontrer,
+  tutorielOuvert,
+} from '../utils/tutoriel';
 
 // The unwrapping of the welcome book (« Ça marche », libs/ouiread/welcomeGift.ts).
 // Played once, when the server has just put the book in the library; it can be
@@ -12,6 +19,10 @@ import { WELCOME_GIFT_EVENT } from '@/libs/sync';
 // The scene: a midnight-blue and gold parcel drops in and wriggles; a tap opens it (or
 // it opens by itself after a few seconds): the lid flies off, light and
 // confetti burst out, and the book rises from the box.
+//
+// Since 27 Nov 2026 (the owner's order of a first visit, utils/tutoriel.ts) it
+// waits for the welcome tour to end, and « Découvrir mon livre » opens the book
+// in the reader, where the reader's own tour starts.
 
 type Stage = 'hidden' | 'arrive' | 'waiting' | 'open' | 'revealed';
 
@@ -43,27 +54,51 @@ const confettiPieces = () => {
   });
 };
 
-export default function WelcomeGift() {
+type Props = {
+  /** Opens the given book in the reader (the library's own way in). */
+  onDiscover?: (hash: string) => void;
+};
+
+export default function WelcomeGift({ onDiscover }: Props) {
   const _ = useTranslation();
+  const { user } = useAuth();
   const [stage, setStage] = useState<Stage>('hidden');
+  // The book the server has just given (null for the ?cadeau demo).
+  const [hash, setHash] = useState<string | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pieces = useMemo(confettiPieces, []);
+  const compte = useRef(user);
+  compte.current = user;
 
   const show = useCallback(() => {
+    const given = sessionStorage.getItem(WELCOME_GIFT_EVENT);
     sessionStorage.removeItem(WELCOME_GIFT_EVENT);
+    if (given) setHash(given);
     setStage((current) => (current === 'hidden' ? 'arrive' : current));
   }, []);
 
-  useEffect(() => {
-    if (
-      sessionStorage.getItem(WELCOME_GIFT_EVENT) ||
-      new URLSearchParams(window.location.search).has('cadeau')
-    ) {
-      show();
-    }
-    window.addEventListener(WELCOME_GIFT_EVENT, show);
-    return () => window.removeEventListener(WELCOME_GIFT_EVENT, show);
+  // The tour comes first: while it is on screen, or about to open for this new
+  // account, the gift stays in sessionStorage until the tour's end.
+  const tryShow = useCallback(() => {
+    if (!sessionStorage.getItem(WELCOME_GIFT_EVENT)) return;
+    if (tutorielOuvert() || tutorielAMontrer(compte.current)) return;
+    show();
   }, [show]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('cadeau')) show();
+    else tryShow();
+    // « Découvrir Plus » leaves for the Plus page: the gift waits for the return.
+    const afterTour = (e: Event) => {
+      if (!(e as CustomEvent<FinTutoriel>).detail?.ailleurs) tryShow();
+    };
+    window.addEventListener(WELCOME_GIFT_EVENT, tryShow);
+    window.addEventListener(TUTORIEL_FERME, afterTour);
+    return () => {
+      window.removeEventListener(WELCOME_GIFT_EVENT, tryShow);
+      window.removeEventListener(TUTORIEL_FERME, afterTour);
+    };
+  }, [show, tryShow]);
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -175,7 +210,10 @@ export default function WelcomeGift() {
             ref={buttonRef}
             type='button'
             className='lel-gift__cta'
-            onClick={() => setStage('hidden')}
+            onClick={() => {
+              setStage('hidden');
+              if (hash) onDiscover?.(hash);
+            }}
           >
             {_('Discover my book')}
           </button>

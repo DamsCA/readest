@@ -10,23 +10,28 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { PiArrowRightBold, PiSpeakerHighDuotone, PiSpeakerSlashDuotone } from 'react-icons/pi';
+import { PiArrowRightBold, PiSpeakerHigh, PiSpeakerSlash } from 'react-icons/pi';
+import { useAuth } from '@/context/AuthContext';
 import { isWebAppPlatform } from '@/services/environment';
 import { isTranslationAvailable } from '@/services/translators/utils';
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { mesurer } from '@/utils/mesure';
-import { garderSonCoupe, lireSonCoupe, POSES, type Pose } from '@/app/library/utils/tutoriel';
+import {
+  garderSonCoupe,
+  lireSonCoupe,
+  POSES,
+  type Pose,
+  visiteLecteurAFaire,
+  visiteLecteurFaite,
+} from '@/app/library/utils/tutoriel';
 
 // The reader's tour (owner's ask, 26 Nov 2026: « lorsqu'il va cliquer sur
 // Ça marche … tu vas faire des spotlights sur les boutons pour voir comment il
-// l'utilise »). The first time a book opens on a phone-sized screen, the
-// bookmark lights the reader's real buttons one at a time: Traduire, Écouter,
-// the contents, the text settings, then how to turn a page. « Passer » is
-// always there. Web only; once per browser.
-
-/** Remembered in the browser: the reader's tour has been shown. */
-export const CLE_VISITE_VUE = 'lel-visite-lecteur-vue';
+// l'utilise »). On the first book opened after the welcome tour, on a
+// phone-sized screen, the bookmark lights the reader's real buttons one at a
+// time: Traduire, Écouter, the contents, the text settings, then how to turn a
+// page. « Passer » is always there. Web only; once per person on a browser.
 
 // Non-breaking space: French punctuation (« », ?, !, :) never starts a line.
 const E = ' ';
@@ -101,30 +106,22 @@ const trouver = (cible: Cible): Rect | null => {
 const memes = (a: Rect | null, b: Rect | null) =>
   a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.l === b.l && a.h === b.h);
 
-/** A first book on this browser, on a phone-sized screen? */
-const premiereOuverture = () => {
-  if (!isWebAppPlatform() || window.innerWidth >= 640) return false;
-  try {
-    return !localStorage.getItem(CLE_VISITE_VUE);
-  } catch {
-    // No storage: it would come back with every book, so it is not shown.
-    return false;
-  }
-};
-
-const marquerVue = () => {
-  try {
-    localStorage.setItem(CLE_VISITE_VUE, new Date().toISOString().slice(0, 10));
-  } catch {}
-};
+// The moment (owner's ask, 27 Nov 2026, « au bon moment… il faut un moment
+// précis »): the first book opened after the welcome tour, on a phone-sized
+// screen, once the page and its bars are there; once per person here (a
+// visitor, or an account). Never before the tour (library/utils/tutoriel.ts).
+const cEstLeMoment = (userId: string | null) =>
+  isWebAppPlatform() && window.innerWidth < 640 && visiteLecteurAFaire(userId);
 
 export default function VisiteLecteur({ bookKey }: { bookKey: string }) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [ouverte, setOuverte] = useState(false);
   const { getBookData } = useBookDataStore();
   const { getViewSettings } = useReaderStore();
 
   useEffect(() => {
-    if (!premiereOuverture()) return undefined;
+    if (!cEstLeMoment(userId)) return undefined;
     // Let the page and its bars settle first.
     let essais = 0;
     const minuterie = window.setInterval(() => {
@@ -132,12 +129,12 @@ export default function VisiteLecteur({ bookKey }: { bookKey: string }) {
       if (document.querySelector('.lel-tuto-traduire') || essais > 20) {
         window.clearInterval(minuterie);
         if (!document.querySelector('.lel-tuto-traduire')) return;
-        marquerVue();
+        visiteLecteurFaite(userId);
         setOuverte(true);
       }
     }, 300);
     return () => window.clearInterval(minuterie);
-  }, []);
+  }, [userId]);
 
   if (!ouverte) return null;
   const book = getBookData(bookKey)?.book;
@@ -354,9 +351,9 @@ function Visite({
             onClick={basculerSon}
           >
             {coupe ? (
-              <PiSpeakerSlashDuotone size={18} aria-hidden />
+              <PiSpeakerSlash size={18} aria-hidden />
             ) : (
-              <PiSpeakerHighDuotone size={18} aria-hidden />
+              <PiSpeakerHigh size={18} aria-hidden />
             )}
           </button>
           <span

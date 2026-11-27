@@ -257,11 +257,6 @@ html:not([data-eink='true']) .popup-triangle-outer:not([class*='101728']) {
   color: #101728;
   fill: #101728;
 }
-/* The gold second layer of the icons would vanish on gold. */
-.lel-plus-cta .lel-icon path[opacity='0.2'] {
-  fill: #101728 !important;
-  opacity: 0.25;
-}
 .lel-plus-cta-text {
   display: flex;
   min-width: 0;

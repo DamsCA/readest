@@ -7,16 +7,16 @@ import { useRouter } from 'next/navigation';
 import type { IconType } from 'react-icons';
 import {
   PiArrowRightBold,
-  PiCloudCheckDuotone,
-  PiDeviceMobileDuotone,
-  PiGiftDuotone,
-  PiHeadphonesDuotone,
+  PiCloudCheck,
+  PiDeviceMobile,
+  PiGift,
+  PiHeadphones,
   PiPauseFill,
   PiSparkleFill,
-  PiSpeakerHighDuotone,
-  PiSpeakerSlashDuotone,
+  PiSpeakerHigh,
+  PiSpeakerSlash,
   PiStopFill,
-  PiTranslateDuotone,
+  PiTranslate,
 } from 'react-icons/pi';
 import { useAuth } from '@/context/AuthContext';
 import { mesurer } from '@/utils/mesure';
@@ -26,24 +26,29 @@ import {
   DUREE_PAGE_LUE,
   type FinTutoriel,
   garderSonCoupe,
+  INVITATION_FERMEE,
+  invitationFermee,
   lireSonCoupe,
   marquerTutorielVu,
   noterTutorielOuvert,
+  noterVisiteLecteurAFaire,
   PAGE_LUE,
   type Pose,
   POSES,
-  premiereVisite,
   REPLIQUES,
   type RepliqueId,
   TUTORIEL_FERME,
   TUTORIEL_REVOIR,
+  tutorielAMontrer,
+  tutorielVisiteurAMontrer,
 } from '../utils/tutoriel';
 
 // The welcome tour of the web reader, the phone app's own (lisetlead-app/src/app/bienvenue.tsx):
 // the bookmark wakes up, shows a page in English, translates it, reads it with
 // the Plus voice, offers the welcome book, then presents Plus. « Passer » is
-// always there. It opens by itself on a first visit to the reader (the
-// library, at / and /library), and again from the settings menu.
+// always there. It opens by itself right after the gift window, once per person
+// here (« Plus tard » for a visitor, the sign-up for a new account, see
+// utils/tutoriel.ts), and again from the settings menu.
 //
 // Browsers keep a page silent until it is touched: her first line shows
 // without sound, and her voice starts with the first tap (« Montrez-moi »).
@@ -62,9 +67,9 @@ const VISAGE: Record<Etape, Pose> = {
 
 // The first three benefits of the app's Plus screen, titles only.
 const BIENFAITS: { Icone: IconType; titre: string }[] = [
-  { Icone: PiTranslateDuotone, titre: 'Une traduction digne d’un traducteur' },
-  { Icone: PiHeadphonesDuotone, titre: 'Des voix qui donnent vie au livre' },
-  { Icone: PiCloudCheckDuotone, titre: 'Toute votre bibliothèque en ligne' },
+  { Icone: PiTranslate, titre: 'Une traduction digne d’un traducteur' },
+  { Icone: PiHeadphones, titre: 'Des voix qui donnent vie au livre' },
+  { Icone: PiCloudCheck, titre: 'Toute votre bibliothèque en ligne' },
 ];
 
 // The account first for a visitor, then the offers (as « Passer à Plus » in the settings menu).
@@ -207,18 +212,42 @@ const useEcran = () => {
 // ---------- The tour ----------
 
 export default function Tutoriel() {
+  const { user } = useAuth();
   // null: closed; otherwise the key of this opening (each one starts over).
   const [ouverture, setOuverture] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (premiereVisite()) {
-      marquerTutorielVu();
-      setOuverture(Date.now());
-    }
-    const revoir = () => setOuverture(Date.now());
-    window.addEventListener(TUTORIEL_REVOIR, revoir);
-    return () => window.removeEventListener(TUTORIEL_REVOIR, revoir);
+  const compte = useRef(user);
+  compte.current = user;
+
+  // Marked open at once, so that the gift waits for the tour's end (WelcomeGift).
+  const ouvrir = useCallback((userId: string | null) => {
+    marquerTutorielVu(userId);
+    noterTutorielOuvert(true);
+    setOuverture(Date.now());
   }, []);
+
+  // Right after the gift window (utils/tutoriel.ts): a new account just signed
+  // up, or a visitor who closed it with « Plus tard » (also after a reload).
+  useEffect(() => {
+    if (user) {
+      if (tutorielAMontrer(user)) ouvrir(user.id);
+    } else if (invitationFermee() && tutorielVisiteurAMontrer()) {
+      ouvrir(null);
+    }
+  }, [user, ouvrir]);
+
+  useEffect(() => {
+    const apresInvitation = () => {
+      if (!compte.current && tutorielVisiteurAMontrer()) ouvrir(null);
+    };
+    const revoir = () => setOuverture(Date.now());
+    window.addEventListener(INVITATION_FERMEE, apresInvitation);
+    window.addEventListener(TUTORIEL_REVOIR, revoir);
+    return () => {
+      window.removeEventListener(INVITATION_FERMEE, apresInvitation);
+      window.removeEventListener(TUTORIEL_REVOIR, revoir);
+    };
+  }, [ouvrir]);
 
   useEffect(() => {
     if (ouverture === null) return undefined;
@@ -226,11 +255,16 @@ export default function Tutoriel() {
     return () => noterTutorielOuvert(false);
   }, [ouverture]);
 
-  const finir = useCallback((fin: FinTutoriel) => {
-    noterTutorielOuvert(false);
-    setOuverture(null);
-    window.dispatchEvent(new CustomEvent<FinTutoriel>(TUTORIEL_FERME, { detail: fin }));
-  }, []);
+  const finir = useCallback(
+    (fin: FinTutoriel) => {
+      noterTutorielOuvert(false);
+      setOuverture(null);
+      // Its end, however it ends, is what brings the reader's tour on the next book.
+      noterVisiteLecteurAFaire(user?.id ?? null);
+      window.dispatchEvent(new CustomEvent<FinTutoriel>(TUTORIEL_FERME, { detail: fin }));
+    },
+    [user],
+  );
 
   if (ouverture === null) return null;
   // On document.body: the library's own containers would trap a fixed overlay.
@@ -355,7 +389,11 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
       if (ferme.current) return;
       ferme.current = true;
       silence();
-      onFin({ inscription: !!options.inscription, cadeauVu: cadeauVu.current });
+      onFin({
+        inscription: !!options.inscription,
+        cadeauVu: cadeauVu.current,
+        ailleurs: !!options.vers,
+      });
       if (options.vers) router.push(options.vers);
     },
     [onFin, router, silence],
@@ -597,9 +635,9 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
             onClick={basculer}
           >
             {voix.coupe ? (
-              <PiSpeakerSlashDuotone size={20} className='lel-icon' aria-hidden />
+              <PiSpeakerSlash size={20} className='lel-icon' aria-hidden />
             ) : (
-              <PiSpeakerHighDuotone size={20} className='lel-icon' aria-hidden />
+              <PiSpeakerHigh size={20} className='lel-icon' aria-hidden />
             )}
           </button>
           <button type='button' className='tuto-passer' onClick={passer}>
@@ -633,7 +671,7 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
           {etape === 2 && (
             <div className='tuto__outils'>
               <Outil
-                Icone={PiTranslateDuotone}
+                Icone={PiTranslate}
                 label={traduction === 'non' ? 'Traduire' : 'Traduit'}
                 actif={traduction !== 'non'}
                 invite={traduction === 'non'}
@@ -651,7 +689,7 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
             <>
               <div className='tuto__outils tuto__outils--deux'>
                 <Outil
-                  Icone={lecture === 'plus' ? PiPauseFill : PiHeadphonesDuotone}
+                  Icone={lecture === 'plus' ? PiPauseFill : PiHeadphones}
                   label={lecture === 'plus' ? 'Pause' : 'Écouter'}
                   actif={lecture === 'plus' || lecture === 'pause'}
                   invite={lecture === 'aucune' && !revelation}
@@ -659,7 +697,7 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
                 />
                 {telephone && (
                   <Outil
-                    Icone={lecture === 'telephone' ? PiStopFill : PiDeviceMobileDuotone}
+                    Icone={lecture === 'telephone' ? PiStopFill : PiDeviceMobile}
                     label='Voix du téléphone'
                     actif={lecture === 'telephone'}
                     discret
@@ -683,7 +721,7 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
               <>
                 <Bouton
                   label='Recevoir mon livre'
-                  Icone={PiGiftDuotone}
+                  Icone={PiGift}
                   onClick={() => {
                     mesure('tuto_cadeau');
                     fermer({ inscription: true });
@@ -1159,9 +1197,6 @@ const STYLES = `
   font-size: 15px; font-weight: 500; color: #A9B0C0;
 }
 .tuto-lien:active { opacity: .6; }
-/* The gold layer of the icons would vanish on gold. */
-.tuto-bouton--or .lel-icon path[opacity='0.2'],
-.tuto-outil__rond--actif .lel-icon path[opacity='0.2'] { fill: #241A06 !important; opacity: .25; }
 
 /* The benefits of Plus */
 .tuto-bienfaits {

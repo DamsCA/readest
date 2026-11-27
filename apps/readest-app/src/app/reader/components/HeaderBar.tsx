@@ -254,6 +254,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
                 annotationQuickAction === 'highlight' || annotationQuickAction === null ? (
                   <IconHighlight
                     size={iconSize18}
+                    className={annotationQuickAction === null ? undefined : 'lel-icon--teinte'}
                     style={
                       {
                         '--lel-accent':

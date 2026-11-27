@@ -160,11 +160,17 @@ foliate-fxl {
   pointer-events: none;
 }
 
-/* Lis et Lead's icons (components/icons/lisetlead.tsx): the soft layer of the
-   two-tone icons takes the gold of the logo, or the colour given in --lel-accent
-   (the highlighter shows the highlight colour). */
+/* Lis et Lead's icons (components/icons/lisetlead.tsx) are drawn with their line
+   only. Owner, 27 Nov 2026: the gold filling inside them (« la loupe avec au
+   centre un jaune bizarre… c'est vraiment moche ») is gone: the soft layer of the
+   two-tone icons is hidden. It stays only where it says something: the
+   highlighter's colour (.lel-icon--teinte, with --lel-accent). */
 .lel-icon path[opacity='0.2'] {
-  fill: var(--lel-accent, #e8c06a);
+  display: none;
+}
+.lel-icon.lel-icon--teinte path[opacity='0.2'] {
+  display: inline;
+  fill: var(--lel-accent);
   opacity: 0.85;
 }
 

@@ -89,8 +89,9 @@ import {
 // beaucoup trop à Readest… même au niveau des icônes… des lettres ». Readest
 // mixes thin line icons from four families (Material, Ionicons, Remix, Lucide)
 // and draws letters (« Aa », « T », « A A ») for its reading settings. Here one
-// family, Phosphor in two tones, whose soft layer takes the gold of the logo
-// (globals.css, .lel-icon), and pictures instead of letters.
+// family, Phosphor, and pictures instead of letters. Since 27 Nov 2026 they are
+// drawn with their line only: the gold filling of the two-tone icons is hidden
+// (globals.css, .lel-icon; the owner found it « vraiment moche »).
 const brand = (Icon: IconType, name: string): IconType => {
   const Branded = (props: IconBaseProps) => (
     <Icon {...props} className={clsx('lel-icon', props.className)} />

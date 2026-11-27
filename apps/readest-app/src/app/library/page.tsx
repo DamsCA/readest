@@ -1392,6 +1392,24 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const openBook = useOpenBook(handleBookDownload, setLoading);
   const continueBook = useMemo(() => getContinueReadingBook(libraryBooks), [libraryBooks]);
 
+  // « Découvrir mon livre » on the gift (WelcomeGift): the welcome book opens in
+  // the reader, where its tour starts. The book may still be on its way into
+  // the shelf from the first sync: it is looked for again for a few seconds.
+  const openGift = useCallback(
+    (hash: string) => {
+      let tries = 0;
+      const tryOpen = () => {
+        const book = useLibraryStore
+          .getState()
+          .library.find((b) => b.hash === hash && !b.deletedAt);
+        if (book) void openBook(book);
+        else if (++tries < 20) setTimeout(tryOpen, 500);
+      };
+      tryOpen();
+    },
+    [openBook],
+  );
+
   if (!appService || !insets || checkOpenWithBooks || checkLastOpenBooks) {
     return <div className={clsx('full-height', !appService?.isLinuxApp && 'bg-base-200')} />;
   }
@@ -1611,7 +1629,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         onClose={() => setShowImportFromUrl(false)}
         onSubmit={handleImportBookFromUrl}
       />
-      <WelcomeGift />
+      <WelcomeGift onDiscover={openGift} />
       <InvitationInscription />
       <Tutoriel />
       <Toast />
