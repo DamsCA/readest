@@ -71,9 +71,12 @@ type Verified = {
   expiresAt: Date;
   active: boolean;
   environment?: string;
+  // The Lis et Lead account the store tied the purchase to (Apple appAccountToken,
+  // Google obfuscatedAccountId), when the app set one.
+  owner?: string;
 };
 
-const verifyApple = async (transactionId: string, userId: string): Promise<Verified> => {
+const verifyApple = async (transactionId: string): Promise<Verified> => {
   const issuer = process.env['APPLE_IAP_ISSUER_ID'];
   const keyId = process.env['APPLE_IAP_KEY_ID'];
   const pem = process.env['APPLE_IAP_PRIVATE_KEY'];
@@ -85,7 +88,12 @@ const verifyApple = async (transactionId: string, userId: string): Promise<Verif
     pem,
     'ES256',
   );
+  // Production first, then the sandbox (TestFlight, App Review). Until the app is
+  // live on the App Store, production answers 401 to our key, not 404: measured on
+  // 27 Nov 2026, same key accepted by the sandbox. Stopping at that 401 left every
+  // TestFlight purchase unactivated (« nous n'avons pas pu l'activer »).
   let body: { signedTransactionInfo?: string } | null = null;
+  const refus: number[] = [];
   for (const host of ['api.storekit.itunes.apple.com', 'api.storekit-sandbox.itunes.apple.com']) {
     const res = await fetch(
       `https://${host}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`,
@@ -97,15 +105,16 @@ const verifyApple = async (transactionId: string, userId: string): Promise<Verif
       body = await res.json();
       break;
     }
-    if (res.status !== 404) throw new Error(`APPLE_${res.status}`);
+    refus.push(res.status);
   }
+  if (!body && refus.some((s) => s !== 404 && s !== 401)) {
+    throw new Error(`APPLE_${refus.join('_')}`);
+  }
+  if (!body && refus.every((s) => s === 401)) throw new Error('APPLE_401');
   if (!body?.signedTransactionInfo) throw new Error('APPLE_UNKNOWN_TRANSACTION');
   const t = decodeJwsPayload(body.signedTransactionInfo);
   if (t.bundleId !== BUNDLE_ID || !APPLE_PRODUCTS.has(t.productId))
     throw new Error('APPLE_WRONG_PRODUCT');
-  if (t.appAccountToken && String(t.appAccountToken).toLowerCase() !== userId.toLowerCase()) {
-    throw new Error('APPLE_OTHER_ACCOUNT');
-  }
   const expiresAt = new Date(Number(t.expiresDate || 0));
   return {
     originalId: String(t.originalTransactionId || t.transactionId),
@@ -113,6 +122,7 @@ const verifyApple = async (transactionId: string, userId: string): Promise<Verif
     expiresAt,
     active: !t.revocationDate && expiresAt.getTime() > Date.now(),
     environment: t.environment,
+    owner: t.appAccountToken ? String(t.appAccountToken) : undefined,
   };
 };
 
@@ -147,7 +157,7 @@ const googleAccessToken = async () => {
   return ((await res.json()) as { access_token: string }).access_token;
 };
 
-const verifyGoogle = async (purchaseToken: string, userId: string): Promise<Verified> => {
+const verifyGoogle = async (purchaseToken: string): Promise<Verified> => {
   const access = await googleAccessToken();
   const res = await fetch(
     `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${BUNDLE_ID}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`,
@@ -163,7 +173,6 @@ const verifyGoogle = async (purchaseToken: string, userId: string): Promise<Veri
   const item = s.lineItems?.find((l) => l.productId === GOOGLE_SUBSCRIPTION);
   if (!item) throw new Error('GOOGLE_WRONG_PRODUCT');
   const owner = s.externalAccountIdentifiers?.obfuscatedExternalAccountId;
-  if (owner && owner !== userId) throw new Error('GOOGLE_OTHER_ACCOUNT');
   const expiresAt = new Date(item.expiryTime);
   const valid = [
     'SUBSCRIPTION_STATE_ACTIVE',
@@ -176,6 +185,7 @@ const verifyGoogle = async (purchaseToken: string, userId: string): Promise<Veri
     expiresAt,
     active: valid.includes(s.subscriptionState ?? '') && expiresAt.getTime() > Date.now(),
     environment: s.testPurchase ? 'test' : 'production',
+    owner: owner || undefined,
   };
 };
 
@@ -203,10 +213,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     if (platform === 'ios') {
       if (!body.transactionId) return json(400, { error: 'transactionId required' });
-      v = await verifyApple(body.transactionId, user.id);
+      v = await verifyApple(body.transactionId);
     } else {
       if (!body.purchaseToken) return json(400, { error: 'purchaseToken required' });
-      v = await verifyGoogle(body.purchaseToken, user.id);
+      v = await verifyGoogle(body.purchaseToken);
     }
   } catch (e) {
     const code = String((e as Error)?.message || e);
@@ -217,6 +227,24 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const admin = createSupabaseAdminClient();
+
+  // A purchase tied to another Lis et Lead account stays with it. But when that
+  // account was deleted, the store keeps billing the same person (our deletion
+  // dialog says so), who now signs in with this account: Plus follows them,
+  // instead of an error at every launch (27 Nov 2026, TestFlight).
+  if (v.owner && v.owner.toLowerCase() !== user.id.toLowerCase()) {
+    const { data, error: lookup } = await admin.auth.admin.getUserById(v.owner);
+    if (data?.user) {
+      return json(409, {
+        error: platform === 'ios' ? 'APPLE_OTHER_ACCOUNT' : 'GOOGLE_OTHER_ACCOUNT',
+      });
+    }
+    if (lookup && lookup.status !== 404) {
+      console.error('store verify owner lookup', lookup.message);
+      return json(503, { error: 'OWNER_LOOKUP_FAILED' });
+    }
+  }
+
   const { error } = await admin.from('store_subscriptions').upsert(
     {
       user_id: user.id,
