@@ -1,0 +1,17 @@
+# Lis et Lead
+
+> Lis et Lead est une liseuse en ligne, en français. Elle traduit vos livres en français pendant que vous lisez, avec des phrases naturelles plutôt qu'une traduction mot à mot, et vous les lit à voix haute. Elle s'ouvre dans le navigateur, sur téléphone comme sur ordinateur, sans rien installer. Le compte est gratuit ; l'abonnement Plus ajoute la traduction IA et les voix premium.
+
+## Pages
+
+- [Découvrir Lis et Lead](https://lisetlead.com/decouvrir) : ce que fait la liseuse, comment l'utiliser, les questions fréquentes.
+- [La liseuse](https://lisetlead.com/) : l'application elle-même (elle a besoin de JavaScript).
+
+## En bref
+
+- Formats : EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT. Les livres achetés sur Kindle restent verrouillés par Amazon.
+- Langues : de l'anglais, de l'espagnol, de l'allemand, de l'italien et de bien d'autres langues, vers le français.
+- Lecture à voix haute en français.
+- La bibliothèque, la page en cours, les surlignages et les notes suivent le lecteur sur tous ses appareils.
+- Livre offert à l'inscription : « Ça marche », de R. H. Jarrett (1926), dans une nouvelle traduction française.
+- Contact : contact@lisetlead.com

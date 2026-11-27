@@ -7,8 +7,10 @@ import { isWebAppPlatform } from '@/services/environment';
 // recordings, the same demo page. Its scene is components/Tutoriel.tsx.
 
 /**
- * Remembered in the browser: the tour has been shown. Without a suffix for a
- * visitor (the key the tour has used since 26 Nov 2026), `:<id>` for an account.
+ * Remembered in the browser: the tour has been shown, `:visiteur` for a visitor,
+ * `:<id>` for an account. The bare key (the tour of 26 Nov 2026, shown on
+ * arrival) no longer counts: that tour came before the gift window, and the
+ * owner, on a phone that had seen it, got no tour after « Plus tard » (27 Nov).
  */
 export const CLE_TUTORIEL_VU = 'lel-tutoriel-vu';
 /** « Couper le son »: her voice stays off, between visits. */
@@ -54,11 +56,11 @@ const NOUVEAU_COMPTE_MS = 24 * 60 * 60 * 1000;
 
 /** Set when the tour ends: the next book opened brings the reader's tour. */
 const CLE_VISITE_A_FAIRE = 'lel-visite-lecteur-a-faire';
-/** The reader's tour has been shown (since 26 Nov 2026, without a suffix for a visitor). */
+/** The reader's tour has been shown (`:visiteur` or `:<id>`; the bare key of 26 Nov no longer counts). */
 export const CLE_VISITE_VUE = 'lel-visite-lecteur-vue';
 
 /** A key for a visitor (no account) or for one account. */
-const cle = (base: string, userId?: string | null) => (userId ? `${base}:${userId}` : base);
+const cle = (base: string, userId: string | null) => `${base}:${userId ?? 'visiteur'}`;
 const lire = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -102,7 +104,7 @@ export const invitationFermee = () => {
 
 /** A visitor who has not had the tour on this browser. Web only. */
 export const tutorielVisiteurAMontrer = () =>
-  isWebAppPlatform() && stockageOk() && !lire(CLE_TUTORIEL_VU);
+  isWebAppPlatform() && stockageOk() && !lire(cle(CLE_TUTORIEL_VU, null));
 
 /**
  * The visitor who just signed up is the same person: what they did here as a
@@ -112,10 +114,10 @@ export const tutorielVisiteurAMontrer = () =>
  */
 const reprendreCommeCompte = (userId: string) => {
   for (const base of [CLE_TUTORIEL_VU, CLE_VISITE_A_FAIRE, CLE_VISITE_VUE]) {
-    const valeur = lire(base);
+    const valeur = lire(cle(base, null));
     if (valeur === null) continue;
     if (lire(cle(base, userId)) === null) ecrire(cle(base, userId), valeur);
-    effacer(base);
+    effacer(cle(base, null));
   }
 };
 
@@ -131,7 +133,7 @@ export const tutorielAMontrer = (compte: Compte) => {
   const cree = creeLe(compte);
   if (!Number.isFinite(cree) || Date.now() - cree > NOUVEAU_COMPTE_MS) return false;
   if (lire(cle(CLE_TUTORIEL_VU, compte.id))) return false;
-  if (lire(CLE_TUTORIEL_VU)) {
+  if (lire(cle(CLE_TUTORIEL_VU, null))) {
     reprendreCommeCompte(compte.id);
     return false;
   }

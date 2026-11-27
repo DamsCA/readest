@@ -8,6 +8,10 @@ import LienBibliotheque from './LienBibliotheque';
 // formats come from SUPPORTED_BOOK_EXTS, the quotas from the API routes.
 
 export const metadata: Metadata = {
+  // Kept out of search results (27 Nov 2026): it shows the prices, and a first
+  // public contact never does (owner's rule of 26 Nov 2026). /decouvrir is the
+  // page for search engines and AI assistants.
+  robots: { index: false, follow: true },
   title: { absolute: 'Lis et Lead — tous les livres du monde, en français' },
   description:
     'Ouvrez un livre en anglais : Lis et Lead le traduit pendant que vous lisez, avec des phrases naturelles, et vous le lit à voix haute. Gratuit, un livre offert à l’inscription.',

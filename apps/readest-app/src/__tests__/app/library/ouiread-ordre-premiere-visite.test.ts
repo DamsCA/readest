@@ -32,6 +32,14 @@ describe('a visitor gets the tour after the gift window', () => {
     marquerTutorielVu(null);
     expect(tutorielVisiteurAMontrer()).toBe(false);
   });
+
+  it('also on a browser that saw the tour of 26 Nov (shown on arrival)', () => {
+    localStorage.setItem('lel-tutoriel-vu', '2026-11-26');
+    localStorage.setItem('lel-visite-lecteur-vue', '2026-11-26');
+    expect(tutorielVisiteurAMontrer()).toBe(true);
+    noterVisiteLecteurAFaire(null);
+    expect(visiteLecteurAFaire(null)).toBe(true);
+  });
 });
 
 describe('a new account gets the tour right after its sign-up', () => {

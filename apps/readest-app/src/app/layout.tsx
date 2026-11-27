@@ -31,7 +31,15 @@ export const metadata: Metadata = {
   // « ?v=3 » (26/11/2026, icônes bleu nuit ; ?v=2 le 23/11) : une adresse neuve, que l'ancien cache hors ligne ne connaît
   // pas ; un visiteur qui revient voit le logo Lis et Lead dès sa première visite.
   manifest: '/manifest.json?v=3',
-  keywords: ['liseuse', 'livres', 'traduction', 'lecture à voix haute', 'epub', 'pdf', 'ouiread'],
+  keywords: [
+    'liseuse en ligne',
+    'traduire un livre en français',
+    'lire un livre en anglais',
+    'lecture à voix haute',
+    'livre audio',
+    'epub',
+    'pdf',
+  ],
   authors: [
     {
       name: 'Lis et Lead',
@@ -144,8 +152,9 @@ const shouldInjectRuntimeConfig = process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'w
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // French: the site is in French (search engines and AI assistants read this).
     <html
-      lang='en'
+      lang='fr'
       className={process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri' ? 'edge-to-edge' : ''}
     >
       <head>
@@ -165,6 +174,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Providers>
           </EnvProvider>
         </ViewTransitions>
+        {/* For a browser or a robot without JavaScript (most AI assistants' robots do not run
+            it, owner's ask of 27 Nov 2026 for search engines and AI chats): what the site is,
+            and the page that tells it in full, drawn on the server (app/decouvrir). Last in
+            the page, so that /decouvrir's own text comes first. */}
+        <noscript>
+          <p style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', lineHeight: 1.5 }}>
+            Lis et Lead est une liseuse en ligne qui traduit vos livres en français pendant que vous
+            lisez et vous les lit à voix haute. Elle a besoin de JavaScript pour s’ouvrir.{' '}
+            <a href='/decouvrir'>Découvrir Lis et Lead</a>
+          </p>
+        </noscript>
       </body>
     </html>
   );

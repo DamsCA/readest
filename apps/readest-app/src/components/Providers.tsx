@@ -4,6 +4,7 @@ import '@/utils/polyfill';
 import posthog from 'posthog-js';
 import i18n from '@/i18n/i18n';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { IconContext } from 'react-icons';
 import { AuthProvider } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -101,7 +102,11 @@ const finalizeTelemetryDecision = ({
   }
 };
 
+/** Pages of text only, drawn on the server without the reader's engine (see below). */
+const PAGES_DE_TEXTE = new Set(['/decouvrir']);
+
 const Providers = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
   const { envConfig, appService } = useEnv();
   const { applyUILanguage } = useSettingsStore();
   const { applyBackgroundTexture } = useBackgroundTexture();
@@ -216,6 +221,12 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     const updated = getAndroidPatchedViewportContent(navigator.userAgent, meta.content);
     if (updated) meta.content = updated;
   }, []);
+
+  // Pages made only of text (owner's ask of 27 Nov 2026, search engines and AI
+  // assistants): drawn as they are, on the server too. Everything else waits for
+  // the reader's engine below, which only starts in the browser, so robots that
+  // do not run JavaScript would see an empty page.
+  if (PAGES_DE_TEXTE.has((pathname ?? '').replace(/\/$/, ''))) return <>{children}</>;
 
   // Make sure appService is available in all children components
   if (!appService) return;

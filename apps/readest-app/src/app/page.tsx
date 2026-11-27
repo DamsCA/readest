@@ -1,6 +1,8 @@
-'use client';
-
+import type { Metadata } from 'next';
 import LibraryPage from './library/page';
+
+// The address search engines keep for the home page (27 Nov 2026, référencement).
+export const metadata: Metadata = { alternates: { canonical: '/' } };
 
 // lisetlead.com opens the app itself, for everyone. The owner's call
 // (23 Nov 2026): a visitor lands straight in the app; a window then invites
