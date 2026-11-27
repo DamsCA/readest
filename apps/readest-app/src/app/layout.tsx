@@ -92,6 +92,9 @@ export const metadata: Metadata = {
     siteName: 'Lis et Lead',
     images: [{ url: previewImage, width: 1200, height: 630, alt: 'Lis et Lead' }],
   },
+  // Google Search Console, property https://lisetlead.com/ on the owner's account
+  // (27 Nov 2026). Keep it: removing it loses the property's proof of ownership.
+  verification: { google: 'MSqaOzbQNWOArUnQLU04Gt0xOa-bt5LFkgdK2OeLr44' },
   twitter: {
     card: 'summary_large_image',
     title,
