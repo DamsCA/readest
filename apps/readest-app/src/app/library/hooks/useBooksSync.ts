@@ -9,6 +9,7 @@ import { SYNC_BOOKS_INTERVAL_SEC } from '@/services/constants';
 import { throttle } from '@/utils/throttle';
 import { debounce } from '@/utils/debounce';
 import { eventDispatcher } from '@/utils/event';
+import { prendreEtagere } from '@/libs/ouiread/etagereDuCompte';
 import {
   pickFresherReadingStatus,
   needsCoverRefresh,
@@ -18,11 +19,14 @@ import {
 export const useBooksSync = () => {
   const _ = useTranslation();
   const { user } = useAuth();
-  const { appService } = useEnv();
+  const { appService, envConfig } = useEnv();
   const { library, isSyncing, libraryLoaded } = useLibraryStore();
   const { setLibrary, setIsSyncing, setSyncProgress } = useLibraryStore();
   const { useSyncInited, syncedBooks, syncBooks, lastSyncedAtBooks } = useSync();
   const isPullingRef = useRef(false);
+  // The account whose shelf this is, and whether its first pull is done
+  // (libs/ouiread/etagereDuCompte.ts). Nothing is pushed before that.
+  const etagere = useRef<{ id: string; prete: boolean } | null>(null);
 
   const getNewBooks = useCallback(() => {
     if (!user) return {};
@@ -78,6 +82,7 @@ export const useBooksSync = () => {
     throttle(
       async () => {
         if (isPullingRef.current) return;
+        if (!etagere.current?.prete) return;
         const newBooks = getNewBooks();
         if (!newBooks.lastSyncedAt) return;
         isPullingRef.current = true;
@@ -108,9 +113,35 @@ export const useBooksSync = () => {
   }, [user, syncBooks, getNewBooks]);
 
   useEffect(() => {
-    if (!user || !useSyncInited || !libraryLoaded) return;
-    pullLibrary();
-  }, [user, useSyncInited, libraryLoaded, pullLibrary]);
+    if (!user) {
+      etagere.current = null;
+      return;
+    }
+    if (!useSyncInited || !libraryLoaded || !appService) return;
+    const courant = etagere.current;
+    if (courant?.id === user.id) {
+      if (courant.prete) pullLibrary();
+      return;
+    }
+    // This account's first sync on this browser: another account's shelf
+    // leaves first, and the first pull then starts from zero (so a new
+    // account gets its welcome books).
+    const suivi = { id: user.id, prete: false };
+    etagere.current = suivi;
+    prendreEtagere(user.id, appService, envConfig)
+      .catch((error) => {
+        console.warn('Shelf: could not check whose shelf this is', error);
+        return false;
+      })
+      .then(async (reprise) => {
+        if (etagere.current !== suivi) return;
+        try {
+          await pullLibrary(reprise);
+        } finally {
+          suivi.prete = true;
+        }
+      });
+  }, [user, useSyncInited, libraryLoaded, pullLibrary, appService, envConfig]);
 
   const updateLibrary = useCallback(async () => {
     if (!syncedBooks?.length) return;
