@@ -15,3 +15,12 @@
 - La bibliothèque, la page en cours, les surlignages et les notes suivent le lecteur sur tous ses appareils.
 - Livre offert à l'inscription : « Ça marche », de R. H. Jarrett (1926), dans une nouvelle traduction française.
 - Contact : contact@lisetlead.com
+
+## Questions fréquentes
+
+- Comment lire un livre en anglais quand on ne parle pas anglais ? Ouvrez-le dans Lis et Lead et touchez « Traduire » : chaque page s'affiche en français pendant que vous lisez.
+- Quelle différence avec un traducteur en ligne ? Un traducteur en ligne traduit le passage qu'on y colle ; Lis et Lead traduit le livre lui-même, page après page, pendant la lecture, et garde la page, les surlignages et les notes.
+- Faut-il installer une application ? Non : Lis et Lead s'ouvre dans le navigateur, sur téléphone comme sur ordinateur.
+- Est-ce gratuit ? Oui : le compte gratuit donne la traduction standard sans limite, la lecture à voix haute et la bibliothèque sur tous les appareils. L'abonnement Plus ajoute la traduction IA et les voix premium sans compter.
+
+Mis à jour le 27 novembre 2026.

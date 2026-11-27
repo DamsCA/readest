@@ -39,7 +39,16 @@ export const metadata: Metadata = {
 
 const LISEUSE = '/';
 
+// The day this page last changed, shown at the bottom and given to search engines.
+const MAJ = '2026-11-27';
+const MAJ_TEXTE = '27 novembre 2026';
+
+// The questions people put to search engines and AI assistants, the answer first (27 Nov 2026).
 const QUESTIONS: { q: string; r: string }[] = [
+  {
+    q: 'Qu’est-ce que Lis et Lead ?',
+    r: 'Lis et Lead est une liseuse en ligne, en français. Elle traduit vos livres en français pendant que vous lisez et vous les lit à voix haute. Elle s’ouvre dans le navigateur, sur téléphone comme sur ordinateur, et le compte est gratuit.',
+  },
   {
     q: 'Comment lire un livre en anglais quand on ne parle pas anglais ?',
     r: 'Ouvrez-le dans Lis et Lead et touchez « Traduire » : chaque page s’affiche en français pendant que vous lisez, avec des phrases naturelles plutôt qu’une traduction mot à mot.',
@@ -51,6 +60,14 @@ const QUESTIONS: { q: string; r: string }[] = [
   {
     q: 'Comment écouter un livre à voix haute ?',
     r: 'Dans un livre ouvert, touchez « Écouter » : Lis et Lead vous le lit à voix haute, en français, dans les transports, en marchant ou les yeux fermés.',
+  },
+  {
+    q: 'Quelle différence avec un traducteur en ligne ?',
+    r: 'Un traducteur en ligne traduit le passage que vous y collez, morceau par morceau. Lis et Lead traduit le livre lui-même, page après page, pendant que vous lisez : vous restez dans votre livre, avec votre page, vos surlignages et vos notes, et vous pouvez l’écouter.',
+  },
+  {
+    q: 'Comment lire un livre en anglais sur son téléphone ?',
+    r: 'Ouvrez lisetlead.com sur votre téléphone, ajoutez votre livre à votre bibliothèque, ouvrez-le, puis touchez « Traduire ». Votre page vous attend ensuite sur l’ordinateur.',
   },
   {
     q: 'Faut-il installer une application ?',
@@ -74,42 +91,82 @@ const QUESTIONS: { q: string; r: string }[] = [
   },
 ];
 
-// For search engines and AI assistants: who we are, what the app does, and the
-// questions above. No price, no rating (we have none to show).
-const DONNEES = [
+// For search engines and AI assistants: this page, what the app does, and the
+// questions above. Who we are (#organisation, #site) is said on every page, in
+// app/layout.tsx. No paid price (owner's rule of 26 Nov 2026), no rating (we
+// have none to show): the one offer named is the free account.
+const DONNEES = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebPage',
+      '@id': `${SITE}/decouvrir#page`,
+      url: `${SITE}/decouvrir`,
+      name: TITRE,
+      description: DESCRIPTION,
+      inLanguage: 'fr',
+      isPartOf: { '@id': `${SITE}/#site` },
+      about: { '@id': `${SITE}/#liseuse` },
+      dateModified: MAJ,
+    },
+    {
+      '@type': 'WebApplication',
+      '@id': `${SITE}/#liseuse`,
+      name: 'Lis et Lead',
+      url: `${SITE}/`,
+      description: DESCRIPTION,
+      applicationCategory: 'EducationalApplication',
+      operatingSystem: 'Web',
+      inLanguage: 'fr',
+      browserRequirements: 'JavaScript',
+      publisher: { '@id': `${SITE}/#organisation` },
+      offers: { '@type': 'Offer', name: 'Compte gratuit', price: '0', priceCurrency: 'EUR' },
+      featureList: [
+        'Traduction des livres en français pendant la lecture',
+        'Lecture à voix haute',
+        'Bibliothèque sur tous vos appareils',
+        'EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT',
+      ],
+    },
+    {
+      '@type': 'FAQPage',
+      '@id': `${SITE}/decouvrir#questions`,
+      mainEntity: QUESTIONS.map(({ q, r }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: r },
+      })),
+    },
+  ],
+};
+
+// Three ways to read a book written in English, side by side (AI assistants
+// quote tables like this one). Only what holds for every case, nothing on others' prices.
+// Our column comes first, right after the question: on a phone it shows without scrolling.
+const FACONS: { critere: string; attendre: string; coller: string; nous: string }[] = [
   {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: 'Lis et Lead',
-    url: `${SITE}/`,
-    logo: `${SITE}/icon.png`,
-    email: 'contact@lisetlead.com',
+    critere: 'Quand pouvez-vous le lire ?',
+    attendre: 'Quand une traduction paraît, si elle paraît',
+    coller: 'Tout de suite',
+    nous: 'Tout de suite',
   },
   {
-    '@context': 'https://schema.org',
-    '@type': 'WebApplication',
-    name: 'Lis et Lead',
-    url: `${SITE}/`,
-    description: DESCRIPTION,
-    applicationCategory: 'EducationalApplication',
-    operatingSystem: 'Web',
-    inLanguage: 'fr',
-    browserRequirements: 'JavaScript',
-    featureList: [
-      'Traduction des livres en français pendant la lecture',
-      'Lecture à voix haute',
-      'Bibliothèque sur tous vos appareils',
-      'EPUB, PDF, MOBI, AZW3, FB2, CBZ, TXT',
-    ],
+    critere: 'Ce qu’il faut faire',
+    attendre: 'Attendre',
+    coller: 'Copier chaque passage, le coller, le lire ailleurs',
+    nous: 'Ouvrir le livre et toucher « Traduire »',
   },
   {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: QUESTIONS.map(({ q, r }) => ({
-      '@type': 'Question',
-      name: q,
-      acceptedAnswer: { '@type': 'Answer', text: r },
-    })),
+    critere: 'À voix haute',
+    attendre: 'S’il existe un livre audio',
+    coller: 'Par petits morceaux',
+    nous: 'Tout le livre, en français',
+  },
+  {
+    critere: 'Votre page, vos surlignages, vos notes',
+    attendre: 'Selon le support',
+    coller: 'Non',
+    nous: 'Oui, sur tous vos appareils',
   },
 ];
 
@@ -240,6 +297,44 @@ export default function DecouvrirPage() {
         </div>
       </section>
 
+      <section className='mx-auto max-w-5xl px-5 pb-14 sm:px-8 md:pb-20'>
+        <h2 className='font-serif text-3xl font-bold sm:text-4xl'>
+          Lire un livre écrit en anglais : trois façons
+        </h2>
+        <div className='mt-8 overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-[#101728]/5'>
+          <table className='w-full min-w-[600px] text-left text-[15px]'>
+            <thead>
+              <tr className='border-b border-[#101728]/10'>
+                <th scope='col' className='p-4 font-semibold text-[#101728]/60'>
+                  <span className='sr-only'>Critère</span>
+                </th>
+                <th scope='col' className='bg-[#101728] p-4 font-semibold text-[#f3ecdd]'>
+                  Lis et Lead
+                </th>
+                <th scope='col' className='p-4 font-semibold'>
+                  Un traducteur en ligne
+                </th>
+                <th scope='col' className='p-4 font-semibold'>
+                  Attendre une traduction
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {FACONS.map(({ critere, attendre, coller, nous }) => (
+                <tr key={critere} className='border-b border-[#101728]/10 last:border-0'>
+                  <th scope='row' className='p-4 font-semibold'>
+                    {critere}
+                  </th>
+                  <td className='bg-[#101728] p-4 font-semibold text-[#f3ecdd]'>{nous}</td>
+                  <td className='p-4 text-[#101728]/70'>{coller}</td>
+                  <td className='p-4 text-[#101728]/70'>{attendre}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section className='bg-white'>
         <div className='mx-auto grid max-w-5xl gap-12 px-5 py-14 sm:px-8 md:grid-cols-2 md:py-20'>
           <div>
@@ -341,7 +436,12 @@ export default function DecouvrirPage() {
       </section>
 
       <footer className='mx-auto flex max-w-5xl flex-col gap-3 px-5 py-8 text-sm text-[#101728]/60 sm:flex-row sm:justify-between sm:px-8'>
-        <p>© 2026 Lis et Lead</p>
+        <p>
+          © 2026 Lis et Lead · Mis à jour le <time dateTime={MAJ}>{MAJ_TEXTE}</time> ·{' '}
+          <a href='mailto:contact@lisetlead.com' className='underline'>
+            contact@lisetlead.com
+          </a>
+        </p>
         <nav className='flex flex-wrap gap-x-5 gap-y-2'>
           <a href='/mentions-legales' className='underline'>
             Mentions légales

@@ -20,6 +20,30 @@ const description =
   'à l’inscription : « Ça marche ».';
 const previewImage = '/og-ouiread.png';
 
+// Who Lis et Lead is, for search engines and AI assistants, on every page (owner's ask of
+// 27 Nov 2026, référencement). Pages say more and point here by @id (app/decouvrir).
+const QUI = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${url}#organisation`,
+      name: 'Lis et Lead',
+      url,
+      logo: `${url}icon.png`,
+      email: 'contact@lisetlead.com',
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${url}#site`,
+      name: 'Lis et Lead',
+      url,
+      inLanguage: 'fr',
+      publisher: { '@id': `${url}#organisation` },
+    },
+  ],
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(url),
   title: {
@@ -185,6 +209,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href='/decouvrir'>Découvrir Lis et Lead</a>
           </p>
         </noscript>
+        <script
+          type='application/ld+json'
+          // Fixed text of our own, not user input.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(QUI) }}
+        />
       </body>
     </html>
   );

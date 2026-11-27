@@ -27,10 +27,22 @@ const REDIRECTED_HOSTS = [
   'ouiread.damien-aure99c.workers.dev',
 ];
 
+// The scheme the visitor really used, as Cloudflare's edge saw it (cf-visitor,
+// x-forwarded-proto). Without either header (local dev, tests) it is unknown,
+// and nothing is redirected: a wrong guess here would loop forever.
+const visitorScheme = (request: NextRequest) => {
+  const visitor = request.headers.get('cf-visitor');
+  if (visitor) return visitor.includes('"http"') ? 'http' : 'https';
+  return request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase() ?? null;
+};
+
 export function middleware(request: NextRequest) {
   const isApi = request.nextUrl.pathname.startsWith('/api/');
   const host = (request.headers.get('host') || '').toLowerCase();
-  if (!isApi && REDIRECTED_HOSTS.includes(host)) {
+  // One address per page for search engines (27 Nov 2026, référencement): http://lisetlead.com
+  // answered the same pages as https://, a duplicate of the whole site.
+  const plainHttp = host === CANONICAL_HOST && visitorScheme(request) === 'http';
+  if (!isApi && (REDIRECTED_HOSTS.includes(host) || plainHttp)) {
     const target = new URL(
       request.nextUrl.pathname + request.nextUrl.search,
       `https://${CANONICAL_HOST}`,
@@ -72,6 +84,10 @@ export function middleware(request: NextRequest) {
   // document response, not just /api/* — `crossOriginIsolated` is a property
   // of the top-level browsing context, determined by the document's headers.
   const response = NextResponse.next();
+  // Browsers that came once over https keep to it (no subdomains: maj.lisetlead.com is its own).
+  if (host === CANONICAL_HOST && visitorScheme(request) === 'https') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000');
+  }
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   // The /s share landing embeds the book cover via an <img> that redirects to a
   // cross-origin R2 presigned URL. Under COEP: require-corp the browser blocks
