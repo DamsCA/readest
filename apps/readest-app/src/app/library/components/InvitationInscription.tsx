@@ -11,6 +11,7 @@ import { startGoogleSignIn } from '@/app/auth/utils/googleWeb';
 import { startAppleSignIn } from '@/app/auth/utils/appleWeb';
 import { mesurer } from '@/utils/mesure';
 import {
+  debloquerSon,
   type FinTutoriel,
   INVITATION_FERMEE,
   TUTORIEL_FERME,
@@ -117,6 +118,8 @@ export default function InvitationInscription() {
   if (!ouverte) return null;
 
   const fermer = () => {
+    // This tap lets the tour that follows speak at once (utils/tutoriel.ts).
+    debloquerSon();
     marquerFermee();
     mesurer('invitation_fermee');
     setOuverte(false);

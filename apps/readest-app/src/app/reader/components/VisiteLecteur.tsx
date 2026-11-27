@@ -19,11 +19,14 @@ import { useBookDataStore } from '@/store/bookDataStore';
 import { mesurer } from '@/utils/mesure';
 import {
   garderSonCoupe,
+  lecteurVoix,
   lireSonCoupe,
   POSES,
   type Pose,
+  prechargerVoix,
   visiteLecteurAFaire,
   visiteLecteurFaite,
+  voixPrete,
 } from '@/app/library/utils/tutoriel';
 
 // The reader's tour (owner's ask, 26 Nov 2026: « lorsqu'il va cliquer sur
@@ -162,6 +165,10 @@ function Visite({
 }) {
   const { hoveredBookKey, setHoveredBookKey } = useReaderStore();
   const [liste] = useState(() => etapes(dejaEnFrancais));
+  // Every line of this tour is fetched now, so that each one starts at once.
+  useEffect(() => {
+    prechargerVoix(liste.map((e) => e.voix));
+  }, [liste]);
   const [n, setN] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [coupe, setCoupe] = useState(lireSonCoupe);
@@ -213,12 +220,11 @@ function Visite({
   const jouer = useCallback(
     (source: string) => {
       if (coupe) return;
-      if (!lecteur.current) {
-        lecteur.current = new Audio();
-        lecteur.current.preload = 'auto';
-      }
+      // The player shared with the welcome tour: already allowed to speak when
+      // the reader tapped « Plus tard » or went through the tour.
+      if (!lecteur.current) lecteur.current = lecteurVoix();
       const a = lecteur.current;
-      a.src = source;
+      a.src = voixPrete(source);
       a.play().then(
         () => {
           enAttente.current = false;

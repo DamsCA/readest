@@ -232,3 +232,88 @@ export const PAGE_LUE = `${VOIX}/l4-page-lue.mp3`;
 // recording's pauses (22.73 s long); scaled to the real length when it plays.
 export const DUREE_PAGE_LUE = 22.73;
 export const DEBUTS_PAGE_LUE = [0, 5.67, 10.76, 15.53, 19.63, 21.15];
+
+// ---------- Her voice in the browser: ready at once, and allowed to speak ----------
+// Owner, 27 Nov 2026: « sur le navigateur, ça avait pris quelques secondes avant
+// d'entendre parler ». Each recording was downloaded only when it was about to
+// play. Now the tour's recordings are fetched as soon as it opens, and one
+// player is shared by the welcome tour and the reader's tour: unlocked by the
+// visitor's own tap (« Plus tard », « Revoir le tutoriel »), it may then speak
+// on its own (browsers, iPhones above all, keep a page silent until a tap).
+
+const enMemoire = new Map<string, string>();
+
+/** Fetches recordings ahead of time; `voixPrete` then gives their local copy. */
+export const prechargerVoix = (adresses: string[]) => {
+  for (const adresse of adresses) {
+    if (enMemoire.has(adresse)) continue;
+    enMemoire.set(adresse, adresse);
+    fetch(adresse)
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => {
+        if (b) enMemoire.set(adresse, URL.createObjectURL(b));
+      })
+      .catch(() => {});
+  }
+};
+
+/** The local copy of a recording when it is there, else its address. */
+export const voixPrete = (adresse: string) => enMemoire.get(adresse) ?? adresse;
+
+let lecteur: HTMLAudioElement | null = null;
+let debloque = false;
+
+/** The one player of her lines in the browser. */
+export const lecteurVoix = () => {
+  if (!lecteur) {
+    lecteur = new Audio();
+    lecteur.preload = 'auto';
+  }
+  return lecteur;
+};
+
+/** 50 ms of silence, made here (a WAV file, 8 kHz, 8 bits). */
+const silence = () => {
+  const n = 400;
+  const tampon = new ArrayBuffer(44 + n);
+  const v = new DataView(tampon);
+  const ecrire = (o: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+  };
+  ecrire(0, 'RIFF');
+  v.setUint32(4, 36 + n, true);
+  ecrire(8, 'WAVE');
+  ecrire(12, 'fmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true);
+  v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  ecrire(36, 'data');
+  v.setUint32(40, n, true);
+  new Uint8Array(tampon, 44).fill(128);
+  return URL.createObjectURL(new Blob([tampon], { type: 'audio/wav' }));
+};
+
+/**
+ * Called from a tap: plays 50 ms of silence on the shared player, so that the
+ * browser lets it speak afterwards without another tap.
+ */
+export const debloquerSon = () => {
+  try {
+    const a = lecteurVoix();
+    a.src = silence();
+    const essai = a.play();
+    debloque = true;
+    essai?.catch(() => {
+      debloque = false;
+    });
+  } catch {
+    // No sound here: her lines simply wait for a tap, as before.
+  }
+};
+
+/** Has a tap already allowed her to speak on this page? */
+export const sonDebloque = () => debloque;

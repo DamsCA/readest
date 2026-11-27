@@ -22,12 +22,14 @@ import { useAuth } from '@/context/AuthContext';
 import { mesurer } from '@/utils/mesure';
 import demo from '../utils/tutoriel-demo.json';
 import {
+  debloquerSon,
   DEBUTS_PAGE_LUE,
   DUREE_PAGE_LUE,
   type FinTutoriel,
   garderSonCoupe,
   INVITATION_FERMEE,
   invitationFermee,
+  lecteurVoix,
   lireSonCoupe,
   marquerTutorielVu,
   noterTutorielOuvert,
@@ -35,12 +37,15 @@ import {
   PAGE_LUE,
   type Pose,
   POSES,
+  prechargerVoix,
   REPLIQUES,
   type RepliqueId,
+  sonDebloque,
   TUTORIEL_FERME,
   TUTORIEL_REVOIR,
   tutorielAMontrer,
   tutorielVisiteurAMontrer,
+  voixPrete,
 } from '../utils/tutoriel';
 
 // The welcome tour of the web reader, the phone app's own (lisetlead-app/src/app/bienvenue.tsx):
@@ -112,48 +117,42 @@ type OptionsVoix = {
   echec?: () => void;
 };
 
-/** One player for her lines, kept quiet while « son coupé » is on. */
+/** One player for her lines (shared, utils/tutoriel.ts), kept quiet while « son coupé » is on. */
 function useVoix() {
-  const lecteur = useRef<HTMLAudioElement | null>(null);
   const [coupe, setCoupe] = useState(lireSonCoupe);
   const coupeRef = useRef(coupe);
   const fin = useRef<(() => void) | null>(null);
   const suivi = useRef<((secondes: number, duree: number) => void) | null>(null);
   const jeton = useRef(0);
 
-  const audio = useCallback(() => {
-    if (!lecteur.current) {
-      const a = new Audio();
-      a.preload = 'auto';
-      a.addEventListener('timeupdate', () =>
-        suivi.current?.(a.currentTime, Number.isFinite(a.duration) ? a.duration : 0),
-      );
-      a.addEventListener('ended', () => {
-        const f = fin.current;
-        fin.current = null;
-        suivi.current = null;
-        f?.();
-      });
-      lecteur.current = a;
-    }
-    return lecteur.current;
-  }, []);
+  const audio = useCallback(() => lecteurVoix(), []);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const a = lecteurVoix();
+    const temps = () =>
+      suivi.current?.(a.currentTime, Number.isFinite(a.duration) ? a.duration : 0);
+    const finie = () => {
+      const f = fin.current;
       fin.current = null;
       suivi.current = null;
-      lecteur.current?.pause();
-      lecteur.current = null;
-    },
-    [],
-  );
+      f?.();
+    };
+    a.addEventListener('timeupdate', temps);
+    a.addEventListener('ended', finie);
+    return () => {
+      fin.current = null;
+      suivi.current = null;
+      a.removeEventListener('timeupdate', temps);
+      a.removeEventListener('ended', finie);
+      a.pause();
+    };
+  }, []);
 
   const arreter = useCallback(() => {
     jeton.current++;
     fin.current = null;
     suivi.current = null;
-    lecteur.current?.pause();
+    lecteurVoix().pause();
   }, []);
 
   const jouer = useCallback(
@@ -162,11 +161,11 @@ function useVoix() {
       fin.current = null;
       suivi.current = null;
       if (coupeRef.current && !options.forcer) {
-        lecteur.current?.pause();
+        lecteurVoix().pause();
         return false;
       }
       const a = audio();
-      a.src = source;
+      a.src = voixPrete(source);
       fin.current = options.fin ?? null;
       suivi.current = options.suivre ?? null;
       a.play().catch(() => {
@@ -180,9 +179,11 @@ function useVoix() {
     [audio],
   );
 
-  const pause = useCallback(() => lecteur.current?.pause(), []);
+  const pause = useCallback(() => lecteurVoix().pause(), []);
   const reprendre = useCallback(() => {
-    lecteur.current?.play().catch(() => {});
+    lecteurVoix()
+      .play()
+      .catch(() => {});
   }, []);
 
   /** Turns her voice off or on; the choice is kept for next time. */
@@ -240,7 +241,11 @@ export default function Tutoriel() {
     const apresInvitation = () => {
       if (!compte.current && tutorielVisiteurAMontrer()) ouvrir(null);
     };
-    const revoir = () => setOuverture(Date.now());
+    const revoir = () => {
+      // Sent from a tap in the menu: her voice may start at once.
+      debloquerSon();
+      setOuverture(Date.now());
+    };
     window.addEventListener(INVITATION_FERMEE, apresInvitation);
     window.addEventListener(TUTORIEL_REVOIR, revoir);
     return () => {
@@ -289,8 +294,10 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
   const [revelation, setRevelation] = useState(false);
   const [lecture, setLecture] = useState<Lecture>('aucune');
   const [phrase, setPhrase] = useState(-1);
-  // Her lines play only after a first tap (the browser would refuse them before).
-  const debloque = useRef(false);
+  // Her lines play only after a tap (the browser would refuse them before): the
+  // visitor's « Plus tard » already counts (utils/tutoriel.ts, debloquerSon).
+  const debloque = useRef(sonDebloque());
+  const l1Dite = useRef(false);
   const cadeauVu = useRef(false);
   const ferme = useRef(false);
   const envoyes = useRef(new Set<string>());
@@ -322,6 +329,11 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
     };
   }, [mesure]);
 
+  // Every recording of the tour is fetched now, so that each line starts at once.
+  useEffect(() => {
+    prechargerVoix([...Object.values(REPLIQUES).map((r) => r.voix), PAGE_LUE]);
+  }, []);
+
   // 1. She wakes up, then speaks (her first line, without sound until a tap).
   useEffect(() => {
     const t = setTimeout(() => setParle(true), 2100);
@@ -352,6 +364,15 @@ function Scene({ onFin }: { onFin: (fin: FinTutoriel) => void }) {
     },
     [jouer],
   );
+
+  // Her first line, spoken as soon as she wakes up when a tap has already
+  // allowed it (« Plus tard », « Revoir le tutoriel »); otherwise it stays on
+  // screen and her voice starts with « Montrez-moi ».
+  useEffect(() => {
+    if (!parle || etape !== 1 || l1Dite.current || !debloque.current) return;
+    l1Dite.current = true;
+    dire('l1');
+  }, [parle, etape, dire]);
 
   const silence = useCallback(() => {
     arreterTelephone();
