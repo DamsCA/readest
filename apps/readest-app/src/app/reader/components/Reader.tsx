@@ -20,7 +20,7 @@ import { useReplicaPull } from '@/hooks/useReplicaPull';
 import { eventDispatcher } from '@/utils/event';
 import { interceptWindowOpen } from '@/utils/open';
 import { mountAdditionalFonts } from '@/styles/fonts';
-import { isTauriAppPlatform } from '@/services/environment';
+import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 import { getSysFontsList, setSystemUIVisibility } from '@/utils/bridge';
 import { AboutWindow } from '@/components/AboutWindow';
 import { KeyboardShortcutsHelp } from '@/components/KeyboardShortcutsHelp';
@@ -199,7 +199,8 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
         <ReaderContent ids={ids} settings={settings} />
         <AboutWindow />
         <KeyboardShortcutsHelp />
-        <UpdaterWindow />
+        {/* Never on the web (helpers/updater.ts, 28 Nov 2026). */}
+        {!isWebAppPlatform() && <UpdaterWindow />}
         <ProofreadRulesManager />
         <Toast />
       </Suspense>

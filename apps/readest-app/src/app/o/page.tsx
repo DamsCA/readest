@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { isWebAppPlatform } from '@/services/environment';
 import { IoAlertCircleOutline, IoBookOutline, IoOpenOutline } from 'react-icons/io5';
 import { DOWNLOAD_READEST_URL, READEST_WEB_BASE_URL } from '@/services/constants';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -201,7 +202,20 @@ const OpenAnnotationLanding = () => {
   );
 };
 
+// lisetlead.com, 28 Nov 2026: Google Safe Browsing flagged the site « Pages
+// trompeuses » (social engineering: pushing people to download software) on
+// 26 Nov. Readest's own download and update prompts, shown under the Lis et Lead
+// name, are the likely cause: none of them may appear on the web.
+const VersDecouvrir = () => {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/decouvrir');
+  }, [router]);
+  return null;
+};
+
 const Page = () => {
+  if (isWebAppPlatform()) return <VersDecouvrir />;
   return (
     <Suspense fallback={null}>
       <OpenAnnotationLanding />

@@ -42,6 +42,8 @@ vi.mock('@/components/UpdaterWindow', () => ({
 let mockIsTauriAppPlatform = false;
 vi.mock('@/services/environment', () => ({
   isTauriAppPlatform: () => mockIsTauriAppPlatform,
+  // The web never checks for updates (helpers/updater.ts, 28 Nov 2026).
+  isWebAppPlatform: () => false,
 }));
 
 let mockAppVersion = '1.0.0';

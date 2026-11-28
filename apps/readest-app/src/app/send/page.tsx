@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { isTauriAppPlatform } from '@/services/environment';
+import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 import { ingestFile } from '@/services/ingestService';
 import {
   convertFileIfNeeded,
@@ -187,7 +187,9 @@ export default function SendPage() {
             {_('Add')}
           </button>
         </div>
-      ) : (
+      ) : isWebAppPlatform() ? null : (
+        // lisetlead.com (28 Nov 2026): Readest's browser extension is not ours, and
+        // inviting readers to install it was one more « install software » prompt.
         <section className='card eink-bordered border-base-200 bg-base-100 flex flex-col gap-2 border p-5'>
           <div className='flex items-center gap-2'>
             <MdExtension className='text-base-content/70 h-5 w-5 flex-shrink-0' />

@@ -1569,7 +1569,8 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       )}
       <AboutWindow />
       <KeyboardShortcutsHelp />
-      <UpdaterWindow />
+      {/* Never on the web (helpers/updater.ts, 28 Nov 2026). */}
+      {!isWebAppPlatform() && <UpdaterWindow />}
       <MigrateDataWindow />
       <BackupWindow onPullLibrary={pullLibrary} />
       <CacheManagerWindow />

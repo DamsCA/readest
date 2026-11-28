@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
 import { READEST_WEB_BASE_URL, SHARE_BASE_URL } from '@/services/constants';
 import { resolveActiveShare } from '@/libs/shareServer';
 import ShareLanding from './ShareLanding';
@@ -18,6 +19,10 @@ interface PageProps {
 }
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  // lisetlead.com: no share landing on the web (see Page below).
+  if (process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web') {
+    return { title: 'Lis et Lead', robots: { index: false, follow: false } };
+  }
   // The Tauri build runs `output: 'export'`, which forbids `await searchParams`
   // anywhere in collected page data. `process.env.NEXT_PUBLIC_APP_PLATFORM` is
   // replaced at build time, so this early return DCEs the rest of the function
@@ -77,7 +82,12 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   };
 }
 
+// lisetlead.com, 28 Nov 2026: Google Safe Browsing flagged the site « Pages
+// trompeuses » (social engineering: pushing people to download software) on
+// 26 Nov. Readest's own download and update prompts, shown under the Lis et Lead
+// name, are the likely cause: none of them may appear on the web.
 export default function Page() {
+  if (process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web') redirect('/decouvrir');
   // Client child uses useSearchParams, which Next 16 requires to be wrapped
   // in Suspense. Mirrors src/app/o/page.tsx.
   return (

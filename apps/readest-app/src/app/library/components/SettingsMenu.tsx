@@ -13,17 +13,13 @@ import {
   IconUser,
   IconUserChecked,
 } from '@/components/icons/lisetlead';
-import {
-  PAYMENTS_ENABLED,
-  READEST_CLOUD_ENABLED,
-  READEST_PREMIUM_ENABLED,
-} from '@/services/features';
+import { PAYMENTS_ENABLED, READEST_CLOUD_ENABLED } from '@/services/features';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { APP_DISPLAY_NAME, DOWNLOAD_READEST_URL } from '@/services/constants';
+import { APP_DISPLAY_NAME } from '@/services/constants';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { setCacheManagerDialogVisible } from '@/app/library/components/CacheManagerWindow';
 import { useAuth } from '@/context/AuthContext';
@@ -125,11 +121,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
 
   const showAboutReadest = () => {
     setAboutDialogVisible(true);
-    setIsDropdownOpen?.(false);
-  };
-
-  const downloadReadest = () => {
-    window.open(DOWNLOAD_READEST_URL, '_blank');
     setIsDropdownOpen?.(false);
   };
 
@@ -538,9 +529,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         </ul>
       </MenuItem>
       <hr aria-hidden='true' className='border-base-200 my-1' />
-      {READEST_PREMIUM_ENABLED && READEST_CLOUD_ENABLED && isWebAppPlatform() && (
-        <MenuItem label={_('Download Readest')} onClick={downloadReadest} />
-      )}
       <MenuItem
         label={_('About {{name}}', { name: APP_DISPLAY_NAME })}
         onClick={showAboutReadest}
