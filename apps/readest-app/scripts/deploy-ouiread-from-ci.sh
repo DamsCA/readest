@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-REPO=DamsCA/readest
+REPO=DamsCA/lisetlead-site
 RUN_ID="${1:-}"
 if [ -z "$RUN_ID" ]; then
   RUN_ID=$(gh run list --repo "$REPO" --workflow deploy-web-ouiread.yml --branch play-release \

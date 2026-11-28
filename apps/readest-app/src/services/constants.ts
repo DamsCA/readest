@@ -818,7 +818,7 @@ export const APP_DISPLAY_NAME = 'Lis et Lead';
 // date (section 5a), and point to its complete source (sections 6 and 13).
 // The build stamps the exact commit and date; a local build falls back to the
 // branch and to the day the redesign began.
-export const SOURCE_CODE_REPO_URL = 'https://github.com/DamsCA/readest';
+export const SOURCE_CODE_REPO_URL = 'https://github.com/DamsCA/lisetlead-site';
 export const getSourceCodeUrl = () => {
   const commit = process.env['NEXT_PUBLIC_SOURCE_COMMIT'];
   return `${SOURCE_CODE_REPO_URL}/tree/${commit || 'play-release'}`;
@@ -854,7 +854,8 @@ export const SHARE_CFI_MAX_LENGTH = 512;
 // build (e.g. 0.11.18) that can't even install over the fork's own signature.
 // Hardcoded (not env-derived) so it can never silently fall back to the official
 // host if a NEXT_PUBLIC_ var fails to inline at build time.
-const LATEST_DOWNLOAD_BASE_URL = 'https://github.com/DamsCA/readest/releases/latest/download';
+const LATEST_DOWNLOAD_BASE_URL =
+  'https://github.com/DamsCA/lisetlead-site/releases/latest/download';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 

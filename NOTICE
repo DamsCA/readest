@@ -1,4 +1,4 @@
-Liseuse (provisional name) - a modified version of Readest
+Lis et Lead (lisetlead.com) - free software, GNU AGPL-3.0
 
 This program is a modified version of Readest
 (https://github.com/readest/readest), Copyright (C) Bilingify LLC and the
@@ -20,4 +20,4 @@ Main modifications:
   shared links, "Send to Readest", online metadata search, purchases and
   usage statistics are switched off (src/services/features.ts).
 
-Complete corresponding source code: https://github.com/DamsCA/readest
+Complete corresponding source code: https://github.com/DamsCA/lisetlead-site
