@@ -70,8 +70,9 @@ export default function CguPage() {
 
       <h2>7. Logiciel libre</h2>
       <p>
-        Lis et Lead est une version modifiée de Readest, sous licence GNU Affero General Public
-        License version 3 : son code source est disponible sur github.com/DamsCA/readest.
+        Lis et Lead est un logiciel libre, sous licence GNU Affero General Public License version 3
+        ; il reprend et modifie du code © Bilingify LLC. Son code source complet est disponible sur
+        lisetlead.com/code-source.
       </p>
 
       <h2>8. Modifications et contact</h2>

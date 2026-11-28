@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { checkForAppUpdates } from '@/helpers/updater';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
-import { APP_DISPLAY_NAME, getModifiedOn, getSourceCodeUrl } from '@/services/constants';
+import { APP_DISPLAY_NAME, getModifiedOn } from '@/services/constants';
 import Dialog from './Dialog';
 import Link from './Link';
 
@@ -151,7 +151,7 @@ export const AboutWindow = () => {
             </p>
             <p className='text-neutral-content text-xs'>
               {_('The complete source code of this version:')}{' '}
-              <Link href={getSourceCodeUrl()} className='text-primary underline'>
+              <Link href='/code-source' className='text-primary underline'>
                 {_('Source code')}
               </Link>
             </p>
