@@ -86,7 +86,8 @@ import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import WelcomeGift from './components/WelcomeGift';
 import InvitationInscription from './components/InvitationInscription';
-import { LIVRES_OFFERTS, fichierOffert } from '@/libs/ouiread/offerts';
+import { CATALOGUE } from '@/libs/ouiread/catalogue';
+import { pageDeverrouillage, telechargerLivre } from '@/libs/ouiread/catalogueClient';
 import { mesurer } from '@/utils/mesure';
 import Tutoriel from './components/Tutoriel';
 import GroupHeader from './components/GroupHeader';
@@ -1016,26 +1017,35 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     await updateBook(envConfig, updatedBook);
   };
 
-  // lisetlead.com/offerts: « Lire en français » leads here with ?offert=<id>.
-  // The book is added to the library, then opened (28 Nov 2026).
-  const offertTraite = useRef(false);
+  // lisetlead.com/bibliotheque: « Lire ce livre » leads here with ?livre=<id>.
+  // A Plus reader gets the book added and opened; the others go to the sign-up,
+  // then to the Plus offer (28 Nov 2026).
+  const livreTraite = useRef(false);
   useEffect(() => {
-    const id = searchParams?.get('offert');
-    if (!id || !libraryLoaded || offertTraite.current) return;
-    offertTraite.current = true;
+    const id = searchParams?.get('livre');
+    if (!id || !libraryLoaded || livreTraite.current) return;
+    livreTraite.current = true;
     const url = new URL(window.location.href);
-    url.searchParams.delete('offert');
+    url.searchParams.delete('livre');
     window.history.replaceState(null, '', url.toString());
-    const livre = LIVRES_OFFERTS.find((l) => l.id === id);
+    const livre = CATALOGUE.find((l) => l.id === id);
     if (!livre) return;
     void (async () => {
       const present = () =>
         useLibraryStore.getState().library.some((b) => b.hash === livre.hash && !b.deletedAt);
       if (!present()) {
-        const fichier = await fichierOffert(id);
-        if (!fichier) return;
-        await importBooks([{ file: fichier }], '');
-        mesurer('offert_ajoute');
+        const resultat = await telechargerLivre(id);
+        if (!resultat.ok) {
+          if (resultat.raison !== 'reseau') {
+            mesurer('catalogue_verrou');
+            router.push(
+              pageDeverrouillage(resultat.raison === 'connexion' ? 'anonyme' : 'gratuit', id),
+            );
+          }
+          return;
+        }
+        await importBooks([{ file: resultat.fichier }], '');
+        mesurer('catalogue_ajoute');
       }
       if (present()) navigateToReader(router, [livre.hash]);
     })();

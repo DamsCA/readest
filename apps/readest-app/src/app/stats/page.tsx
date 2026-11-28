@@ -79,7 +79,10 @@ interface Stats {
     | 'achat_reussi'
     | 'offerts_vus'
     | 'offert_ajoute'
-    | 'invitation_appli',
+    | 'invitation_appli'
+    | 'catalogue_vu'
+    | 'catalogue_verrou'
+    | 'catalogue_ajoute',
     number
   >;
   tutoriel?: {
@@ -445,8 +448,9 @@ export default function StatsPage() {
                 {stats.lecture.quota_atteint} ont épuisé la traduction offerte du jour ·{' '}
                 {stats.lecture.quota_voix} l’essai des voix Plus · {stats.lecture.achat_commence}{' '}
                 paiements commencés, {stats.lecture.achat_reussi} réussis ·{' '}
-                {stats.lecture.offerts_vus} ont vu les livres anglais offerts,{' '}
-                {stats.lecture.offert_ajoute} en ont ajouté · {stats.lecture.invitation_appli}{' '}
+                {stats.lecture.catalogue_vu} ont vu la bibliothèque Lis et Lead,{' '}
+                {stats.lecture.catalogue_verrou} ont touché un livre réservé à Plus,{' '}
+                {stats.lecture.catalogue_ajoute} en ont ajouté un · {stats.lecture.invitation_appli}{' '}
                 invitations ouvertes dans TikTok, Instagram ou Facebook. Compté depuis le 28/11.
               </p>
             </>

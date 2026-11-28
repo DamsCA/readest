@@ -16,9 +16,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${SITE}/`, lastModified: maj, changeFrequency: 'weekly', priority: 1 },
     { url: `${SITE}/decouvrir`, lastModified: maj, changeFrequency: 'monthly', priority: 0.9 },
-    // The English classics we offer (28 Nov 2026).
+    // The Lis et Lead library (28 Nov 2026).
     {
-      url: `${SITE}/offerts`,
+      url: `${SITE}/bibliotheque`,
       lastModified: new Date('2026-11-28'),
       changeFrequency: 'monthly',
       priority: 0.8,

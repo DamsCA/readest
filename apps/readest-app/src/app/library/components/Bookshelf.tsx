@@ -28,7 +28,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { navigateToLibrary, navigateToReader, showReaderWindow } from '@/utils/nav';
-import ClassiquesOfferts from './ClassiquesOfferts';
+import CatalogueLisEtLead from './CatalogueLisEtLead';
 import {
   createBookFilter,
   createBookGroups,
@@ -104,7 +104,7 @@ type BookshelfListContext = {
   fixedColumns: number;
   // Scrolls with the books: the "Continue reading" card and the filter chips.
   header: React.ReactNode;
-  // Under the books: the English classics we offer (28 Nov 2026).
+  // Under the books: the Lis et Lead library, for Plus readers (28 Nov 2026).
   footer: React.ReactNode;
   // Room left under the last row (the phone's tab bar sits there).
   footerHeight: number;
@@ -740,7 +740,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       autoColumns: settings.libraryAutoColumns,
       fixedColumns: settings.libraryColumns,
       header: shelfHeader,
-      footer: isSelectMode ? null : <ClassiquesOfferts />,
+      footer: isSelectMode ? null : <CatalogueLisEtLead />,
       footerHeight: appService?.isMobile
         ? LIBRARY_TAB_BAR_HEIGHT + (safeAreaInsets?.bottom ?? 0) + 24
         : 34,

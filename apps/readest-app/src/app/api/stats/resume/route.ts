@@ -159,6 +159,9 @@ export async function GET(req: NextRequest) {
     'offerts_vus',
     'offert_ajoute',
     'invitation_appli',
+    'catalogue_vu',
+    'catalogue_verrou',
+    'catalogue_ajoute',
   ];
   const depuis = new Date(Date.now() - jours * 86_400_000).toISOString();
   const { data: lignes, error: erreurLecture } = await admin

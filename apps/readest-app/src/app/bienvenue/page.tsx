@@ -278,6 +278,10 @@ export default function BienvenuePage() {
             </p>
             <ul className='mb-8 mt-6 space-y-3 text-[15px]'>
               <Coche>Tout le gratuit, et en plus :</Coche>
+              <Coche>
+                La bibliothèque Lis et Lead : les grands classiques du développement personnel, en
+                français
+              </Coche>
               <Coche>Une traduction digne d’un traducteur : le sens, le ton, les expressions</Coche>
               <Coche>Des voix premium qui donnent vie à chaque page</Coche>
               <Coche>Toute votre bibliothèque en ligne, sur chaque appareil</Coche>

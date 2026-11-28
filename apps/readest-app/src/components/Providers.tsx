@@ -103,7 +103,7 @@ const finalizeTelemetryDecision = ({
 };
 
 /** Pages of text only, drawn on the server without the reader's engine (see below). */
-const PAGES_DE_TEXTE = new Set(['/decouvrir', '/offerts']);
+const PAGES_DE_TEXTE = new Set(['/decouvrir', '/offerts', '/bibliotheque']);
 
 const Providers = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();

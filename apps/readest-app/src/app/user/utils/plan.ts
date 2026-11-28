@@ -167,6 +167,13 @@ export function getPlanDetails(
             label: _('Tout le gratuit, et en plus :'),
           },
           {
+            // The Lis et Lead library (libs/ouiread/catalogue.ts, 28 Nov 2026).
+            label: _('La bibliothèque Lis et Lead'),
+            description: _(
+              'Les grands classiques du développement personnel, traduits en français : La Science de l’enrichissement, Le Fonceur, L’homme est ce qu’il pense… À lire et à écouter.',
+            ),
+          },
+          {
             label: _('Une traduction digne d’un traducteur'),
             description: _(
               'Le sens, le ton et les expressions : « il pleut des cordes », jamais « il pleut des chats et des chiens ». Du vrai français, du premier chapitre au dernier.',

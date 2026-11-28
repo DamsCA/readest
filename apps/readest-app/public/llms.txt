@@ -5,7 +5,7 @@
 ## Pages
 
 - [Découvrir Lis et Lead](https://lisetlead.com/decouvrir) : ce que fait la liseuse, comment l'utiliser, les questions fréquentes.
-- [Classiques anglais offerts](https://lisetlead.com/offerts) : cinq livres du domaine public à lire en français dans la liseuse (James Allen, Wallace D. Wattles, Florence Scovel Shinn, Russell H. Conwell, Marc Aurèle).
+- [La bibliothèque Lis et Lead](https://lisetlead.com/bibliotheque) : les grands classiques du développement personnel (Wallace D. Wattles, Peter B. Kyne, James Allen, Florence Scovel Shinn, Russell H. Conwell, P. T. Barnum, Benjamin Franklin, Orison Swett Marden…), traduits en français, à lire et à écouter, inclus dans Lis et Lead Plus.
 - [La liseuse](https://lisetlead.com/) : l'application elle-même (elle a besoin de JavaScript).
 
 ## En bref
@@ -15,7 +15,7 @@
 - Lecture à voix haute en français.
 - La bibliothèque, la page en cours, les surlignages et les notes suivent le lecteur sur tous ses appareils.
 - Livre offert à l'inscription : « Ça marche », de R. H. Jarrett (1926), dans une nouvelle traduction française.
-- Classiques anglais offerts, sans compte : As a Man Thinketh, The Science of Getting Rich, The Game of Life and How to Play It, Acres of Diamonds, Meditations.
+- La bibliothèque Lis et Lead (abonnement Plus) : La Science de l'enrichissement, Le Fonceur, L'homme est ce qu'il pense, Le jeu de la vie, Des hectares de diamants, L'art de gagner de l'argent, Le chemin de la fortune, et d'autres classiques traduits en français.
 - Contact : contact@lisetlead.com
 
 ## Questions fréquentes

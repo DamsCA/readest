@@ -73,6 +73,10 @@ const EVENEMENTS = new Set([
   'offerts_vus',
   'offert_ajoute',
   'invitation_appli',
+  // The Lis et Lead library, for Plus readers (28 Nov 2026).
+  'catalogue_vu',
+  'catalogue_verrou',
+  'catalogue_ajoute',
 ]);
 
 // Link previews and crawlers are not visitors. « lel-verif » marks our own
