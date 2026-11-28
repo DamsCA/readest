@@ -162,8 +162,7 @@ export default function OffertsPage() {
           ))}
         </dl>
         <p className='mt-8 text-sm text-[#101728]/55'>
-          Textes du domaine public issus du Projet Gutenberg (gutenberg.org), présentés avec une
-          couverture Lis et Lead.
+          Textes du domaine public, présentés avec une couverture Lis et Lead.
         </p>
       </section>
 

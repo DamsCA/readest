@@ -3,9 +3,10 @@ import liste from '../../../public/offerts/liste.json';
 /**
  * The English classics Lis et Lead offers (owner's go, 28 Nov 2026: « Oui, ces
  * trois-là » — a shelf of public-domain books to read in French). Their files
- * sit in public/offerts/: the EPUB (the Project Gutenberg text, with our cover
- * and a clean title), the cover in two sizes, and liste.json, which the phone
- * app reads too. They are made by ktaffilliate's offerts/fabriquer_epub.py;
+ * sit in public/offerts/: the EPUB (the public-domain text, its distributor's
+ * notices removed, with our cover and a clean title), the cover in two sizes,
+ * and liste.json, which the phone app reads too. They are made by
+ * ktaffilliate/lancement-lis-et-lead/classiques-offerts/fabriquer_epub.py;
  * `hash` is the book's fingerprint (utils/md5.ts, partialMD5), so a book
  * already in the library is recognised.
  */
