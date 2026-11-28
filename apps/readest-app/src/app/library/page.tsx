@@ -86,6 +86,8 @@ import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import WelcomeGift from './components/WelcomeGift';
 import InvitationInscription from './components/InvitationInscription';
+import { LIVRES_OFFERTS, fichierOffert } from '@/libs/ouiread/offerts';
+import { mesurer } from '@/utils/mesure';
 import Tutoriel from './components/Tutoriel';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
@@ -1013,6 +1015,32 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     metadata.coverImageFile = undefined;
     await updateBook(envConfig, updatedBook);
   };
+
+  // lisetlead.com/offerts: « Lire en français » leads here with ?offert=<id>.
+  // The book is added to the library, then opened (28 Nov 2026).
+  const offertTraite = useRef(false);
+  useEffect(() => {
+    const id = searchParams?.get('offert');
+    if (!id || !libraryLoaded || offertTraite.current) return;
+    offertTraite.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('offert');
+    window.history.replaceState(null, '', url.toString());
+    const livre = LIVRES_OFFERTS.find((l) => l.id === id);
+    if (!livre) return;
+    void (async () => {
+      const present = () =>
+        useLibraryStore.getState().library.some((b) => b.hash === livre.hash && !b.deletedAt);
+      if (!present()) {
+        const fichier = await fichierOffert(id);
+        if (!fichier) return;
+        await importBooks([{ file: fichier }], '');
+        mesurer('offert_ajoute');
+      }
+      if (present()) navigateToReader(router, [livre.hash]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, libraryLoaded]);
 
   const handleImportBooksFromFiles = async () => {
     setIsSelectMode(false);

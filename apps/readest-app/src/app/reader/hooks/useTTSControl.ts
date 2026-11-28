@@ -33,6 +33,7 @@ import { buildTTSMediaMetadata } from '@/utils/ttsMetadata';
 import { invokeUseBackgroundAudio } from '@/utils/bridge';
 import { estimateTTSTime } from '@/utils/ttsTime';
 import { useTTSMediaSession } from './useTTSMediaSession';
+import { mesurer } from '@/utils/mesure';
 
 interface UseTTSControlProps {
   bookKey: string;
@@ -224,6 +225,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       // answers 402 once a free reader's monthly taste is used, 429 once a
       // subscriber's monthly hours are, and 401 to a reader not signed in.
       if (engine === 'Fish Audio') {
+        if (status === 402) mesurer('quota_voix');
         // The reading never stops for this (22 Nov 2026, "the person must be able
         // to use the voices for free, but understand that Plus is much better"):
         // it goes on at once with the free standard voice, as the translation goes
@@ -755,6 +757,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   const handleTTSSpeak = async (event: CustomEvent) => {
     const { bookKey: ttsBookKey, range, index, oneTime = false } = event.detail;
     if (bookKey !== ttsBookKey) return;
+    mesurer('ecoute_lancee');
     // Guard against concurrent starts (e.g. rapid double-clicks on the TTS
     // icon). Without this, both invocations race past the `await`s below and
     // end up creating two TTSController instances that speak simultaneously.

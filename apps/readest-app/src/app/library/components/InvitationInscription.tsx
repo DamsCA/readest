@@ -91,10 +91,12 @@ export default function InvitationInscription() {
       return undefined;
     }
     const montrer = () => {
-      setAppli(appliHote());
+      const hote = appliHote();
+      setAppli(hote);
       setIphone(/iPhone|iPad|iPod/i.test(navigator.userAgent));
       setOuverte(true);
       mesurer('invitation_vue');
+      if (hote) mesurer('invitation_appli');
     };
     const attendre = () =>
       setTimeout(() => {
@@ -183,6 +185,16 @@ export default function InvitationInscription() {
             <p className='lel-invite__secours'>
               Rien ne s’ouvre ? Touchez ⋯ en haut de l’écran, puis « Ouvrir dans le navigateur ».
             </p>
+            {/* Inside these apps Google refuses to sign anyone in (its rule for embedded
+                browsers): visitors tried e-mail, then the browser, then Google, and gave
+                up (/stats, 28 Nov 2026). Here the e-mail is the way that works. */}
+            <a
+              className='lel-invite__google'
+              href={INSCRIPTION_EMAIL}
+              onClick={() => mesurer('invitation_email')}
+            >
+              Recevoir mes livres par e-mail
+            </a>
           </div>
         )}
         {APPLE && iphone && (
@@ -195,23 +207,27 @@ export default function InvitationInscription() {
             Recevoir mes livres avec Apple
           </button>
         )}
-        <button type='button' className='lel-invite__google' onClick={avecGoogle}>
-          <FcGoogle size={22} aria-hidden='true' />
-          Recevoir mes livres avec Google
-        </button>
+        {!appli && (
+          <button type='button' className='lel-invite__google' onClick={avecGoogle}>
+            <FcGoogle size={22} aria-hidden='true' />
+            Recevoir mes livres avec Google
+          </button>
+        )}
         {APPLE && !iphone && (
           <button type='button' className='lel-invite__apple' onClick={avecApple}>
             <FaApple size={20} aria-hidden='true' />
             Recevoir mes livres avec Apple
           </button>
         )}
-        <a
-          className='lel-invite__email'
-          href={INSCRIPTION_EMAIL}
-          onClick={() => mesurer('invitation_email')}
-        >
-          Avec mon adresse e-mail
-        </a>
+        {!appli && (
+          <a
+            className='lel-invite__email'
+            href={INSCRIPTION_EMAIL}
+            onClick={() => mesurer('invitation_email')}
+          >
+            Avec mon adresse e-mail
+          </a>
+        )}
         <p className='lel-invite__note'>Gratuit, sans carte bancaire</p>
         <button type='button' className='lel-invite__plus-tard' onClick={fermer}>
           Plus tard, je visite d’abord

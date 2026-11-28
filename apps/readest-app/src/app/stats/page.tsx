@@ -68,6 +68,20 @@ interface Stats {
     telegram: number;
     arrivee: number;
   };
+  lecture?: Record<
+    | 'livre_ouvert'
+    | 'traduction_lancee'
+    | 'ecoute_lancee'
+    | 'quota_atteint'
+    | 'quota_voix'
+    | 'plus_vu'
+    | 'achat_commence'
+    | 'achat_reussi'
+    | 'offerts_vus'
+    | 'offert_ajoute'
+    | 'invitation_appli',
+    number
+  >;
   tutoriel?: {
     vu: number;
     traduire: number;
@@ -402,6 +416,38 @@ export default function StatsPage() {
               <p className='lel-stats__petit'>
                 {stats.bio.arrivee} arrivés au bout du chemin
                 {stats.bio.telegram > 0 ? ` · ${stats.bio.telegram} clics vers Telegram` : ''}
+              </p>
+            </>
+          )}
+
+          {stats.lecture && (
+            <>
+              <h2>Dans la liseuse · {periode}</h2>
+              <div className='lel-stats__cartes'>
+                <div>
+                  <strong>{stats.lecture.livre_ouvert}</strong>
+                  <span>ont ouvert un livre</span>
+                </div>
+                <div>
+                  <strong>{stats.lecture.traduction_lancee}</strong>
+                  <span>ont lancé la traduction</span>
+                </div>
+                <div>
+                  <strong>{stats.lecture.ecoute_lancee}</strong>
+                  <span>ont lancé l’écoute</span>
+                </div>
+                <div>
+                  <strong>{stats.lecture.plus_vu}</strong>
+                  <span>ont vu l’offre Plus</span>
+                </div>
+              </div>
+              <p className='lel-stats__petit'>
+                {stats.lecture.quota_atteint} ont épuisé la traduction offerte du jour ·{' '}
+                {stats.lecture.quota_voix} l’essai des voix Plus · {stats.lecture.achat_commence}{' '}
+                paiements commencés, {stats.lecture.achat_reussi} réussis ·{' '}
+                {stats.lecture.offerts_vus} ont vu les livres anglais offerts,{' '}
+                {stats.lecture.offert_ajoute} en ont ajouté · {stats.lecture.invitation_appli}{' '}
+                invitations ouvertes dans TikTok, Instagram ou Facebook. Compté depuis le 28/11.
               </p>
             </>
           )}

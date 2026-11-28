@@ -11,6 +11,7 @@ import { googleProvider } from './google';
 import { getAPIBaseUrl } from '@/services/environment';
 import { eventDispatcher } from '@/utils/event';
 import i18n from '@/i18n/i18n';
+import { mesurer } from '@/utils/mesure';
 
 // Without the relay (the web app), the AI translation goes through the app's
 // own server (/api/ai/translate), which knows the reader's plan: subscribers
@@ -26,6 +27,7 @@ class PlusRequiredError extends Error {}
 const lockUntilMidnight = (plusRequired: boolean) => {
   if (Date.now() < lockedUntil) return;
   lockedUntil = nextUtcMidnightFrom(Date.now());
+  if (plusRequired) mesurer('quota_atteint');
   eventDispatcher.dispatch('toast', {
     timeout: 9000,
     type: 'info',

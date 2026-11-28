@@ -6,6 +6,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { getAccessToken } from '@/utils/access';
 import { StripeProductMetadata } from '@/types/payment';
 import { AvailablePlan, PlanType } from '@/types/quota';
+import { mesurer } from '@/utils/mesure';
 
 let stripePromise: Promise<StripeClient | null>;
 
@@ -46,6 +47,7 @@ export const createStripeCheckoutSession = async (
   productId: string,
   planType: PlanType = 'subscription',
 ): Promise<StripeCheckoutResponse> => {
+  mesurer('achat_commence');
   const token = await getAccessToken();
   const isEmbeddedCheckout = isTauriAppPlatform();
 

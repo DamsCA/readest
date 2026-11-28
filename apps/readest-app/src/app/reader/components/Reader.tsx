@@ -29,6 +29,7 @@ import { ProofreadRulesManager } from './ProofreadRules';
 import { Toast } from '@/components/Toast';
 import { getLocale } from '@/utils/misc';
 import { initDayjs } from '@/utils/time';
+import { mesurer } from '@/utils/mesure';
 import ReaderContent from './ReaderContent';
 
 /*
@@ -86,6 +87,7 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
   useReplicaPull({ kinds: ['dictionary', 'font', 'texture'] });
 
   useEffect(() => {
+    mesurer('livre_ouvert');
     mountAdditionalFonts(document);
     interceptWindowOpen();
     if (isTauriAppPlatform()) {

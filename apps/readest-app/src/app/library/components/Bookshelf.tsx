@@ -28,6 +28,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { navigateToLibrary, navigateToReader, showReaderWindow } from '@/utils/nav';
+import ClassiquesOfferts from './ClassiquesOfferts';
 import {
   createBookFilter,
   createBookGroups,
@@ -103,6 +104,8 @@ type BookshelfListContext = {
   fixedColumns: number;
   // Scrolls with the books: the "Continue reading" card and the filter chips.
   header: React.ReactNode;
+  // Under the books: the English classics we offer (28 Nov 2026).
+  footer: React.ReactNode;
   // Room left under the last row (the phone's tab bar sits there).
   footerHeight: number;
 };
@@ -145,7 +148,10 @@ BookshelfLinearList.displayName = 'BookshelfLinearList';
 
 const BookshelfHeader = ({ context }: { context?: BookshelfListContext }) => <>{context?.header}</>;
 const BookshelfFooter = ({ context }: { context?: BookshelfListContext }) => (
-  <div style={{ height: context?.footerHeight ?? 34 }} />
+  <>
+    {context?.footer}
+    <div style={{ height: context?.footerHeight ?? 34 }} />
+  </>
 );
 
 const GRID_VIRTUOSO_COMPONENTS: GridComponents<BookshelfListContext> = {
@@ -734,6 +740,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       autoColumns: settings.libraryAutoColumns,
       fixedColumns: settings.libraryColumns,
       header: shelfHeader,
+      footer: isSelectMode ? null : <ClassiquesOfferts />,
       footerHeight: appService?.isMobile
         ? LIBRARY_TAB_BAR_HEIGHT + (safeAreaInsets?.bottom ?? 0) + 24
         : 34,
@@ -742,6 +749,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       settings.libraryAutoColumns,
       settings.libraryColumns,
       shelfHeader,
+      isSelectMode,
       appService?.isMobile,
       safeAreaInsets?.bottom,
     ],

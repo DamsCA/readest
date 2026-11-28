@@ -59,6 +59,20 @@ const EVENEMENTS = new Set([
   'rappel_chapitre',
   'rappel_plus_clic',
   'app_inscription_email',
+  // Inside the reader, on the site and in the app (owner's ask, 28 Nov 2026:
+  // « analyser et améliorer le taux de conversion » — what happens after the
+  // sign-up was not measured at all).
+  'livre_ouvert',
+  'traduction_lancee',
+  'ecoute_lancee',
+  'quota_atteint',
+  'quota_voix',
+  'plus_vu',
+  'achat_commence',
+  'achat_reussi',
+  'offerts_vus',
+  'offert_ajoute',
+  'invitation_appli',
 ]);
 
 // Link previews and crawlers are not visitors. « lel-verif » marks our own

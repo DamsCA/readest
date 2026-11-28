@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import LienBibliotheque from './LienBibliotheque';
+import MesureVue from './MesureVue';
 
 // The page people land on from a shared link (22 Nov 2026): what Lis et Lead
 // does, shown rather than told, the gift book, the prices, and one button.
@@ -75,6 +76,7 @@ const Question = ({ q, children }: { q: string; children: React.ReactNode }) => 
 export default function BienvenuePage() {
   return (
     <main className='h-screen overflow-y-auto bg-[#faf6ee] text-[#101728] antialiased'>
+      <MesureVue />
       {/* En-tête + promesse */}
       <section className='bg-[radial-gradient(120%_80%_at_80%_0%,#1d273f_0%,#101728_55%,#0b1120_100%)] text-[#f3ecdd]'>
         <header className='mx-auto flex max-w-5xl items-center justify-between px-5 py-4 sm:px-8'>

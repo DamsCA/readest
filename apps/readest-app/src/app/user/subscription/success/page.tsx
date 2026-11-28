@@ -9,6 +9,7 @@ import { getAccessToken } from '@/utils/access';
 import { PlanType } from '@/types/quota';
 import { VerifiedIAP } from '@/libs/payment/iap/types';
 import Spinner from '@/components/Spinner';
+import { mesurer } from '@/utils/mesure';
 
 const STRIPE_CHECK_URL = `${getAPIBaseUrl()}/stripe/check`;
 const APPLE_IAP_VERIFY_URL = `${getNodeAPIBaseUrl()}/apple/iap-verify`;
@@ -50,7 +51,10 @@ const SuccessPageWithSearchParams = () => {
   const orderId = searchParams?.get('order_id');
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    mesurer('achat_reussi');
+  }, []);
 
   const updateStripeSessionStatus = async () => {
     try {

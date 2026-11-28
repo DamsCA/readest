@@ -9,6 +9,7 @@ import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { saveViewSettings } from '@/helpers/settings';
 import { isTranslationAvailable } from '@/services/translators/utils';
 import Button from '@/components/Button';
+import { mesurer } from '@/utils/mesure';
 
 const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
   const _ = useTranslation();
@@ -66,7 +67,10 @@ const TranslationToggler = ({ bookKey }: { bookKey: string }) => {
       aria-label={_('Toggle Translation')}
       className='lel-tuto-traduire'
       disabled={!translationAvailable && !translationEnabled}
-      onClick={() => setTranslationEnabled(!translationEnabled)}
+      onClick={() => {
+        if (!translationEnabled) mesurer('traduction_lancee');
+        setTranslationEnabled(!translationEnabled);
+      }}
       label={
         translationAvailable
           ? translationEnabled

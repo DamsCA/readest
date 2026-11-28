@@ -145,7 +145,38 @@ export async function GET(req: NextRequest) {
     console.error('stats stripe:', e);
     paye = { erreur: 'Stripe ne répond pas pour le moment.' };
   }
-  const reponse = json({ ...stats, jours, argent: paye });
+  // What readers do once inside (28 Nov 2026): unique visitors per event over the
+  // period, read straight from public.visites (the owner's devices never reach it).
+  const LECTURE = [
+    'livre_ouvert',
+    'traduction_lancee',
+    'ecoute_lancee',
+    'quota_atteint',
+    'quota_voix',
+    'plus_vu',
+    'achat_commence',
+    'achat_reussi',
+    'offerts_vus',
+    'offert_ajoute',
+    'invitation_appli',
+  ];
+  const depuis = new Date(Date.now() - jours * 86_400_000).toISOString();
+  const { data: lignes, error: erreurLecture } = await admin
+    .from('visites')
+    .select('evenement, visiteur')
+    .in('evenement', LECTURE)
+    .gte('at', depuis)
+    .limit(20000);
+  if (erreurLecture) console.error('stats lecture:', erreurLecture.message);
+  const lecture: Record<string, number> = Object.fromEntries(LECTURE.map((e) => [e, 0]));
+  const vus = new Set<string>();
+  for (const l of (lignes ?? []) as { evenement: string; visiteur: string | null }[]) {
+    const cle = `${l.evenement}|${l.visiteur ?? Math.random()}`;
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    lecture[l.evenement] = (lecture[l.evenement] ?? 0) + 1;
+  }
+  const reponse = json({ ...stats, jours, argent: paye, lecture });
   // Five years; SameSite=None so the bio page's events (sent from
   // legenieendormi.web.app) carry it too where the browser allows.
   reponse.headers.append(

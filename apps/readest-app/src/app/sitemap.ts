@@ -16,6 +16,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${SITE}/`, lastModified: maj, changeFrequency: 'weekly', priority: 1 },
     { url: `${SITE}/decouvrir`, lastModified: maj, changeFrequency: 'monthly', priority: 0.9 },
+    // The English classics we offer (28 Nov 2026).
+    {
+      url: `${SITE}/offerts`,
+      lastModified: new Date('2026-11-28'),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
     // /guide, the address everyone is given; /guide.html leads there (Cloudflare's own redirect).
     { url: `${SITE}/guide`, lastModified: maj, changeFrequency: 'monthly', priority: 0.6 },
   ];
