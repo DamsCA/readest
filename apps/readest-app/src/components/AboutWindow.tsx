@@ -6,12 +6,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { checkForAppUpdates } from '@/helpers/updater';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
-import {
-  APP_DISPLAY_NAME,
-  UPSTREAM_SOURCE_URL,
-  getModifiedOn,
-  getSourceCodeUrl,
-} from '@/services/constants';
+import { APP_DISPLAY_NAME, getModifiedOn, getSourceCodeUrl } from '@/services/constants';
 import Dialog from './Dialog';
 import Link from './Link';
 
@@ -132,7 +127,7 @@ export const AboutWindow = () => {
             dir='ltr'
           >
             <p className='text-base-content text-sm font-semibold'>
-              {_('{{name}} is a modified version of Readest, modified on {{date}}.', {
+              {_('{{name}} is free software, modified on {{date}}.', {
                 name: APP_DISPLAY_NAME,
                 date: new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(
                   new Date(getModifiedOn()),
@@ -158,10 +153,6 @@ export const AboutWindow = () => {
               {_('The complete source code of this version:')}{' '}
               <Link href={getSourceCodeUrl()} className='text-primary underline'>
                 {_('Source code')}
-              </Link>
-              {' · '}
-              <Link href={UPSTREAM_SOURCE_URL} className='text-primary underline'>
-                Readest
               </Link>
             </p>
           </div>

@@ -50,7 +50,7 @@ export class OpenRouterProvider implements AIProvider {
       // compatible backends (they ignore unknown headers).
       headers: {
         'HTTP-Referer': 'https://readest.com',
-        'X-Title': 'Readest',
+        'X-Title': 'Lis et Lead',
       },
       // Route chat completions / embeddings through our environment-aware
       // fetch so streaming responses bypass the renderer's CORS sandbox

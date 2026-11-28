@@ -6,7 +6,7 @@
  * switched on per build with NEXT_PUBLIC_CLOUD_ENABLED=true: the web deploy
  * sets it, and the Google Play build leaves it off until the app ships with
  * accounts. Readest's own services stay off in every build: its purchases,
- * its usage statistics, its demo shelf, shared links and "Send to Readest".
+ * its usage statistics, its demo shelf, shared links and "Send to Lis et Lead".
  */
 export const READEST_CLOUD_ENABLED = process.env['NEXT_PUBLIC_CLOUD_ENABLED'] === 'true';
 
@@ -20,7 +20,7 @@ export const DEMO_BOOKS_ENABLED = false;
 export const READEST_PREMIUM_ENABLED = false;
 
 /**
- * "Send to Readest" (books sent by e-mail to an inbox) needs Readest's e-mail
+ * "Send to Lis et Lead" (books sent by e-mail to an inbox) needs Readest's e-mail
  * worker and the send_* tables: not offered, so the inbox is never polled.
  */
 export const SEND_TO_READEST_ENABLED = false;

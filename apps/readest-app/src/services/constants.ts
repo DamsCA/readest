@@ -808,7 +808,7 @@ export const CJK_FONTS_PATTENS = new RegExp(
 
 export const BOOK_IDS_SEPARATOR = '+';
 
-export const DOWNLOAD_READEST_URL = 'https://readest.com?utm_source=readest_web';
+export const DOWNLOAD_READEST_URL = 'https://lisetlead.com/decouvrir';
 
 // The app's name, shown in the library header. Provisional until the owner
 // picks the final name for the store listing.
@@ -819,15 +819,14 @@ export const APP_DISPLAY_NAME = 'Lis et Lead';
 // The build stamps the exact commit and date; a local build falls back to the
 // branch and to the day the redesign began.
 export const SOURCE_CODE_REPO_URL = 'https://github.com/DamsCA/readest';
-export const UPSTREAM_SOURCE_URL = 'https://github.com/readest/readest';
 export const getSourceCodeUrl = () => {
   const commit = process.env['NEXT_PUBLIC_SOURCE_COMMIT'];
   return `${SOURCE_CODE_REPO_URL}/tree/${commit || 'play-release'}`;
 };
 export const getModifiedOn = () => process.env['NEXT_PUBLIC_BUILD_DATE'] || '2026-11-21';
 
-export const READEST_WEB_BASE_URL = 'https://web.readest.com';
-export const READEST_NODE_BASE_URL = 'https://node.readest.com';
+export const READEST_WEB_BASE_URL = 'https://lisetlead.com';
+export const READEST_NODE_BASE_URL = 'https://lisetlead.com';
 
 export const SHARE_BASE_URL = `${READEST_WEB_BASE_URL}/s`;
 export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
@@ -835,7 +834,7 @@ export const SHARE_EXPIRATION_DAYS = [1, 3, 7] as const;
 // Send to Readest — the domain inbound capture emails are addressed to, the
 // R2 bucket holding raw inbound payloads, and the per-user cap on undrained
 // inbox items (defense against a leaked address).
-export const SEND_EMAIL_DOMAIN = 'readest.com';
+export const SEND_EMAIL_DOMAIN = 'lisetlead.com';
 export const SEND_INBOX_BUCKET = 'readest-send-inbox';
 export const SEND_INBOX_PENDING_LIMIT = 50;
 // Hard cap on the size of a single uploaded EPUB the browser extension can
@@ -871,9 +870,9 @@ export const READEST_NIGHTLY_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.
 export const READEST_UPDATER_PUBKEY =
   'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFMEQ1QjE2OEU1NEIzNTEKUldSUnMxU09GbHNOdmpEaWFMT1crRFpEV2VORzQ2MklxaFc0M1R0ci9xY2c1bENXS0xhM1R1L2sK';
 
-export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://storage.readest.com';
+export const READEST_PUBLIC_STORAGE_BASE_URL = 'https://lisetlead.com';
 
-export const READEST_OPDS_USER_AGENT = 'Readest/1.0 (OPDS Browser)';
+export const READEST_OPDS_USER_AGENT = 'LisEtLead/1.0 (OPDS Browser)';
 
 export const SYNC_PROGRESS_INTERVAL_SEC = 3;
 export const SYNC_NOTES_INTERVAL_SEC = 5;

@@ -33,7 +33,7 @@ export default function AppLockScreen() {
     if (biometricInFlightRef.current) return;
     biometricInFlightRef.current = true;
     try {
-      const ok = await authenticateWithBiometrics(_('Unlock Readest'));
+      const ok = await authenticateWithBiometrics(_('Unlock Lis et Lead'));
       if (ok) unlock();
     } finally {
       biometricInFlightRef.current = false;
@@ -127,7 +127,7 @@ export default function AppLockScreen() {
           {_('Enter your PIN')}
         </h1>
         <p className='text-base-content/60 mb-8 text-sm leading-relaxed'>
-          {_('Readest is locked. Enter your 4-digit PIN to continue.')}
+          {_('Lis et Lead is locked. Enter your 4-digit PIN to continue.')}
         </p>
 
         <PinInput
