@@ -116,7 +116,7 @@ const withCoverCard = (cover: string, title: string, author: string | null) => (
         <div style={{ fontSize: 22, color: '#0066cc', fontWeight: 500 }}>
           Shared via Lis et Lead
         </div>
-        <div style={{ fontSize: 18, color: '#a3a3a3' }}>readest.com</div>
+        <div style={{ fontSize: 18, color: '#a3a3a3' }}>lisetlead.com</div>
       </div>
     </div>
   </div>
@@ -155,7 +155,7 @@ const textOnlyCard = (title: string, author: string | null) => (
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       <div style={{ fontSize: 26, color: '#0066cc', fontWeight: 500 }}>Shared via Lis et Lead</div>
-      <div style={{ fontSize: 20, color: '#a3a3a3' }}>readest.com</div>
+      <div style={{ fontSize: 20, color: '#a3a3a3' }}>lisetlead.com</div>
     </div>
   </div>
 );

@@ -4,7 +4,6 @@ import { isMacPlatform } from '@/services/environment';
 import { getShortcutsForDisplay } from '@/helpers/shortcuts';
 import { formatKeyForDisplay } from '@/utils/shortcutKeys';
 import Dialog from './Dialog';
-import Link from './Link';
 
 export const setShortcutsDialogVisible = (visible: boolean) => {
   const dialog = document.getElementById('shortcuts_help');
@@ -125,14 +124,6 @@ export const KeyboardShortcutsHelp = () => {
           <div className='md:grid md:grid-cols-2 md:gap-6'>
             <div>{leftColumn.map(renderSection)}</div>
             <div>{rightColumn.map(renderSection)}</div>
-          </div>
-          <div className='border-base-200 mt-2 border-t pt-3 text-center'>
-            <Link
-              href='https://github.com/readest/readest/wiki/Keyboard-Shortcuts-Reference-Guide'
-              className='text-primary text-sm underline'
-            >
-              {_('View all keyboard shortcuts')}
-            </Link>
           </div>
         </div>
       )}

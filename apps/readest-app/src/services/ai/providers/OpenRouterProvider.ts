@@ -49,7 +49,7 @@ export class OpenRouterProvider implements AIProvider {
       // Optional OpenRouter app attribution. Harmless for other OpenAI-
       // compatible backends (they ignore unknown headers).
       headers: {
-        'HTTP-Referer': 'https://readest.com',
+        'HTTP-Referer': 'https://lisetlead.com',
         'X-Title': 'Lis et Lead',
       },
       // Route chat completions / embeddings through our environment-aware

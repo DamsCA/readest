@@ -73,7 +73,7 @@ export class ReadwiseClient {
       title: book.title,
       author: book.author,
       ...(isPublicUrl(book.coverImageUrl) ? { image_url: book.coverImageUrl } : {}),
-      source_type: 'readest',
+      source_type: 'lisetlead',
       category: 'books',
       note: note.note || undefined,
       location: note.page,

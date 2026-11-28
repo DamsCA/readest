@@ -657,7 +657,7 @@ const actionItems = [
   {
     id: 'action.about',
     labelKey: _('About Lis et Lead'),
-    keywords: ['about', 'readest', 'version', 'info'],
+    keywords: ['about', 'lis et lead', 'version', 'info'],
   },
   {
     id: 'action.telemetry',
