@@ -5,7 +5,7 @@
 ## Pages
 
 - [Découvrir Lis et Lead](https://lisetlead.com/decouvrir) : ce que fait la liseuse, comment l'utiliser, les questions fréquentes.
-- [La bibliothèque Lis et Lead](https://lisetlead.com/bibliotheque) : les grands classiques du développement personnel (Wallace D. Wattles, Peter B. Kyne, James Allen, Florence Scovel Shinn, Russell H. Conwell, P. T. Barnum, Benjamin Franklin, Orison Swett Marden…), traduits en français, à lire et à écouter, inclus dans Lis et Lead Plus.
+- [La bibliothèque Lis et Lead](https://lisetlead.com/bibliotheque) : les grands classiques du développement personnel (Wallace D. Wattles, Peter B. Kyne, James Allen, Florence Scovel Shinn, Russell H. Conwell, P. T. Barnum, Benjamin Franklin, Orison Swett Marden, Samuel Smiles, Elbert Hubbard, Ralph Waldo Trine, William Walker Atkinson…), traduits en français, à lire et à écouter, inclus dans Lis et Lead Plus.
 - [La liseuse](https://lisetlead.com/) : l'application elle-même (elle a besoin de JavaScript).
 
 ## En bref
