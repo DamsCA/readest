@@ -1038,7 +1038,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         if (!resultat.ok) {
           if (resultat.raison !== 'reseau') {
             mesurer('catalogue_verrou');
-            router.push(
+            // A full navigation: a router push made while the library is still
+            // settling was lost (tested 28 Nov 2026).
+            window.location.assign(
               pageDeverrouillage(resultat.raison === 'connexion' ? 'anonyme' : 'gratuit', id),
             );
           }
